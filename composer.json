@@ -6,15 +6,6 @@
     "autoload": {
         "psr-4": {
             "App\\": "app/"
-        },
-        "classmap": [
-            "app/config",
-            "app/controllers",
-            "app/helpers",
-            "app/middleware",
-            "app/models",
-            "app/services",
-            "app/views"
-        ]
+        }
     }
 }
