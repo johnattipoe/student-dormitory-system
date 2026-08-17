@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.role == 'admin';
+    }
+
+    function isHouseMaster() {
+      return isSignedIn() && request.auth.token.role == 'house_master';
+    }
+
+    function isHouseParent() {
+      return isSignedIn() && request.auth.token.role == 'houseparent';
+    }
+
+    function isSecurity() {
+      return isSignedIn() && request.auth.token.role == 'security';
+    }
+
+    function isNurse() {
+      return isSignedIn() && request.auth.token.role == 'nurse';
+    }
+
+    function isStudent() {
+      return isSignedIn() && request.auth.token.role == 'student';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (isAdmin() || isOwner(userId) || isHouseMaster() || isHouseParent() || isSecurity() || isNurse());
+      allow create: if isSignedIn() && (isAdmin() || isOwner(userId));
+      allow update, delete: if isSignedIn() && (isAdmin() || isOwner(userId));
+    }
+
+    match /students/{studentId} {
+      allow read: if isSignedIn() && (isAdmin() || isHouseMaster() || isHouseParent() || isSecurity() || isNurse() || isOwner(resource.data.userId));
+      allow create: if isSignedIn() && (isAdmin() || isHouseMaster() || isNurse());
+      allow update, delete: if isSignedIn() && (isAdmin() || isHouseMaster() || isNurse());
+    }
+
+    match /houses/{houseId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn() && (isAdmin() || isHouseMaster());
+    }
+
+    match /rooms/{roomId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn() && (isAdmin() || isHouseMaster() || isHouseParent());
+    }
+
+    match /attendance/{attendanceId} {
+      allow read: if isSignedIn() && (isAdmin() || isHouseMaster() || isHouseParent() || isSecurity() || isNurse());
+      allow create, update, delete: if isSignedIn() && (isAdmin() || isHouseMaster() || isSecurity());
+    }
+
+    match /visitors/{visitorId} {
+      allow read: if isSignedIn() && (isAdmin() || isHouseMaster() || isHouseParent() || isSecurity());
+      allow create, update, delete: if isSignedIn() && (isAdmin() || isSecurity());
+    }
+
+    match /incidents/{incidentId} {
+      allow read: if isSignedIn() && (isAdmin() || isHouseMaster() || isHouseParent() || isSecurity() || isNurse());
+      allow create, update, delete: if isSignedIn() && (isAdmin() || isSecurity() || isNurse());
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn() && (isAdmin() || isHouseMaster() || isSecurity() || isNurse());
+    }
+
+    match /medical_records/{recordId} {
+      allow read: if isSignedIn() && (isAdmin() || isNurse() || isHouseParent() || isStudent());
+      allow create, update, delete: if isSignedIn() && (isAdmin() || isNurse());
+    }
+
+    match /activity_logs/{logId} {
+      allow read: if isSignedIn() && (isAdmin() || isHouseMaster() || isHouseParent() || isSecurity() || isNurse());
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

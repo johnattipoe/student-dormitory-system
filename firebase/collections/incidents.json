@@ -1,0 +1,22 @@
+{
+  "collection": "incidents",
+  "description": "Security, health, and dormitory incident records.",
+  "fields": {
+    "title": "string",
+    "description": "string",
+    "studentId": "string|null",
+    "priority": "string",
+    "status": "string",
+    "createdAt": "timestamp",
+    "updatedAt": "timestamp"
+  },
+  "sample": {
+    "title": "Noise complaint",
+    "description": "Student reported loud noise after curfew.",
+    "studentId": "STD-1001",
+    "priority": "medium",
+    "status": "open",
+    "createdAt": "2026-08-12T10:30:00Z",
+    "updatedAt": "2026-08-12T10:30:00Z"
+  }
+}

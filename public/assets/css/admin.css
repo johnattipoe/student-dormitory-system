@@ -1,0 +1,17 @@
+/* Admin module — Users, Houses, Settings, Activity Logs */
+
+/* Users table: role badges get a subtle color per role for fast scanning */
+.badge.bg-secondary.text-uppercase { letter-spacing: .04em; font-size: .65rem; }
+
+/* Settings page: group related time inputs visually */
+#settingsPage .row.g-3 > .col-md-6 { border-left: 2px solid #eef1f7; padding-left: 1rem; }
+
+/* Activity log table: monospace action codes, muted timestamps */
+table code { background: #f0f2f8; color: var(--sds-primary-dark, #24488f); padding: .1rem .4rem; border-radius: 4px; font-size: .78rem; }
+
+/* Quick-links row on the admin dashboard */
+.content-wrapper .card .btn + .btn { margin-left: .35rem; }
+
+/* CSV export button */
+#exportCsv { border-style: dashed; }
+#exportCsv:hover { border-style: solid; }

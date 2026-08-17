@@ -1,0 +1,7 @@
+.login-body {
+  min-height: 100vh;
+  margin: 0;
+  padding: 1rem;
+  background: linear-gradient(135deg, #2f5fbb 0%, #101a2f 100%);
+}
+.login-card { width: 100%; max-width: 400px; border-radius: 16px; }

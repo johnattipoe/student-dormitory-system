@@ -1,0 +1,10 @@
+/* Security module — visitor register/check-in/check-out, on-premises board */
+
+/* On-premises table refreshed live by security.js — subtle flash on update */
+#onPremisesTable { transition: background-color .3s ease; }
+
+/* Check-in / check-out action buttons, sized for quick tapping at a gate desk */
+.btn-success, .btn-dark { min-width: 110px; }
+
+/* Registered-but-not-checked-in visitors */
+.badge.bg-secondary { background-color: #6c757d !important; }

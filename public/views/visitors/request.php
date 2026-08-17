@@ -1,0 +1,55 @@
+<?php
+require __DIR__ . '/../../../bootstrap.php';
+$allowedRoles = [ROLE_STUDENT];
+require APP_ROOT . '/app/middleware/RoleMiddleware.php';
+
+$pageTitle = 'Visitor Request';
+$errors = $_SESSION['_errors'] ?? []; unset($_SESSION['_errors']);
+$old = $_SESSION['_old'] ?? []; unset($_SESSION['_old']);
+
+$navItems = [
+    ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/student/dashboard/index.php')],
+    ['icon' => 'bi-person-badge', 'label' => 'Visitor Request', 'href' => url('views/visitors/request.php'), 'active' => true],
+];
+
+require APP_ROOT . '/app/views/components/header.php';
+require APP_ROOT . '/app/views/components/sidebar.php';
+?>
+<div class="main-content">
+    <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
+    <div class="content-wrapper">
+        <div class="card stat-card p-4" style="max-width:720px">
+            <h5 class="mb-3">Submit Visitor Request</h5>
+            <form method="POST" action="<?= url('views/visitors/request.php') ?>">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Visitor Name</label>
+                        <input name="visitorName" class="form-control" value="<?= e($old['visitorName'] ?? '') ?>" required>
+                        <?php if (!empty($errors['visitorName'])): ?><div class="text-danger small"><?= e($errors['visitorName']) ?></div><?php endif; ?>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Phone</label>
+                        <input name="phone" class="form-control" value="<?= e($old['phone'] ?? '') ?>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Relationship</label>
+                        <input name="relationship" class="form-control" value="<?= e($old['relationship'] ?? '') ?>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Visit Date</label>
+                        <input type="date" name="visitDate" class="form-control" value="<?= e($old['visitDate'] ?? '') ?>">
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label">Purpose</label>
+                        <textarea name="purpose" class="form-control"><?= e($old['purpose'] ?? '') ?></textarea>
+                    </div>
+                </div>
+                <div class="mt-4 d-flex gap-2">
+                    <button class="btn btn-primary">Submit Request</button>
+                    <a href="<?= url('views/student/visitors/index.php') ?>" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php require APP_ROOT . '/app/views/components/footer.php'; ?>

@@ -1,0 +1,20 @@
+/* Nurse module — medical records, emergency cases */
+
+/* Emergency-armed state toggled by medical.js when the checkbox is checked */
+body.emergency-armed #isEmergency + label,
+body.emergency-armed label[for="isEmergency"] {
+  font-weight: 700;
+}
+body.emergency-armed .card.stat-card {
+  box-shadow: 0 0 0 2px #dc3545, 0 2px 10px rgba(220,53,69,.15);
+}
+
+/* Overdue follow-up rows, set via data-followup + medical.js */
+tr.table-warning td { font-weight: 500; }
+
+/* Emergency cases page heading */
+.text-danger .bi-exclamation-octagon { animation: nurse-pulse 1.6s ease-in-out infinite; }
+@keyframes nurse-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}

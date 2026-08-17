@@ -1,0 +1,19 @@
+{
+  "projectId": "dormitory-monitoring-sys-d3cc7",
+  "database": {
+    "rules": "firestore.rules"
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    }
+  }
+}

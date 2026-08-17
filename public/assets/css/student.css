@@ -1,0 +1,12 @@
+/* Student module — self-service dashboard, profile, room, notifications */
+
+/* Notification list items fade slightly once viewed (student.js adds this on click) */
+.border-bottom.py-2 { cursor: pointer; transition: opacity .2s ease; }
+.border-bottom.py-2:hover { background: #fafbfd; }
+
+/* Roommates list */
+.list-group-item { border-left: none; border-right: none; }
+.list-group-item:first-child { border-top: none; }
+
+/* Read-only profile table */
+.table-borderless th { color: #6c757d; font-weight: 500; width: 160px; }

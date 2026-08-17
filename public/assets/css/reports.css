@@ -1,0 +1,13 @@
+/* Reports module — attendance/occupancy/health charts, printable summaries */
+
+.report-chart, canvas[id$="Chart"] { max-width: 100%; }
+
+/* Print-friendly output when using .btn-print (reports.js) */
+@media print {
+  .sidebar, .topbar, .btn, #notifBell { display: none !important; }
+  .main-content { width: 100% !important; }
+  .card.stat-card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+}
+
+/* Report summary stat row */
+.content-wrapper .row.g-3 .fs-3 { line-height: 1.1; }

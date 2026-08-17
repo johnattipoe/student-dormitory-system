@@ -1,0 +1,13 @@
+/* Senior Houseparent module — visitor requests, attendance oversight */
+
+/* Pending visitor-request rows get a soft highlight until decided */
+tr:has(.badge.bg-warning) { background: #fffbea; }
+
+/* Approve / reject buttons: tighten spacing since they sit in a table cell */
+form .btn-group .btn,
+form .btn-success + .btn-danger,
+form .btn-success,
+form .btn-danger { padding: .2rem .5rem; }
+
+/* Visitor request status badges */
+.badge.bg-warning.text-capitalize { color: #664d03; }

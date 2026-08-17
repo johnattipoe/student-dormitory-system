@@ -1,0 +1,6 @@
+.git
+.gitignore
+.env
+firebase-service-account.json
+storage/logs/*
+node_modules

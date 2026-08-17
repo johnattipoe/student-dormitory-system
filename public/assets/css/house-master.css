@@ -1,0 +1,10 @@
+/* House Master module — house-scoped dashboard, room occupancy, incidents */
+
+/* Highlight the "open incidents" stat card when count > 0 (paired with house-master.js) */
+.stat-card.border-danger { border: 1px solid #f5c2c7 !important; box-shadow: 0 2px 12px rgba(220,53,69,.12); }
+
+/* House summary header on the house-master dashboard */
+.content-wrapper h5 { border-bottom: 1px solid #e9ecef; padding-bottom: .5rem; }
+
+/* Room occupancy progress bars, slightly taller for readability at this density */
+.card .progress { min-width: 120px; }

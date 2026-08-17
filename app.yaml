@@ -1,0 +1,3 @@
+runtime: php83
+
+entrypoint: serve public

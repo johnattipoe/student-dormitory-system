@@ -1,0 +1,30 @@
+{
+  "collection": "students",
+  "description": "Student profile data for dormitory residents.",
+  "fields": {
+    "userId": "string",
+    "studentId": "string",
+    "firstName": "string",
+    "lastName": "string",
+    "email": "string",
+    "phone": "string",
+    "course": "string",
+    "houseId": "string|null",
+    "status": "string",
+    "createdAt": "timestamp",
+    "updatedAt": "timestamp"
+  },
+  "sample": {
+    "userId": "demo-user-id",
+    "studentId": "STD-1001",
+    "firstName": "Jane",
+    "lastName": "Doe",
+    "email": "jane@example.com",
+    "phone": "+254700000001",
+    "course": "Computer Science",
+    "houseId": "house-1",
+    "status": "active",
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  }
+}
