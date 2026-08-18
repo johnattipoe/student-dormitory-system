@@ -10,24 +10,29 @@
 namespace App\Repositories;
 
 use App\Models\Student;
-use Google\Cloud\Firestore\CollectionReference;
+use App\Services\FirebaseService;
 
+/**
+ * Example Repository - Wraps data access for Student entities
+ * 
+ * In production, inject FirebaseService via dependency injection
+ * and call its methods: getDocument(), getCollection(), addDocument(), etc.
+ */
 class StudentRepository
 {
-    private CollectionReference $collection;
+    private FirebaseService $firebase;
     
-    public function __construct(private \App\Services\FirebaseService $firebase)
+    public function __construct()
     {
-        $this->collection = $firebase->collection('students');
+        $this->firebase = FirebaseService::getInstance();
     }
     
     /**
      * Find a student by ID
      */
-    public function findById(string $id): ?Student
+    public function findById(string $id): ?array
     {
-        $doc = $this->collection->document($id)->snapshot();
-        return $doc->exists() ? $this->hydrate($doc) : null;
+        return $this->firebase->getDocument('students', $id);
     }
     
     /**
@@ -35,11 +40,7 @@ class StudentRepository
      */
     public function findActive(): array
     {
-        $docs = $this->collection
-            ->where('status', '==', 'active')
-            ->documents();
-        
-        return array_map(fn($doc) => $this->hydrate($doc), $docs->rows());
+        return $this->firebase->where('students', 'status', '==', 'active');
     }
     
     /**
@@ -47,11 +48,7 @@ class StudentRepository
      */
     public function findByHouseId(string $houseId): array
     {
-        $docs = $this->collection
-            ->where('house_id', '==', $houseId)
-            ->documents();
-        
-        return array_map(fn($doc) => $this->hydrate($doc), $docs->rows());
+        return $this->firebase->where('students', 'house_id', '==', $houseId);
     }
     
     /**
@@ -59,8 +56,7 @@ class StudentRepository
      */
     public function create(array $data): string
     {
-        $docRef = $this->collection->add($data);
-        return $docRef->id();
+        return $this->firebase->addDocument('students', $data);
     }
     
     /**
@@ -68,7 +64,7 @@ class StudentRepository
      */
     public function update(string $id, array $data): void
     {
-        $this->collection->document($id)->update($data);
+        $this->firebase->updateDocument('students', $id, $data);
     }
     
     /**
@@ -76,14 +72,6 @@ class StudentRepository
      */
     public function delete(string $id): void
     {
-        $this->collection->document($id)->delete();
-    }
-    
-    /**
-     * Hydrate Firestore document into Student model
-     */
-    private function hydrate($doc): Student
-    {
-        return new Student($doc->id(), $doc->data());
+        $this->firebase->deleteDocument('students', $id);
     }
 }
