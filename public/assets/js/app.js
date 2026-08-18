@@ -142,12 +142,19 @@ SDS.submitAction = function (action, fields) {
   form.submit();
 };
 
-SDS.showLoading = function () {
+SDS.showLoading = function (message) {
   const spinner = document.getElementById('loadingSpinner');
-  if (spinner) {
-    spinner.classList.remove('d-none');
-    spinner.classList.add('d-flex');
+  if (!spinner) return;
+  
+  // Update loading message if provided
+  if (message) {
+    const msgEl = spinner.querySelector('.small.text-muted');
+    if (msgEl) msgEl.textContent = message;
   }
+  
+  spinner.classList.remove('d-none');
+  spinner.classList.add('d-flex');
+  document.body.style.overflow = 'hidden'; // Prevent scrolling during loading
 };
 
 SDS.hideLoading = function () {
@@ -156,6 +163,7 @@ SDS.hideLoading = function () {
     spinner.classList.add('d-none');
     spinner.classList.remove('d-flex');
   }
+  document.body.style.overflow = 'auto'; // Restore scrolling
 };
 
 /** Toast helper — SweetAlert2 toast if available, else a lightweight Bootstrap-style fallback. */
@@ -173,19 +181,46 @@ SDS.toast = function (type, message) {
 };
 
 /** Small fetch wrapper: JSON in, JSON out, same-origin credentials, basic error handling. */
-SDS.postJSON = async function (url, data) {
-  const res = await fetch(url, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-    body: JSON.stringify(data || {}),
-  });
-  if (!res.ok) throw new Error('Request failed: ' + res.status);
-  return res.json();
+SDS.postJSON = async function (url, data, options) {
+  options = options || {};
+  const showSpinner = options.showLoading !== false; // Default true
+  
+  if (showSpinner) SDS.showLoading(options.loadingMessage);
+  
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify(data || {}),
+    });
+    if (!res.ok) throw new Error('Request failed: ' + res.status);
+    const result = await res.json();
+    if (showSpinner) SDS.hideLoading();
+    return result;
+  } catch (e) {
+    if (showSpinner) SDS.hideLoading();
+    throw e;
+  }
 };
 
-SDS.getJSON = async function (url) {
-  const res = await fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-  if (!res.ok) throw new Error('Request failed: ' + res.status);
-  return res.json();
+SDS.getJSON = async function (url, options) {
+  options = options || {};
+  const showSpinner = options.showLoading !== false; // Default true
+  
+  if (showSpinner) SDS.showLoading(options.loadingMessage);
+  
+  try {
+    const res = await fetch(url, { 
+      credentials: 'same-origin', 
+      headers: { 'X-Requested-With': 'XMLHttpRequest' } 
+    });
+    if (!res.ok) throw new Error('Request failed: ' + res.status);
+    const result = await res.json();
+    if (showSpinner) SDS.hideLoading();
+    return result;
+  } catch (e) {
+    if (showSpinner) SDS.hideLoading();
+    throw e;
+  }
 };
