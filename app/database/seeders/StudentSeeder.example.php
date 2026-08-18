@@ -10,16 +10,16 @@ namespace App\Database\Seeders;
 
 use App\Services\FirebaseService;
 
+/**
+ * Example Seeder - Populate database with test data
+ * 
+ * Usage: php app/database/seeders/run.php
+ */
 class StudentSeeder
 {
-    public function __construct(private FirebaseService $firebase) {}
-    
-    /**
-     * Run the seeder
-     */
     public function run(): void
     {
-        $collection = $this->firebase->collection('students');
+        $firebase = FirebaseService::getInstance();
         
         $students = [
             [
@@ -47,7 +47,7 @@ class StudentSeeder
         ];
         
         foreach ($students as $student) {
-            $collection->add($student);
+            $firebase->addDocument('students', $student);
         }
         
         echo "StudentSeeder completed: " . count($students) . " records created.\n";
@@ -56,11 +56,9 @@ class StudentSeeder
 
 class RoomSeeder
 {
-    public function __construct(private FirebaseService $firebase) {}
-    
     public function run(): void
     {
-        $collection = $this->firebase->collection('rooms');
+        $firebase = FirebaseService::getInstance();
         
         $rooms = [
             [
@@ -80,7 +78,7 @@ class RoomSeeder
         ];
         
         foreach ($rooms as $room) {
-            $collection->add($room);
+            $firebase->addDocument('rooms', $room);
         }
         
         echo "RoomSeeder completed: " . count($rooms) . " records created.\n";

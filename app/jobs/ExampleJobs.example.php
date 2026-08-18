@@ -8,6 +8,18 @@
 
 namespace App\Jobs;
 
+/**
+ * Example Jobs - Background task classes
+ * 
+ * Jobs decouple heavy operations from web requests.
+ * Implement your queue system (Redis, database, Supervisor, etc.)
+ * and dispatch jobs asynchronously.
+ * 
+ * Usage pattern:
+ *   dispatch(new SendNotificationJob($userId, $message, 'email'));
+ * 
+ * Worker processes queued jobs and calls handle().
+ */
 class SendNotificationJob
 {
     public function __construct(
@@ -17,11 +29,15 @@ class SendNotificationJob
     ) {}
     
     /**
-     * Execute the job (called by queue worker)
+     * Execute when worker processes this job
+     * Implement your queue to call this method
      */
-    public function handle(\App\Services\NotificationService $notificationService): void
+    public function execute(): void
     {
-        $notificationService->send($this->userId, $this->message, $this->type);
+        // Example: Send notification
+        // $service = new NotificationService();
+        // $service->sendToUser($this->userId, $this->message, $this->type);
+        error_log("Sending $this->type notification to user $this->userId");
     }
 }
 
@@ -32,9 +48,12 @@ class GenerateReportJob
         private array $filters,
     ) {}
     
-    public function handle(\App\Services\ReportService $reportService): void
+    public function execute(): void
     {
-        $reportService->generate($this->reportType, $this->filters);
+        // Example: Generate and store report
+        // $service = new ReportService();
+        // $report = $service->generate($this->reportType, $this->filters);
+        error_log("Generating $this->reportType report with filters");
     }
 }
 
@@ -44,9 +63,12 @@ class ProcessAttendanceJob
         private string $attendanceId,
     ) {}
     
-    public function handle(\App\Services\AttendanceService $attendanceService): void
+    public function execute(): void
     {
-        $attendanceService->process($this->attendanceId);
+        // Example: Process attendance check-in/out
+        // $service = new AttendanceService();
+        // $service->process($this->attendanceId);
+        error_log("Processing attendance record: $this->attendanceId");
     }
 }
 
