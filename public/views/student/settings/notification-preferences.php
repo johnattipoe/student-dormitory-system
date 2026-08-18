@@ -26,6 +26,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if ($action === 'update_preferences') {
         try {
+            $quietStart = sanitize($_POST['quietHoursStart'] ?? '');
+            $quietEnd = sanitize($_POST['quietHoursEnd'] ?? '');
+            $quietHours = '';
+            if ($quietStart !== '' && $quietEnd !== '') {
+                $quietHours = $quietStart . '-' . $quietEnd;
+            } elseif ($quietStart !== '') {
+                $quietHours = $quietStart;
+            }
+
             $preferences = [
                 'emailNotifications' => isset($_POST['emailNotifications']) ? true : false,
                 'attendanceAlerts' => isset($_POST['attendanceAlerts']) ? true : false,
@@ -33,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'incidentAlerts' => isset($_POST['incidentAlerts']) ? true : false,
                 'medicalAlerts' => isset($_POST['medicalAlerts']) ? true : false,
                 'systemNotifications' => isset($_POST['systemNotifications']) ? true : false,
-                'quietHours' => sanitize($_POST['quietHours'] ?? ''),
+                'quietHours' => $quietHours,
                 'notificationFrequency' => sanitize($_POST['notificationFrequency'] ?? 'immediate'),
                 'updatedAt' => date('Y-m-d H:i:s'),
             ];
@@ -77,6 +86,13 @@ $preferences = [
 
 if (!empty($userPrefs)) {
     $preferences = array_merge($preferences, $userPrefs[0]);
+}
+
+$quietRange = ['start' => '', 'end' => ''];
+if (!empty($preferences['quietHours']) && str_contains($preferences['quietHours'], '-')) {
+    [$quietRange['start'], $quietRange['end']] = array_map('trim', explode('-', $preferences['quietHours'], 2));
+} elseif (!empty($preferences['quietHours'])) {
+    $quietRange['start'] = trim($preferences['quietHours']);
 }
 
 $pageTitle = 'Notification Preferences';
@@ -183,13 +199,18 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <div class="mb-4">
                     <label class="form-label"><strong>Quiet Hours (Optional)</strong></label>
                     <div class="row g-2">
-                        <div class="col-auto">
-                            <input type="time" name="quietHours" class="form-control form-control-sm" 
-                                   value="<?= e($preferences['quietHours'] ?? '') ?>"
-                                   placeholder="e.g., 22:00 - 08:00">
+                        <div class="col-md-6">
+                            <label for="quietHoursStart" class="form-label small">Start</label>
+                            <input type="time" id="quietHoursStart" name="quietHoursStart" class="form-control form-control-sm" 
+                                   value="<?= e($quietRange['start'] ?? '') ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="quietHoursEnd" class="form-label small">End</label>
+                            <input type="time" id="quietHoursEnd" name="quietHoursEnd" class="form-control form-control-sm" 
+                                   value="<?= e($quietRange['end'] ?? '') ?>">
                         </div>
                     </div>
-                    <small class="text-muted d-block mt-1">No notifications will be sent during these hours</small>
+                    <small class="text-muted d-block mt-1">Example overnight range: 22:00 to 08:00</small>
                 </div>
 
                 <!-- Info Box -->
