@@ -18,6 +18,9 @@ if (!in_array($route, $publicRoutes, true)) {
     $currentUser = AuthMiddleware::handle(); // redirects to login if not authed
 }
 
+// Include global loading spinner
+include __DIR__ . '/../app/views/components/loading.php';
+
 if (is_file($target)) {
     include $target;
 } else {
