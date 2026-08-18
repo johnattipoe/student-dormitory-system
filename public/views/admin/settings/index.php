@@ -4,18 +4,19 @@ $allowedRoles = [ROLE_ADMIN];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 $pageTitle = 'Settings';
+$appConfig = require APP_ROOT . '/app/config/app.php';
 $defaultSettings = [
-    'app_name' => 'Student Dormitory System',
-    'app_url' => 'http://localhost:8000',
-    'session_timeout' => '60',
-    'attendance_grace_minutes' => '10',
-    'allow_self_registration' => '1',
-    'require_email_verification' => '1',
-    'enable_notifications' => '1',
-    'firebase_enabled' => '1',
-    'default_password' => 'Dorm1234',
-    'support_email' => 'support@dormitory.local',
-    'timezone' => 'Africa/Lagos',
+    'app_name' => $appConfig['name'] ?? 'Student Dormitory System',
+    'app_url' => $appConfig['url'] ?? 'https://student-dormitory-system.onrender.com',
+    'session_timeout' => $appConfig['session_lifetime'] ?? '60',
+    'attendance_grace_minutes' => $appConfig['attendance_grace_minutes'] ?? '10',
+    'allow_self_registration' => $appConfig['allow_self_registration'] ? '1' : '0',
+    'require_email_verification' => $appConfig['require_email_verification'] ? '1' : '0',
+    'enable_notifications' => $appConfig['enable_notifications'] ? '1' : '0',
+    'firebase_enabled' => $appConfig['firebase_enabled'] ? '1' : '0',
+    'default_password' => $appConfig['default_password'] ?? 'Dorm1234',
+    'support_email' => $appConfig['support_email'] ?? 'support@dormitory.local',
+    'timezone' => $appConfig['timezone'] ?? 'Africa/Lagos',
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
