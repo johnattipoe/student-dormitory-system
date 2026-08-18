@@ -4,21 +4,7 @@
  * Every "page" request is funneled here as ?route=/views/xxx/yyy.php
  * so we can run global bootstrap (session, env, helpers) exactly once.
  */
-require_once __DIR__ . '/../vendor/autoload.php';
-
-if (!class_exists('App\\Middleware\\AuthMiddleware')) {
-    require_once __DIR__ . '/../app/middleware/AuthMiddleware.php';
-}
-
-$dotenv = \Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-$dotenv->safeLoad();
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-require_once __DIR__ . '/../app/config/constants.php';
-require_once __DIR__ . '/../app/helpers/functions.php';
+require __DIR__ . '/bootstrap.php';
 
 use App\Middleware\AuthMiddleware;
 

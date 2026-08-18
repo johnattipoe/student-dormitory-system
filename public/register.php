@@ -1,15 +1,5 @@
 <?php
-require_once __DIR__ . '/../vendor/autoload.php';
-$dotenv = \Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-$dotenv->safeLoad();
-$appConfig = app_config();
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-require_once __DIR__ . '/../app/config/constants.php';
-require_once __DIR__ . '/../app/helpers/functions.php';
+require __DIR__ . '/bootstrap.php';
 
 use App\Services\UserService;
 
