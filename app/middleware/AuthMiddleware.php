@@ -8,10 +8,6 @@ if (!class_exists(AuthService::class, false)) {
     require_once __DIR__ . '/../services/AuthService.php';
 }
 
-if (!class_exists(AuthService::class, false)) {
-    require_once __DIR__ . '/../services/AuthService.php';
-}
-
 /**
  * AuthMiddleware
  * Include at the top of any protected page:
