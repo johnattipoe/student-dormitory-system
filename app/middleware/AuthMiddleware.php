@@ -2,11 +2,11 @@
 
 namespace App\Middleware;
 
-if (!class_exists(\App\Services\AuthService::class, false)) {
+use App\Services\AuthService;
+
+if (!class_exists(AuthService::class, false)) {
     require_once __DIR__ . '/../services/AuthService.php';
 }
-
-use App\Services\AuthService;
 
 if (!class_exists(AuthService::class, false)) {
     require_once __DIR__ . '/../services/AuthService.php';

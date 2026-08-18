@@ -10,13 +10,16 @@
 
 namespace App\Tests\Unit;
 
+// @phpstan-ignore-next-line - PHPUnit installed as dev dependency
 use PHPUnit\Framework\TestCase;
 use App\Services\PreferenceService;
 
 /**
  * Example Unit Test - Test PreferenceService in isolation
  * 
- * Note: PHPUnit must be installed via Composer
+ * Setup: Install PHPUnit via Composer
+ *   composer require --dev phpunit/phpunit
+ * 
  * Run: vendor/bin/phpunit app/tests/Unit/PreferenceServiceTest.php
  * 
  * Mocking dependencies allows testing without database/Firebase

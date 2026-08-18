@@ -10,13 +10,16 @@
 
 namespace App\Tests\Feature;
 
+// @phpstan-ignore-next-line - PHPUnit installed as dev dependency
 use PHPUnit\Framework\TestCase;
 
 /**
  * Example Feature Test - Test real workflows across services
  * 
- * Note: PHPUnit must be installed via Composer
- * Run: vendor/bin/phputil app/tests/Feature/StudentRegistrationTest.php
+ * Setup: Install PHPUnit via Composer
+ *   composer require --dev phpunit/phpunit
+ * 
+ * Run: vendor/bin/phpunit app/tests/Feature/StudentRegistrationTest.php
  * 
  * Feature tests are integration tests that test across multiple layers.
  * May use test fixtures or mocked Firebase.
