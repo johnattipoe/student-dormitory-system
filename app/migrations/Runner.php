@@ -3,6 +3,7 @@
 namespace App\Migrations;
 
 use App\Services\FirebaseService;
+use Dotenv\Dotenv;
 
 /**
  * Migration Runner - Execute database migrations
@@ -86,11 +87,15 @@ class Runner
 
 // CLI Runner
 if (php_sapi_name() === 'cli') {
-    // Bootstrap application
+    require_once __DIR__ . '/../../vendor/autoload.php';
+
+    $dotenv = Dotenv::createImmutable(__DIR__ . '/../..');
+    $dotenv->safeLoad();
+
     $dir = __DIR__;
     for ($i = 0; $i < 5; $i++) {
-        if (file_exists($dir . '/bootstrap.php')) {
-            require $dir . '/bootstrap.php';
+        if (file_exists($dir . '/../../public/bootstrap.php')) {
+            require_once $dir . '/../../public/bootstrap.php';
             break;
         }
         $parent = dirname($dir);

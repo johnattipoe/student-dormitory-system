@@ -67,9 +67,14 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                     Read: <strong><?= count($readNotifications) ?></strong>
                 </small>
             </div>
-            <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#bulkActionModal" id="bulkActionBtn" disabled>
-                <i class="bi bi-check2"></i> Mark as Read
-            </button>
+            <div class="d-flex gap-2">
+                <a href="<?= url('views/student/settings/notification-preferences.php') ?>" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-sliders"></i> Preferences
+                </a>
+                <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#bulkActionModal" id="bulkActionBtn" disabled>
+                    <i class="bi bi-check2"></i> Mark as Read
+                </button>
+            </div>
         </div>
 
         <div class="card stat-card p-3">
