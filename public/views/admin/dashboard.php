@@ -3,6 +3,17 @@ require __DIR__ . '/../../bootstrap.php';
 $allowedRoles = [ROLE_ADMIN];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
+// Fallback requires for runtime resilience
+if (!class_exists('App\\Services\\NotificationService', false)) {
+    require_once APP_ROOT . '/app/services/NotificationService.php';
+}
+if (!class_exists('App\\Services\\StudentService', false)) {
+    require_once APP_ROOT . '/app/services/StudentService.php';
+}
+if (!class_exists('App\\Services\\FirebaseService', false)) {
+    require_once APP_ROOT . '/app/services/FirebaseService.php';
+}
+
 use App\Services\StudentService;
 use App\Services\FirebaseService;
 use App\Services\NotificationService;
