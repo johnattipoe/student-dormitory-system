@@ -2,6 +2,18 @@
 
 namespace App\Services;
 
+if (!class_exists(\App\Services\ActivityLogService::class, false)) {
+    require_once __DIR__ . '/ActivityLogService.php';
+}
+
+if (!class_exists(\App\Services\FirebaseAuthService::class, false)) {
+    require_once __DIR__ . '/FirebaseAuthService.php';
+}
+
+if (!class_exists(\App\Services\FirebaseService::class, false)) {
+    require_once __DIR__ . '/FirebaseService.php';
+}
+
 /**
  * High-level login/logout flow: verifies credentials against Firebase Auth,
  * loads the matching Firestore user profile, and stores both in the session.
