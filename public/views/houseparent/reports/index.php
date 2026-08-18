@@ -20,12 +20,13 @@ use App\Services\IncidentService;
 use App\Services\StudentService;
 use App\Services\VisitorService;
 
+$houseId = current_user()['houseId'] ?? null;
 $date = sanitize($_GET['date'] ?? date('Y-m-d'));
-$students = StudentService::all();
-$attendance = AttendanceService::forDate($date);
-$visitors = (new VisitorService())->all();
-$incidents = array_values(array_filter((new IncidentService())->all(), fn($incident) => ($incident['status'] ?? 'open') === 'open'));
-$summary = AttendanceService::summary($date);
+$students = StudentService::all($houseId);
+$attendance = AttendanceService::forDate($date, $houseId);
+$visitors = (new VisitorService())->byHouse($houseId);
+$incidents = array_values(array_filter((new IncidentService())->byHouse($houseId), fn($incident) => ($incident['status'] ?? 'open') === 'open'));
+$summary = AttendanceService::summary($date, $houseId);
 
 $pageTitle = 'Houseparent Reports';
 $navItems = [
@@ -58,25 +59,25 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         <div class="card stat-card p-4">
             <div class="row g-3 mt-1">
                 <div class="col-md-3">
-                    <div class="card p-3">
+                    <div class="card p-3 h-100">
                         <div class="text-muted small">Students</div>
                         <h4 class="mb-0"><?= e(count($students)) ?></h4>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card p-3">
+                    <div class="card p-3 h-100">
                         <div class="text-muted small">Present</div>
                         <h4 class="mb-0"><?= e($summary['present'] ?? 0) ?></h4>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card p-3">
+                    <div class="card p-3 h-100">
                         <div class="text-muted small">Absent</div>
                         <h4 class="mb-0"><?= e($summary['absent'] ?? 0) ?></h4>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card p-3">
+                    <div class="card p-3 h-100">
                         <div class="text-muted small">Visitors</div>
                         <h4 class="mb-0"><?= e(count($visitors)) ?></h4>
                     </div>
@@ -85,13 +86,13 @@ require APP_ROOT . '/app/views/components/sidebar.php';
 
             <div class="row g-3 mt-2">
                 <div class="col-md-6">
-                    <div class="card p-3">
+                    <div class="card p-3 h-100">
                         <h6>Attendance Summary</h6>
-                        <p class="mb-0 text-muted">Late: <?= e($summary['late'] ?? 0) ?> · Excused: <?= e($summary['excused'] ?? 0) ?></p>
+                        <p class="mb-0 text-muted">Late: <?= e($summary['late'] ?? 0) ?> · Excused: <?= e($summary['excused'] ?? 0) ?> · Total: <?= e($summary['total'] ?? 0) ?></p>
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <div class="card p-3">
+                    <div class="card p-3 h-100">
                         <h6>Open Incidents</h6>
                         <p class="mb-0 text-muted"><?= e(count($incidents)) ?> active incident(s) in this house</p>
                     </div>

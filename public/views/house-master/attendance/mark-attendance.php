@@ -1,4 +1,4 @@
- <!-- #region --><?php
+<?php
 // Ensure bootstrap is loaded (safe at any view nesting depth)
 if (!defined('APP_ROOT')) {
     $dir = __DIR__;
@@ -12,53 +12,51 @@ if (!defined('APP_ROOT')) {
         $dir = $parent;
     }
 }
-$allowedRoles = [ROLE_HOUSEPARENT];
+$allowedRoles = [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
-use App\Services\StudentService;
 use App\Services\AttendanceService;
+use App\Services\StudentService;
 
+// Handle form submission
+$errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $studentId = sanitize($_POST['studentId'] ?? '');
-    $studentIds = $_POST['studentIds'] ?? [];
     $date = sanitize($_POST['date'] ?? date('Y-m-d'));
     $status = sanitize($_POST['status'] ?? 'present');
     $notes = sanitize($_POST['notes'] ?? '');
+    $houseId = current_user()['houseId'] ?? null;
+    $markedBy = current_user()['uid'] ?? current_user()['id'] ?? 'house-master';
     
-    $markedIds = [];
-    $errors = [];
+    // Check if single or bulk mode
+    $singleStudentId = sanitize($_POST['studentId'] ?? '');
+    $studentIds = (array) ($_POST['studentIds'] ?? []);
     
-    // Bulk marking
-    if (!empty($studentIds) && is_array($studentIds)) {
+    if (!empty($singleStudentId)) {
+        // Single student mode
+        try {
+            AttendanceService::mark($singleStudentId, $status, $date, $houseId, $markedBy);
+            flash('success', 'Attendance marked for student');
+            redirect(url('views/house-master/attendance/index.php'));
+        } catch (Exception $e) {
+            $errors[] = 'Failed to mark attendance: ' . $e->getMessage();
+        }
+    } elseif (!empty($studentIds) && is_array($studentIds)) {
+        // Bulk mode
+        $successCount = 0;
         foreach ($studentIds as $sId) {
-            $sId = sanitize($sId);
-            if ($sId) {
-                try {
-                    AttendanceService::mark($sId, $status, $date, current_user()['houseId'], current_user()['uid']);
-                    $markedIds[] = $sId;
-                } catch (Exception $e) {
-                    $errors[] = "Failed for " . $sId . ": " . $e->getMessage();
-                }
+            try {
+                AttendanceService::mark($sId, $status, $date, $houseId, $markedBy);
+                $successCount++;
+            } catch (Exception $e) {
+                $errors[] = 'Failed for student ' . $sId . ': ' . $e->getMessage();
             }
         }
-        if (!empty($markedIds)) {
-            flash('success', 'Attendance marked for ' . count($markedIds) . ' student(s)');
+        if ($successCount > 0) {
+            flash('success', 'Marked attendance for ' . $successCount . ' student(s)');
+            redirect(url('views/house-master/attendance/index.php'));
         }
-        if (!empty($errors)) {
-            flash('warning', implode('; ', $errors));
-        }
-        redirect(base_url('index.php?route=/views/houseparent/attendance/index.php'));
-    }
-    
-    // Single marking
-    if ($studentId && $date) {
-        try {
-            $result = AttendanceService::mark($studentId, $status, $date, current_user()['houseId'], current_user()['uid']);
-            flash('success', $result['message'] ?? 'Attendance marked successfully');
-            redirect(base_url('index.php?route=/views/houseparent/attendance/index.php'));
-        } catch (Exception $e) {
-            flash('error', $e->getMessage());
-        }
+    } else {
+        $errors[] = 'Please select at least one student';
     }
 }
 
@@ -67,13 +65,14 @@ $students = StudentService::all($houseId);
 
 $pageTitle = 'Mark Attendance';
 $navItems = [
-    ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/houseparent/dashboard/index.php')],
-    ['icon' => 'bi-mortarboard', 'label' => 'Students', 'href' => url('views/houseparent/students/index.php')],
-    ['icon' => 'bi-calendar-check', 'label' => 'Attendance', 'href' => url('views/houseparent/attendance/index.php'), 'active' => true],
-    ['icon' => 'bi-door-open', 'label' => 'Rooms', 'href' => url('views/houseparent/rooms/index.php')],
-    ['icon' => 'bi-people', 'label' => 'Visitors', 'href' => url('views/houseparent/visitors/index.php')],
-    ['icon' => 'bi-shield-exclamation', 'label' => 'Incidents', 'href' => url('views/houseparent/incidents/index.php')],
-    ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/houseparent/notifications/index.php')],
+    ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/house-master/dashboard/index.php')],
+    ['icon' => 'bi-mortarboard', 'label' => 'Students', 'href' => url('views/house-master/students/index.php')],
+    ['icon' => 'bi-calendar-check', 'label' => 'Attendance', 'href' => url('views/house-master/attendance/index.php')],
+    ['icon' => 'bi-door-closed', 'label' => 'Rooms', 'href' => url('views/house-master/rooms/index.php')],
+    ['icon' => 'bi-people', 'label' => 'Visitors', 'href' => url('views/house-master/visitors/index.php')],
+    ['icon' => 'bi-flag', 'label' => 'Incidents', 'href' => url('views/house-master/incidents/index.php')],
+    ['icon' => 'bi-file-earmark-text', 'label' => 'Reports', 'href' => url('views/house-master/reports/index.php')],
+    ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/house-master/notifications/index.php')],
 ];
 
 require APP_ROOT . '/app/views/components/header.php';
@@ -82,6 +81,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
 <div class="main-content">
     <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
+
     <div class="content-wrapper">
         <div class="card stat-card p-4" style="max-width:900px;">
             <h5 class="mb-3">Mark Attendance</h5>
@@ -100,7 +100,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             <div class="tab-content">
                 <!-- Single Student Mode -->
                 <div class="tab-pane fade show active" id="single-mode" role="tabpanel">
-                    <form method="POST" action="<?= url('views/houseparent/attendance/mark-attendance.php') ?>">
+                    <form method="POST" action="<?= url('views/house-master/attendance/mark-attendance.php') ?>">
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">Student</label>
@@ -133,14 +133,14 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         </div>
                         <div class="mt-4 d-flex gap-2">
                             <button class="btn btn-primary">Submit</button>
-                            <a href="<?= url('views/houseparent/attendance/index.php') ?>" class="btn btn-outline-secondary">Cancel</a>
+                            <a href="<?= url('views/house-master/attendance/index.php') ?>" class="btn btn-outline-secondary">Cancel</a>
                         </div>
                     </form>
                 </div>
 
                 <!-- Bulk Mode -->
                 <div class="tab-pane fade" id="bulk-mode" role="tabpanel">
-                    <form method="POST" action="<?= url('views/houseparent/attendance/mark-attendance.php') ?>">
+                    <form method="POST" action="<?= url('views/house-master/attendance/mark-attendance.php') ?>">
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label">Date</label>
@@ -194,7 +194,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
 
                         <div class="mt-4 d-flex gap-2">
                             <button class="btn btn-primary">Mark Attendance</button>
-                            <a href="<?= url('views/houseparent/attendance/index.php') ?>" class="btn btn-outline-secondary">Cancel</a>
+                            <a href="<?= url('views/house-master/attendance/index.php') ?>" class="btn btn-outline-secondary">Cancel</a>
                         </div>
                     </form>
                 </div>
@@ -209,7 +209,6 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 });
             });
         </script>
-    </div>
     </div>
 </div>
 <?php require APP_ROOT . '/app/views/components/footer.php'; ?>

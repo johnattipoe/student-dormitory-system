@@ -19,9 +19,16 @@ use App\Services\AttendanceService;
 use App\Services\StudentService;
 
 $date = sanitize($_GET['date'] ?? date('Y-m-d'));
+$statusFilter = sanitize($_GET['status'] ?? '');
 $houseId = current_user()['houseId'] ?? null;
 $students = StudentService::all($houseId);
 $attendance = AttendanceService::forDate($date, $houseId);
+
+if ($statusFilter) {
+    $attendance = array_filter($attendance, fn($record) => ($record['status'] ?? 'present') === $statusFilter);
+}
+
+$summary = AttendanceService::summary($date, $houseId);
 $pageTitle = 'Attendance History';
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/houseparent/dashboard/index.php')],
@@ -43,12 +50,41 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         <div class="card stat-card p-4">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                 <h5 class="mb-0">Attendance History</h5>
-                <form method="GET" class="d-flex gap-2 align-items-center">
+                <form method="GET" class="d-flex gap-2 align-items-center flex-wrap">
                     <input type="hidden" name="route" value="/views/houseparent/attendance/history.php">
                     <input type="date" name="date" class="form-control" value="<?= e($date) ?>">
-                    <button class="btn btn-primary btn-sm">View</button>
+                    <select name="status" class="form-select form-select-sm" style="max-width: 120px;">
+                        <option value="">All Statuses</option>
+                        <option value="present" <?= $statusFilter === 'present' ? 'selected' : '' ?>>Present</option>
+                        <option value="absent" <?= $statusFilter === 'absent' ? 'selected' : '' ?>>Absent</option>
+                        <option value="late" <?= $statusFilter === 'late' ? 'selected' : '' ?>>Late</option>
+                        <option value="excused" <?= $statusFilter === 'excused' ? 'selected' : '' ?>>Excused</option>
+                    </select>
+                    <button class="btn btn-primary btn-sm">Filter</button>
                 </form>
             </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="card stat-card p-3 text-center h-100">
+                        <div class="text-muted small">Present</div>
+                        <div class="fs-2 fw-bold"><?= e((string) ($summary['present'] ?? 0)) ?></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card p-3 text-center h-100">
+                        <div class="text-muted small">Absent</div>
+                        <div class="fs-2 fw-bold"><?= e((string) ($summary['absent'] ?? 0)) ?></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card p-3 text-center h-100">
+                        <div class="text-muted small">Late</div>
+                        <div class="fs-2 fw-bold"><?= e((string) ($summary['late'] ?? 0)) ?></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="table-responsive">
                 <table class="table table-hover data-table w-100">
                     <thead>

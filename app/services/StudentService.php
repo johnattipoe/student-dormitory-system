@@ -79,4 +79,17 @@ class StudentService
             return str_contains($haystack, $term);
         }));
     }
+
+    public static function updateFlags(string $id, array $flags): void
+    {
+        $data = [];
+        if (isset($flags['flagged'])) $data['flagged'] = $flags['flagged'];
+        if (isset($flags['flagType'])) $data['flagType'] = $flags['flagType'];
+        if (isset($flags['flagReason'])) $data['flagReason'] = $flags['flagReason'];
+        if (isset($flags['flaggedAt'])) $data['flaggedAt'] = $flags['flaggedAt'];
+        if (isset($flags['flaggedBy'])) $data['flaggedBy'] = $flags['flaggedBy'];
+        if (!empty($data)) {
+            self::update($id, $data);
+        }
+    }
 }

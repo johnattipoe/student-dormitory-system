@@ -34,8 +34,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $pageTitle = 'House Master Attendance';
 $date = sanitize($_GET['date'] ?? date('Y-m-d'));
+$searchQuery = sanitize($_GET['search'] ?? '');
+$statusFilter = sanitize($_GET['status'] ?? '');
+
 $students = StudentService::all(current_user()['houseId'] ?? null);
 $attendance = AttendanceService::forDate($date, current_user()['houseId'] ?? null);
+
+// Apply filters
+if (!empty($searchQuery)) {
+    $attendance = array_filter($attendance, function($record) use ($searchQuery, $students) {
+        $student = current(array_filter($students, fn($s) => ((string) ($s['id'] ?? '')) === ((string) ($record['studentId'] ?? ''))));
+        $name = ($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '');
+        $admNo = $student['admissionNo'] ?? '';
+        return stripos($name, $searchQuery) !== false || stripos($admNo, $searchQuery) !== false;
+    });
+}
+
+if (!empty($statusFilter)) {
+    $attendance = array_filter($attendance, fn($record) => ($record['status'] ?? 'present') === $statusFilter);
+}
+
 $summary = AttendanceService::summary($date, current_user()['houseId'] ?? null);
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/house-master/dashboard/index.php')],
@@ -55,19 +73,52 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
     <div class="content-wrapper">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-                <h5 class="mb-0">Attendance Overview</h5>
-                <small class="text-muted">Record and review daily attendance for your assigned house.</small>
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <h5 class="mb-0">Attendance Overview</h5>
+                    <small class="text-muted">Record and review daily attendance for your assigned house.</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="<?= url('views/house-master/attendance/mark-attendance.php') ?>" class="btn btn-success btn-sm">
+                        <i class="bi bi-check2-square"></i> Bulk Mark
+                    </a>
+                    <a href="<?= url('views/house-master/attendance/history.php') ?>" class="btn btn-outline-secondary btn-sm">History</a>
+                </div>
             </div>
-            <div class="d-flex gap-2 align-items-center">
-                <form method="GET" class="d-flex gap-2 align-items-center">
-                    <input type="hidden" name="route" value="/views/house-master/attendance/index.php">
-                    <input type="date" name="date" class="form-control" value="<?= e($date) ?>">
-                    <button class="btn btn-primary btn-sm">View</button>
-                </form>
-                <a href="<?= url('views/house-master/attendance/history.php') ?>" class="btn btn-outline-secondary btn-sm">History</a>
-            </div>
+        </div>
+
+        <!-- Advanced Filters -->
+        <div class="card stat-card p-3 mb-3">
+            <form method="GET" class="row g-3">
+                <input type="hidden" name="route" value="/views/house-master/attendance/index.php">
+                
+                <div class="col-md-3">
+                    <label class="form-label small">Date</label>
+                    <input type="date" name="date" class="form-control form-control-sm" value="<?= e($date) ?>">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label small">Search Student</label>
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Name or admission no." value="<?= e($searchQuery) ?>">
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">All Statuses</option>
+                        <option value="present" <?= $statusFilter === 'present' ? 'selected' : '' ?>>Present</option>
+                        <option value="absent" <?= $statusFilter === 'absent' ? 'selected' : '' ?>>Absent</option>
+                        <option value="late" <?= $statusFilter === 'late' ? 'selected' : '' ?>>Late</option>
+                        <option value="excused" <?= $statusFilter === 'excused' ? 'selected' : '' ?>>Excused</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Filter</button>
+                    <a href="<?= url('views/house-master/attendance/index.php') ?>" class="btn btn-outline-secondary btn-sm">Reset</a>
+                </div>
+            </form>
         </div>
 
         <div class="row g-3 mb-4">
@@ -92,7 +143,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         </div>
 
         <div class="card stat-card p-4 mb-4">
-            <h6 class="mb-3">Mark attendance</h6>
+            <h6 class="mb-3">Quick Mark Attendance</h6>
             <form method="POST" action="<?= url('views/house-master/attendance/index.php') ?>" class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label">Student</label>
@@ -123,6 +174,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         </div>
 
         <div class="card stat-card p-3">
+            <div class="mb-3 small">
+                Showing <strong><?= count($attendance) ?></strong> record(s)
+                <?php if (!empty($searchQuery) || !empty($statusFilter)): ?>
+                    (filtered)
+                <?php endif; ?>
+            </div>
             <table class="table table-hover data-table w-100">
                 <thead>
                     <tr>
@@ -135,7 +192,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <tbody>
                     <?php if (empty($attendance)): ?>
                         <tr>
-                            <td colspan="4" class="text-center text-muted">No attendance records available for this date.</td>
+                            <td colspan="4" class="text-center text-muted">No attendance records matching your filters.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($attendance as $record): ?>
