@@ -78,14 +78,29 @@ class NotificationService
                 ];
             }
 
+            // Check user preferences before creating notification
+            $preferenceService = new PreferenceService();
+            $notificationType = $data['type'] ?? 'info';
+            $isUrgent = ($data['isUrgent'] ?? false) === true;
+            
+            // Skip notification if user disabled this type and it's not urgent
+            if (!$isUrgent && !$preferenceService->isNotificationTypeEnabled($userId, $notificationType)) {
+                return [
+                    'success' => false,
+                    'message' => 'Notification type disabled for user.',
+                    'skipped' => true
+                ];
+            }
+
             $id = $this->firebase->addDocument(
                 $this->collection,
                 [
                     'userId' => $userId,
                     'title' => $data['title'] ?? '',
                     'message' => $data['message'] ?? '',
-                    'type' => $data['type'] ?? 'info',
+                    'type' => $notificationType,
                     'read' => false,
+                    'inQuietHours' => $preferenceService->isInQuietHours($userId),
                     'createdAt' => (new \DateTime())->format(DATE_ATOM),
                 ]
             );
@@ -115,9 +130,18 @@ class NotificationService
         }
 
         $count = 0;
+        $preferenceService = new PreferenceService();
+        $notificationType = $data['type'] ?? 'info';
+        $isUrgent = ($data['isUrgent'] ?? false) === true;
+
         foreach ($users as $user) {
             $uid = (string) ($user['uid'] ?? $user['id'] ?? '');
             if ($uid === '') {
+                continue;
+            }
+
+            // Skip if user disabled this type and it's not urgent
+            if (!$isUrgent && !$preferenceService->isNotificationTypeEnabled($uid, $notificationType)) {
                 continue;
             }
 
@@ -127,8 +151,9 @@ class NotificationService
                     'userId' => $uid,
                     'title' => $data['title'] ?? '',
                     'message' => $data['message'] ?? '',
-                    'type' => $data['type'] ?? 'info',
+                    'type' => $notificationType,
                     'read' => false,
+                    'inQuietHours' => $preferenceService->isInQuietHours($uid),
                     'createdAt' => (new \DateTime())->format(DATE_ATOM),
                 ]
             );
@@ -146,9 +171,18 @@ class NotificationService
     {
         $users = (new UserService())->all();
         $count = 0;
+        $preferenceService = new PreferenceService();
+        $notificationType = $data['type'] ?? 'info';
+        $isUrgent = ($data['isUrgent'] ?? false) === true;
+
         foreach ($users as $user) {
             $uid = (string) ($user['uid'] ?? $user['id'] ?? '');
             if ($uid === '') {
+                continue;
+            }
+
+            // Skip if user disabled this type and it's not urgent
+            if (!$isUrgent && !$preferenceService->isNotificationTypeEnabled($uid, $notificationType)) {
                 continue;
             }
 
@@ -158,8 +192,9 @@ class NotificationService
                     'userId' => $uid,
                     'title' => $data['title'] ?? '',
                     'message' => $data['message'] ?? '',
-                    'type' => $data['type'] ?? 'info',
+                    'type' => $notificationType,
                     'read' => false,
+                    'inQuietHours' => $preferenceService->isInQuietHours($uid),
                     'createdAt' => (new \DateTime())->format(DATE_ATOM),
                 ]
             );

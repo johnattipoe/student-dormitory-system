@@ -19,6 +19,7 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 use App\Services\MedicalService;
 use App\Services\StudentService;
 use App\Services\FirebaseService;
+use App\Services\AuditService;
 
 // Handle bulk operations
 $errors = [];
@@ -34,15 +35,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($diagnosis)) {
             try {
                 $firebaseService = FirebaseService::getInstance();
+                $auditService = new AuditService();
+                $currentUserId = current_user()['uid'];
+                
                 foreach ($studentIds as $sId) {
-                    $firebaseService->addDocument(COL_MEDICAL_RECORDS, [
+                    $recordId = $firebaseService->addDocument(COL_MEDICAL_RECORDS, [
                         'studentId' => $sId,
                         'diagnosis' => $diagnosis,
                         'severity' => $severity,
                         'notes' => $notes,
-                        'recordedBy' => current_user()['uid'],
+                        'recordedBy' => $currentUserId,
                         'createdAt' => date('Y-m-d H:i:s'),
                     ]);
+                    
+                    // Log audit trail
+                    $auditService->logMedicalRecordChange(
+                        $recordId,
+                        $sId,
+                        'created',
+                        $currentUserId,
+                        ['severity' => ['from' => '', 'to' => $severity]],
+                        'Bulk record creation: ' . $diagnosis
+                    );
                 }
                 flash('success', 'Created medical records for ' . count($studentIds) . ' student(s)');
                 redirect(url('views/nurse/medical-records/bulk-management.php'));
@@ -57,18 +71,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($action === 'bulk_mark_critical' && !empty($studentIds)) {
         try {
             $firebaseService = FirebaseService::getInstance();
+            $auditService = new AuditService();
+            $currentUserId = current_user()['uid'];
             $records = $firebaseService->getCollection(COL_MEDICAL_RECORDS, [], 500);
+            $updatedCount = 0;
             
             foreach ($records as $record) {
                 if (in_array($record['studentId'] ?? '', $studentIds)) {
-                    $firebaseService->updateDocument(COL_MEDICAL_RECORDS, (string) ($record['id'] ?? ''), [
+                    $recordId = (string) ($record['id'] ?? '');
+                    $previousSeverity = $record['severity'] ?? 'normal';
+                    
+                    $firebaseService->updateDocument(COL_MEDICAL_RECORDS, $recordId, [
                         'severity' => 'critical',
                         'flaggedAt' => date('Y-m-d H:i:s'),
+                        'flaggedBy' => $currentUserId,
                     ]);
+                    
+                    // Log audit trail
+                    $auditService->logMedicalRecordChange(
+                        $recordId,
+                        $record['studentId'] ?? '',
+                        'severity_changed',
+                        $currentUserId,
+                        ['severity' => ['from' => $previousSeverity, 'to' => 'critical']],
+                        'Bulk severity update to critical'
+                    );
+                    
+                    $updatedCount++;
                 }
             }
             
-            flash('success', 'Marked ' . count($studentIds) . ' record(s) as critical');
+            flash('success', 'Marked ' . $updatedCount . ' record(s) as critical');
             redirect(url('views/nurse/medical-records/bulk-management.php'));
         } catch (Exception $e) {
             $errors[] = $e->getMessage();

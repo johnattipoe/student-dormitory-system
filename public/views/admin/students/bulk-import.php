@@ -20,6 +20,21 @@ use App\Services\StudentService;
 use App\Services\UserService;
 use App\Services\HouseService;
 
+// Handle CSV template download
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download_template'])) {
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="student_import_template.csv"');
+    
+    $output = fopen('php://output', 'w');
+    fputcsv($output, ['FirstName', 'LastName', 'Email', 'Phone', 'AdmissionNo', 'Course', 'Level']);
+    
+    // Add sample row
+    fputcsv($output, ['John', 'Doe', 'john@example.com', '0712345678', 'ADM001', 'Computer Science', 'Year 1']);
+    
+    fclose($output);
+    exit;
+}
+
 // Handle bulk import
 $errors = [];
 $successCount = 0;
@@ -150,6 +165,9 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-upload"></i> Import Students
                         </button>
+                        <a href="<?= url('views/admin/students/bulk-import.php?download_template=1') ?>" class="btn btn-outline-secondary">
+                            <i class="bi bi-download"></i> Download Template
+                        </a>
                     </form>
 
                     <div class="alert alert-info">
