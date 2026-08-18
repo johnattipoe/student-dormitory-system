@@ -20,9 +20,35 @@ use App\Services\HouseService;
 use App\Services\StudentService;
 
 $date = sanitize($_GET['date'] ?? date('Y-m-d'));
+$searchQuery = sanitize($_GET['search'] ?? '');
+$statusFilter = sanitize($_GET['status'] ?? '');
+$houseFilter = sanitize($_GET['house'] ?? '');
+
 $attendance = AttendanceService::forDate($date);
 $students = StudentService::all();
 $houses = HouseService::all();
+
+// Apply filters
+if (!empty($searchQuery)) {
+    $attendance = array_filter($attendance, function($record) use ($searchQuery, $students) {
+        $student = current(array_filter($students, fn($s) => ((string) ($s['id'] ?? '')) === ((string) ($record['studentId'] ?? ''))));
+        $name = ($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '');
+        $admNo = $student['admissionNo'] ?? '';
+        return stripos($name, $searchQuery) !== false || stripos($admNo, $searchQuery) !== false;
+    });
+}
+
+if (!empty($statusFilter)) {
+    $attendance = array_filter($attendance, fn($record) => ($record['status'] ?? 'present') === $statusFilter);
+}
+
+if (!empty($houseFilter)) {
+    $attendance = array_filter($attendance, function($record) use ($houseFilter, $students) {
+        $student = current(array_filter($students, fn($s) => ((string) ($s['id'] ?? '')) === ((string) ($record['studentId'] ?? ''))));
+        return ((string) ($student['houseId'] ?? '')) === $houseFilter;
+    });
+}
+
 $summary = AttendanceService::summary($date);
 $houseMap = [];
 foreach ($houses as $house) {
@@ -47,15 +73,53 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
     <div class="content-wrapper">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-                <h5 class="mb-0">All House Attendance</h5>
-                <small class="text-muted">Monitoring attendance submitted by the house master across all houses.</small>
-            </div>
-            <form method="GET" class="d-flex gap-2 align-items-center">
+        <div class="mb-3">
+            <h5 class="mb-2">Attendance Overview</h5>
+            <small class="text-muted">View and manage attendance records for your house.</small>
+        </div>
+
+        <!-- Advanced Filters -->
+        <div class="card stat-card p-3 mb-3">
+            <form method="GET" class="row g-3">
                 <input type="hidden" name="route" value="/views/houseparent/attendance/index.php">
-                <input type="date" name="date" class="form-control" value="<?= e($date) ?>">
-                <button class="btn btn-primary btn-sm">View</button>
+                
+                <div class="col-md-3">
+                    <label class="form-label small">Date</label>
+                    <input type="date" name="date" class="form-control form-control-sm" value="<?= e($date) ?>">
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small">Search Student</label>
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Name or admission no." value="<?= e($searchQuery) ?>">
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">All Statuses</option>
+                        <option value="present" <?= $statusFilter === 'present' ? 'selected' : '' ?>>Present</option>
+                        <option value="absent" <?= $statusFilter === 'absent' ? 'selected' : '' ?>>Absent</option>
+                        <option value="late" <?= $statusFilter === 'late' ? 'selected' : '' ?>>Late</option>
+                        <option value="excused" <?= $statusFilter === 'excused' ? 'selected' : '' ?>>Excused</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small">House</label>
+                    <select name="house" class="form-select form-select-sm">
+                        <option value="">All Houses</option>
+                        <?php foreach ($houses as $h): ?>
+                            <option value="<?= e((string) ($h['id'] ?? '')) ?>" <?= $houseFilter === ((string) ($h['id'] ?? '')) ? 'selected' : '' ?>>
+                                <?= e($h['name'] ?? '') ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="col-md-2 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Filter</button>
+                    <a href="<?= url('views/houseparent/attendance/index.php') ?>" class="btn btn-outline-secondary btn-sm">Reset</a>
+                </div>
             </form>
         </div>
 
@@ -81,6 +145,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         </div>
 
         <div class="card stat-card p-3">
+            <div class="mb-3 small">
+                Showing <strong><?= count($attendance) ?></strong> record(s)
+                <?php if (!empty($searchQuery) || !empty($statusFilter) || !empty($houseFilter)): ?>
+                    (filtered)
+                <?php endif; ?>
+            </div>
             <table class="table table-hover data-table w-100">
                 <thead>
                     <tr>
@@ -94,7 +164,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <tbody>
                     <?php if (empty($attendance)): ?>
                         <tr>
-                            <td colspan="5" class="text-center text-muted">No attendance records found for this date.</td>
+                            <td colspan="5" class="text-center text-muted">No attendance records found matching your filters.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($attendance as $record): ?>

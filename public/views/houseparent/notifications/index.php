@@ -27,6 +27,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_
 $pageTitle = 'Houseparent Notifications';
 $currentUserId = current_user()['uid'] ?? current_user()['id'] ?? null;
 $notifications = $currentUserId ? $notificationService->forUser($currentUserId) : [];
+$unreadNotifications = array_values(array_filter($notifications, fn($note) => empty($note['read'])));
+$readNotifications = array_values(array_filter($notifications, fn($note) => !empty($note['read'])));
+
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/houseparent/dashboard/index.php')],
     ['icon' => 'bi-mortarboard', 'label' => 'Students', 'href' => url('views/houseparent/students/index.php')],
@@ -47,6 +50,27 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Notifications</h5>
             <span class="badge bg-secondary bg-opacity-10 text-secondary"><?= count($notifications) ?> items</span>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card stat-card p-3 text-center h-100">
+                    <div class="text-muted small">Total</div>
+                    <div class="fs-2 fw-bold"><?= e((string) count($notifications)) ?></div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card p-3 text-center h-100">
+                    <div class="text-muted small">Unread</div>
+                    <div class="fs-2 fw-bold"><?= e((string) count($unreadNotifications)) ?></div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card p-3 text-center h-100">
+                    <div class="text-muted small">Read</div>
+                    <div class="fs-2 fw-bold"><?= e((string) count($readNotifications)) ?></div>
+                </div>
+            </div>
         </div>
 
         <div class="card stat-card p-3">

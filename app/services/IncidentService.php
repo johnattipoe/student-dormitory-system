@@ -207,4 +207,17 @@ class IncidentService
     {
         return $this->all();
     }
+
+    public static function byStudent(?string $studentId): array
+    {
+        if (!$studentId) {
+            return [];
+        }
+        try {
+            $service = new self();
+            return $service->studentIncidents($studentId);
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
 }
