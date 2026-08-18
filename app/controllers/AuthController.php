@@ -5,6 +5,14 @@ namespace App\Controllers;
 use App\Services\AuthService;
 use App\Services\FirebaseAuthService;
 
+if (!class_exists(AuthService::class, false)) {
+    require_once __DIR__ . '/../services/AuthService.php';
+}
+
+if (!class_exists(FirebaseAuthService::class, false)) {
+    require_once __DIR__ . '/../services/FirebaseAuthService.php';
+}
+
 class AuthController
 {
     private AuthService $authService;

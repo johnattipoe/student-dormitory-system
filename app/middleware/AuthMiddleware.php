@@ -4,6 +4,10 @@ namespace App\Middleware;
 
 use App\Services\AuthService;
 
+if (!class_exists(AuthService::class, false)) {
+    require_once __DIR__ . '/../services/AuthService.php';
+}
+
 /**
  * AuthMiddleware
  * Include at the top of any protected page:
