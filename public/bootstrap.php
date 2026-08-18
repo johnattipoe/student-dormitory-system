@@ -14,6 +14,11 @@ if (!empty($appConfig['timezone'])) {
 }
 require_once __DIR__ . '/../app/helpers/functions.php';
 
+// Define public root for use in views and nested includes
+if (!defined('PUBLIC_ROOT')) {
+    define('PUBLIC_ROOT', __DIR__);
+}
+
 // Fallback autoloader for Services and Models (handles stale Composer autoload)
 spl_autoload_register(function ($class) {
     // Only handle App namespace
