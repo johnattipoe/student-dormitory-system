@@ -15,12 +15,12 @@ class ReportController
 
     public function dashboard(): void
     {
-        require_role(
+        require_any_role([
             ROLE_ADMIN,
             ROLE_HOUSE_MASTER,
             ROLE_HOUSE_MISTRESS,
-            ROLE_HOUSEPARENT
-        );
+            ROLE_HOUSEPARENT,
+        ]);
 
         $reports = $this->reportService->dashboard();
 
@@ -29,12 +29,12 @@ class ReportController
 
     public function attendance(): void
     {
-        require_role(
+        require_any_role([
             ROLE_ADMIN,
             ROLE_HOUSE_MASTER,
             ROLE_HOUSE_MISTRESS,
-            ROLE_HOUSEPARENT
-        );
+            ROLE_HOUSEPARENT,
+        ]);
 
         $report = $this->reportService->attendance();
 
@@ -43,12 +43,12 @@ class ReportController
 
     public function occupancy(): void
     {
-        require_role(
+        require_any_role([
             ROLE_ADMIN,
             ROLE_HOUSE_MASTER,
             ROLE_HOUSE_MISTRESS,
-            ROLE_HOUSEPARENT
-        );
+            ROLE_HOUSEPARENT,
+        ]);
 
         $report = $this->reportService->occupancy();
 
@@ -57,7 +57,7 @@ class ReportController
 
     public function students(): void
     {
-        require_role(ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS);
+        require_any_role([ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS]);
 
         $report = $this->reportService->students();
 
@@ -66,13 +66,13 @@ class ReportController
 
     public function visitors(): void
     {
-        require_role(
+        require_any_role([
             ROLE_ADMIN,
             ROLE_HOUSE_MASTER,
             ROLE_HOUSE_MISTRESS,
             ROLE_HOUSEPARENT,
-            ROLE_SECURITY
-        );
+            ROLE_SECURITY,
+        ]);
 
         $report = $this->reportService->visitors();
 
@@ -81,14 +81,14 @@ class ReportController
 
     public function incidents(): void
     {
-        require_role(
+        require_any_role([
             ROLE_ADMIN,
             ROLE_HOUSE_MASTER,
             ROLE_HOUSE_MISTRESS,
             ROLE_HOUSEPARENT,
             ROLE_SECURITY,
-            ROLE_NURSE
-        );
+            ROLE_NURSE,
+        ]);
 
         $report = $this->reportService->incidents();
 
@@ -97,7 +97,7 @@ class ReportController
 
     public function medical(): void
     {
-        require_role(ROLE_ADMIN, ROLE_NURSE);
+        require_any_role([ROLE_ADMIN, ROLE_NURSE]);
 
         $report = $this->reportService->medical();
 
