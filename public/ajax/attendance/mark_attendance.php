@@ -30,25 +30,16 @@ try {
     // Check if record exists and update, or create new
     $attendanceService = new AttendanceService();
     
-    // Try to find existing record
-    $existing = $attendanceService->forStudent($studentId, $date);
-    
-    $recordId = null;
-    if (!empty($existing)) {
-        $recordId = $existing[0]['id'] ?? null;
-    }
-    
-    // Mark attendance (create or update)
+    // Mark attendance; the service updates an existing record for the same date.
     $result = $attendanceService->mark(
         $studentId,
         $status,
         $date,
         $houseId,
-        current_user_id(),
-        current_user()['name'] ?? 'System'
+        current_user_id()
     );
     
-    if ($result) {
+    if (!empty($result['success'])) {
         // Log activity
         ActivityLogService::log(
             current_user_id() ?? 'unknown',
@@ -58,7 +49,7 @@ try {
         );
         
         http_response_code(200);
-        echo json_encode(['ok' => true, 'message' => 'Attendance marked', 'recordId' => $recordId]);
+        echo json_encode(['ok' => true, 'message' => $result['message'] ?? 'Attendance marked', 'recordId' => $result['id'] ?? null]);
     } else {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => 'Failed to mark attendance']);

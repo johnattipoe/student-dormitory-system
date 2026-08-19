@@ -49,6 +49,6 @@ class PreferenceServiceTest extends TestCase
         // Example showing how to structure tests
         // Actual implementation may vary
         $result = $this->service->getFrequency('sample-pref-id');
-        $this->assertIn($result, ['daily', 'weekly', 'disabled', null]);
+        $this->assertTrue(in_array($result, ['daily', 'weekly', 'disabled', null], true));
     }
 }

@@ -134,6 +134,12 @@ class AttendanceService
         return $count;
     }
 
+    public static function update(string $id, array $data): bool
+    {
+        FirebaseService::getInstance()->updateDocument(\COL_ATTENDANCE, $id, $data);
+        return true;
+    }
+
     public static function forDate(string $date, ?string $houseId = null): array
     {
         $records = FirebaseService::getInstance()->where(\COL_ATTENDANCE, 'date', '=', $date);
