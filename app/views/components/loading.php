@@ -17,11 +17,11 @@ $sizeClass = $size === 'sm' ? 'loading-card-sm' : ($size === 'lg' ? 'loading-car
 </div>
 
 <style>
-    .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); z-index: 9999; }
-    .loading-card { background: white; padding: 2rem; border-radius: 0.5rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+    .loading-overlay { position: fixed; inset: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.18); backdrop-filter: blur(4px); z-index: 9999; }
+    .loading-card { background: linear-gradient(135deg, #ffffff, #f8fbff); padding: 2rem; border-radius: 1rem; border: 1px solid rgba(37, 99, 235, .12); box-shadow: 0 18px 45px rgba(20, 30, 60, .16); }
     .loading-card-sm { padding: 1rem; } .loading-card-lg { padding: 3rem; }
-    .fade-in { animation: fadeIn 0.3s ease-in; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .fade-in { animation: fadeIn 0.25s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: scale(1); } }
 </style>
 
 <script>
