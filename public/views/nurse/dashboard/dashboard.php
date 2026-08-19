@@ -30,6 +30,8 @@ $navItems = [
     ['icon' => 'bi-people', 'label' => 'Students', 'href' => url('views/nurse/students/students.php')],
     ['icon' => 'bi-journal-medical', 'label' => 'Medical Records', 'href' => url('views/nurse/medical-records/medical-records.php')],
     ['icon' => 'bi-exclamation-triangle', 'label' => 'Emergency Cases', 'href' => url('views/nurse/emergency-cases/emergency-cases.php')],
+    ['icon' => 'bi-file-earmark-medical', 'label' => 'Medical Report', 'href' => url('reports/export.php?type=medical&format=pdf')],
+    ['icon' => 'bi-file-earmark-text', 'label' => 'Incident Report', 'href' => url('reports/export.php?type=incidents&format=pdf')],
     ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/nurse/notifications/notifications.php')],
 ];
 
