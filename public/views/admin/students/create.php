@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'roomId' => sanitize($_POST['roomId'] ?? ''),
         'guardianName' => sanitize($_POST['guardianName'] ?? ''),
         'guardianPhone' => sanitize($_POST['guardianPhone'] ?? ''),
+        'guardianEmail' => sanitize($_POST['guardianEmail'] ?? ''),
         'status' => sanitize($_POST['status'] ?? 'active'),
     ];
 
@@ -129,6 +130,10 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                     <div class="col-md-6">
                         <label class="form-label">Guardian Phone</label>
                         <input name="guardianPhone" class="form-control" value="<?= e($old['guardianPhone'] ?? '') ?>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Guardian Email</label>
+                        <input type="email" name="guardianEmail" class="form-control" value="<?= e($old['guardianEmail'] ?? '') ?>">
                     </div>
                 </div>
                 <div class="mt-4">

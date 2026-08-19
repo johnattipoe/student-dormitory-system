@@ -47,6 +47,7 @@ $users = (new UserService())->all();
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/admin/notifications/index.php'), 'active' => true],
+    ['icon' => 'bi-chat-left-text', 'label' => 'Message Parents', 'href' => url('views/parent-messages/create.php')],
 ];
 require APP_ROOT . '/app/views/components/header.php';
 require APP_ROOT . '/app/views/components/sidebar.php';
