@@ -27,6 +27,30 @@ $id = $_GET['id'] ?? '';
 $student = $id ? StudentService::find($id) : null;
 if (!$student) { http_response_code(404); echo 'Student not found.'; exit; }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $data = [
+        'firstName' => sanitize($_POST['firstName'] ?? ''),
+        'lastName' => sanitize($_POST['lastName'] ?? ''),
+        'email' => sanitize($_POST['email'] ?? ''),
+        'houseId' => sanitize($_POST['houseId'] ?? ''),
+        'status' => sanitize($_POST['status'] ?? 'active'),
+        'guardianName' => sanitize($_POST['guardianName'] ?? ''),
+        'guardianPhone' => sanitize($_POST['guardianPhone'] ?? ''),
+        'guardianEmail' => sanitize($_POST['guardianEmail'] ?? ''),
+    ];
+
+    if (!validate_email($data['email'])) {
+        $_SESSION['_errors'] = ['email' => 'Email is invalid.'];
+        $_SESSION['_old'] = $data;
+        flash('error', 'Please fix the highlighted fields.');
+        redirect(base_url('index.php?route=/views/admin/students/edit.php&id=' . urlencode($id)));
+    }
+
+    StudentService::update($id, $data);
+    flash('success', 'Student updated successfully.');
+    redirect(base_url('index.php?route=/views/admin/students/index.php&updated=1'));
+}
+
 $houses = FirebaseService::getInstance()->getCollection(COL_HOUSES, [], 100);
 $pageTitle = 'Edit Student';
 
@@ -43,7 +67,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <div class="content-wrapper">
         <div class="card stat-card p-4" style="max-width:720px">
             <h5 class="mb-3">Edit Student</h5>
-            <form method="POST" action="<?= url('students/' . urlencode($student['id'])) ?>">
+            <form method="POST" action="<?= url('index.php?route=/views/admin/students/edit.php&id=' . urlencode((string) $student['id'])) ?>">
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">First Name</label>
@@ -76,6 +100,18 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                             <option value="inactive" <?= ($old['status'] ?? $student['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Inactive</option>
                             <option value="graduated" <?= ($old['status'] ?? $student['status'] ?? '') === 'graduated' ? 'selected' : '' ?>>Graduated</option>
                         </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Guardian Name</label>
+                        <input name="guardianName" class="form-control" value="<?= e($old['guardianName'] ?? $student['guardianName'] ?? '') ?>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Guardian Phone</label>
+                        <input name="guardianPhone" class="form-control" value="<?= e($old['guardianPhone'] ?? $student['guardianPhone'] ?? '') ?>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Guardian Email</label>
+                        <input type="email" name="guardianEmail" class="form-control" value="<?= e($old['guardianEmail'] ?? $student['guardianEmail'] ?? '') ?>">
                     </div>
                 </div>
                 <div class="mt-4">

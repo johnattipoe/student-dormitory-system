@@ -21,6 +21,7 @@ class Student
     public ?string $roomId;
     public string $guardianName;
     public string $guardianPhone;
+    public string $guardianEmail;
     public string $status;
     public ?string $createdAt;
     public ?string $updatedAt;
@@ -40,6 +41,7 @@ class Student
         $this->roomId        = $data['roomId'] ?? null;
         $this->guardianName  = $data['guardianName'] ?? '';
         $this->guardianPhone = $data['guardianPhone'] ?? '';
+        $this->guardianEmail = $data['guardianEmail'] ?? '';
         $this->status        = $data['status'] ?? STATUS_ACTIVE;
         $this->createdAt     = $data['createdAt'] ?? null;
         $this->updatedAt     = $data['updatedAt'] ?? null;
@@ -83,6 +85,7 @@ class Student
             'admissionNo' => $this->admissionNo, 'course' => $this->course, 'level' => $this->level,
             'houseId' => $this->houseId, 'roomId' => $this->roomId,
             'guardianName' => $this->guardianName, 'guardianPhone' => $this->guardianPhone,
+            'guardianEmail' => $this->guardianEmail,
             'status' => $this->status,
         ];
 
@@ -108,6 +111,7 @@ class Student
             'admissionNo' => $this->admissionNo, 'course' => $this->course, 'level' => $this->level,
             'houseId' => $this->houseId, 'roomId' => $this->roomId,
             'guardianName' => $this->guardianName, 'guardianPhone' => $this->guardianPhone,
+            'guardianEmail' => $this->guardianEmail,
             'status' => $this->status, 'createdAt' => $this->createdAt, 'updatedAt' => $this->updatedAt,
         ];
     }

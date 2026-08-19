@@ -37,6 +37,7 @@ class StudentService
             'roomId'      => $data['roomId'] ?? null,
             'guardianName'  => $data['guardianName'] ?? '',
             'guardianPhone' => $data['guardianPhone'] ?? '',
+            'guardianEmail' => $data['guardianEmail'] ?? '',
             'status'      => $data['status'] ?? 'active',
         ]);
     }
