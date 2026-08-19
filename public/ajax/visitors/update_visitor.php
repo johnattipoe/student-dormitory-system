@@ -49,7 +49,8 @@ try {
     
     if ($result) {
         // Log activity
-        (new ActivityLogService())->log(
+        ActivityLogService::log(
+            current_user_id() ?? 'unknown',
             'visitor_status_updated',
             'Visitor ' . $visitorId . ' status changed to ' . $status,
             ['visitorId' => $visitorId, 'status' => $status]

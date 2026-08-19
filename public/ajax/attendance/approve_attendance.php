@@ -46,7 +46,8 @@ try {
     if ($result) {
         // Log activity
         $action = $approved ? 'attendance_approved' : 'attendance_rejected';
-        (new ActivityLogService())->log(
+        ActivityLogService::log(
+            current_user_id() ?? 'unknown',
             $action,
             'Attendance record ' . $recordId . ' ' . ($approved ? 'approved' : 'rejected'),
             ['recordId' => $recordId, 'approved' => $approved]

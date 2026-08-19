@@ -1,16 +1,7 @@
 <?php
-require_once __DIR__ . '/../../vendor/autoload.php';
-$dotenv = \Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-$dotenv->safeLoad();
+require __DIR__ . '/../../bootstrap.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-require_once __DIR__ . '/../../app/config/constants.php';
-$appConfig = require __DIR__ . '/../../app/config/app.php';
-require_once __DIR__ . '/../../app/helpers/functions.php';
-require_once __DIR__ . '/../../app/helpers/auth.php';
+header('Content-Type: application/json');
 
 use App\Services\FirebaseAuthService;
 
@@ -20,8 +11,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-require_login();
-require_role('admin');
+if (!is_logged_in()) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => 'Authentication required']);
+    exit;
+}
+
+if (!has_role('admin')) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Forbidden']);
+    exit;
+}
 
 // Rate-limiting: track failed attempts per IP
 $clientIp = $_SERVER['REMOTE_ADDR'] ?? 'unknown';

@@ -58,7 +58,8 @@ try {
     
     if ($incidentId) {
         // Log activity
-        (new ActivityLogService())->log(
+        ActivityLogService::log(
+            current_user_id() ?? 'unknown',
             'incident_reported',
             'New incident reported - Type: ' . $type . ', Severity: ' . $severity,
             ['studentId' => $studentId, 'type' => $type, 'severity' => $severity, 'incidentId' => $incidentId]

@@ -50,7 +50,8 @@ try {
     
     if ($result) {
         // Log activity
-        (new ActivityLogService())->log(
+        ActivityLogService::log(
+            current_user_id() ?? 'unknown',
             'attendance_marked',
             'Marked ' . $status . ' for student ' . $studentId . ' on ' . $date,
             ['studentId' => $studentId, 'status' => $status, 'date' => $date]
