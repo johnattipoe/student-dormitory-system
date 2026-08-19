@@ -7,6 +7,15 @@ use PHPMailer\PHPMailer\PHPMailer;
 
 class EmailService
 {
+    public function isConfigured(): bool
+    {
+        $config = require APP_ROOT . '/app/config/mail.php';
+
+        return !empty($config['enabled'])
+            && $config['host'] !== ''
+            && $config['from_address'] !== '';
+    }
+
     public function sendHtml(
         string $recipient,
         string $subject,

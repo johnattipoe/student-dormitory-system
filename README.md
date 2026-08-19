@@ -32,6 +32,17 @@ PHP + Firebase Student Dormitory Management System.
 8. Configure .env.
 9. Run composer install.
 
+### Email delivery
+
+PHPMailer is installed through Composer and supports authenticated SMTP delivery.
+Copy the `MAIL_*` settings from `.env.example` into `.env`, then replace the
+placeholder values with the credentials from your mail provider. Keep
+`MAIL_ENABLED=false` until the host, port, sender address, username, and
+password are configured.
+
+Supported encryption values are `tls`, `ssl`, or an empty value for providers
+that do not require encryption. The application never logs the SMTP password.
+
 ## Development
 
 Use the PHP development server:
