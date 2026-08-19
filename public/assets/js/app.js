@@ -152,16 +152,20 @@ SDS.showLoading = function (message) {
     if (msgEl) msgEl.textContent = message;
   }
   
+  spinner.hidden = false;
   spinner.classList.remove('d-none');
   spinner.classList.add('d-flex');
+  spinner.style.setProperty('display', 'flex', 'important');
   document.body.style.overflow = 'hidden'; // Prevent scrolling during loading
 };
 
 SDS.hideLoading = function () {
   const spinner = document.getElementById('loadingSpinner');
   if (spinner) {
+    spinner.hidden = true;
     spinner.classList.add('d-none');
     spinner.classList.remove('d-flex');
+    spinner.style.setProperty('display', 'none', 'important');
   }
   document.body.style.overflow = 'auto'; // Restore scrolling
 };
