@@ -15,3 +15,40 @@ table code { background: #f0f2f8; color: var(--sds-primary-dark, #24488f); paddi
 /* CSV export button */
 #exportCsv { border-style: dashed; }
 #exportCsv:hover { border-style: solid; }
+
+/* Admin color layer */
+.content-wrapper > .mb-4 {
+  padding: 1.25rem;
+  border-radius: var(--sds-radius);
+  background: linear-gradient(135deg, #eff6ff, #f5f3ff 58%, #ecfeff);
+  border: 1px solid rgba(37, 99, 235, .14);
+  box-shadow: 0 10px 28px rgba(37, 99, 235, .08);
+}
+
+.content-wrapper > .mb-4 h5,
+.content-wrapper > .mb-4 h4 {
+  color: #1d4ed8;
+  font-weight: 800;
+}
+
+.content-wrapper > .mb-4 p {
+  color: #475569 !important;
+}
+
+.badge-role,
+.badge.bg-secondary.text-uppercase {
+  background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+  color: #fff !important;
+}
+
+#settingsPage .card {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+#settingsPage .row.g-3 > .col-md-6 {
+  border-left-color: #93c5fd;
+  background: rgba(239, 246, 255, .55);
+  border-radius: 10px;
+  padding-top: .75rem;
+  padding-bottom: .75rem;
+}

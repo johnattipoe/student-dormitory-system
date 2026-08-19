@@ -45,24 +45,36 @@ class FirebaseService
 
     private function credentialsAvailable(): bool
     {
-        $appConfig = require APP_ROOT . '/app/config/app.php';
-        if (empty($appConfig['firebase_enabled'])) {
-            return false;
-        }
-
         $config = require APP_ROOT . '/app/config/firebase.php';
         $credentialPath = $config['credentials_path'] ?? '';
 
-        return is_string($credentialPath) && file_exists($credentialPath);
+        return !empty($config['firebase_enabled'])
+            && is_string($credentialPath)
+            && $credentialPath !== ''
+            && file_exists($credentialPath);
+    }
+
+    private function credentialsErrorMessage(): string
+    {
+        $config = require APP_ROOT . '/app/config/firebase.php';
+        $credentialPath = $config['credentials_path'] ?? '';
+
+        if (empty($config['firebase_enabled'])) {
+            return 'Firebase is disabled. Set FIREBASE_ENABLED=true in .env.';
+        }
+
+        if (!is_string($credentialPath) || $credentialPath === '') {
+            return 'Firebase credentials path is not configured. Set FIREBASE_CREDENTIALS or FIREBASE_CREDENTIALS_BASE64 in .env.';
+        }
+
+        return sprintf('Firebase credentials file not found: %s', $credentialPath);
     }
 
     /** Fetch a single document as an assoc array (with 'id'), or null if it doesn't exist. */
     public function getDocument(string $collection, string $id): ?array
     {
         if (!$this->credentialsAvailable()) {
-            throw new \RuntimeException(
-                'Firebase credentials not available. Ensure FIREBASE_ENABLED=true and valid credentials file exists.'
-            );
+            throw new \RuntimeException($this->credentialsErrorMessage());
         }
 
         $doc = $this->client()->collection($collection)->document($id)->snapshot();
@@ -77,9 +89,7 @@ class FirebaseService
     public function getCollection(string $collection, array $wheres = [], int $limit = 500): array
     {
         if (!$this->credentialsAvailable()) {
-            throw new \RuntimeException(
-                'Firebase credentials not available. Ensure FIREBASE_ENABLED=true and valid credentials file exists.'
-            );
+            throw new \RuntimeException($this->credentialsErrorMessage());
         }
 
         $query = $this->client()->collection($collection);
@@ -101,9 +111,7 @@ class FirebaseService
     public function addDocument(string $collection, array $data, ?string $id = null): string
     {
         if (!$this->credentialsAvailable()) {
-            throw new \RuntimeException(
-                'Firebase credentials not available. Ensure FIREBASE_ENABLED=true and valid credentials file exists.'
-            );
+            throw new \RuntimeException($this->credentialsErrorMessage());
         }
 
         $data['createdAt'] = $this->now();
@@ -121,9 +129,7 @@ class FirebaseService
     public function updateDocument(string $collection, string $id, array $data): void
     {
         if (!$this->credentialsAvailable()) {
-            throw new \RuntimeException(
-                'Firebase credentials not available. Ensure FIREBASE_ENABLED=true and valid credentials file exists.'
-            );
+            throw new \RuntimeException($this->credentialsErrorMessage());
         }
 
         $data['updatedAt'] = $this->now();
@@ -138,9 +144,7 @@ class FirebaseService
     public function deleteDocument(string $collection, string $id): void
     {
         if (!$this->credentialsAvailable()) {
-            throw new \RuntimeException(
-                'Firebase credentials not available. Ensure FIREBASE_ENABLED=true and valid credentials file exists.'
-            );
+            throw new \RuntimeException($this->credentialsErrorMessage());
         }
 
         $this->client()->collection($collection)->document($id)->delete();

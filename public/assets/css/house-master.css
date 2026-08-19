@@ -1,10 +1,50 @@
-/* House Master module — house-scoped dashboard, room occupancy, incidents */
+/* House Master module - house-scoped dashboard, room occupancy, incidents */
+
+.content-wrapper > .mb-4 {
+  padding: 1.25rem;
+  border-radius: var(--sds-radius);
+  background: linear-gradient(135deg, #f0fdf4, #e0f2fe 55%, #f5f3ff);
+  border: 1px solid rgba(22, 163, 74, .14);
+  box-shadow: 0 10px 28px rgba(22, 163, 74, .08);
+}
+
+.content-wrapper > .mb-4 h5 {
+  color: #166534;
+  font-weight: 800;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.content-wrapper > .mb-4 p {
+  color: #475569 !important;
+}
+
+.row.g-3 .stat-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+}
+
+.row.g-3 > .col-md:nth-child(2) .stat-card,
+.row.g-3 > .col-md-3:nth-child(2) .stat-card {
+  background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+}
+
+.row.g-3 > .col-md:nth-child(3) .stat-card,
+.row.g-3 > .col-md-3:nth-child(3) .stat-card {
+  background: linear-gradient(135deg, #ffffff 0%, #fff7ed 100%);
+}
+
+.row.g-3 > .col-md:nth-child(4) .stat-card,
+.row.g-3 > .col-md-3:nth-child(4) .stat-card {
+  background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%);
+}
 
 /* Highlight the "open incidents" stat card when count > 0 (paired with house-master.js) */
-.stat-card.border-danger { border: 1px solid #f5c2c7 !important; box-shadow: 0 2px 12px rgba(220,53,69,.12); }
-
-/* House summary header on the house-master dashboard */
-.content-wrapper h5 { border-bottom: 1px solid #e9ecef; padding-bottom: .5rem; }
+.stat-card.border-danger {
+  border: 1px solid #f5c2c7 !important;
+  box-shadow: 0 2px 12px rgba(220, 53, 69, .12);
+}
 
 /* Room occupancy progress bars, slightly taller for readability at this density */
-.card .progress { min-width: 120px; }
+.card .progress {
+  min-width: 120px;
+}
