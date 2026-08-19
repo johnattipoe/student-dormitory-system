@@ -2,6 +2,7 @@
 require __DIR__ . '/bootstrap.php';
 
 use App\Services\UserService;
+use App\Services\FirebaseAuthService;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = sanitize($_POST['email'] ?? '');
@@ -27,8 +28,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(base_url('forgot-password.php'));
     }
 
-    flash('success', 'Password reset instructions have been sent to ' . $email . '.');
-    redirect(base_url('login.php'));
+    try {
+        $result = FirebaseAuthService::sendPasswordResetEmail($email);
+        if (empty($result['success'])) {
+            flash('error', $result['message'] ?? 'Unable to send password reset instructions.');
+            redirect(base_url('forgot-password.php'));
+        }
+
+        $atPosition = strpos($email, '@');
+        $maskedEmail = $atPosition > 1
+            ? substr($email, 0, 1) . str_repeat('*', max(1, $atPosition - 2)) . substr($email, $atPosition - 1)
+            : $email;
+        flash('success', 'Password reset instructions have been sent to ' . $maskedEmail . '.');
+    } catch (Throwable $e) {
+        error_log('Password reset request failed: ' . $e->getMessage());
+        flash('error', 'Unable to send password reset instructions. Please try again later.');
+    }
+
+    redirect(base_url('forgot-password.php'));
 }
 
 $errorMessage = flash('error');
