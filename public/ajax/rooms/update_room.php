@@ -28,23 +28,17 @@ try {
     $roomService = new RoomService();
     
     // Update room status
-    $result = $roomService->update($roomId, ['status' => $status]);
-    
-    if ($result) {
-        // Log activity
-        ActivityLogService::log(
-            current_user_id() ?? 'unknown',
-            'room_status_updated',
-            'Room ' . $roomId . ' status changed to ' . $status,
-            ['roomId' => $roomId, 'status' => $status]
-        );
-        
-        http_response_code(200);
-        echo json_encode(['ok' => true, 'message' => 'Room status updated']);
-    } else {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'Failed to update room']);
-    }
+    $roomService->update($roomId, ['status' => $status]);
+
+    ActivityLogService::log(
+        current_user_id() ?? 'unknown',
+        'room_status_updated',
+        'Room ' . $roomId . ' status changed to ' . $status,
+        ['roomId' => $roomId, 'status' => $status]
+    );
+
+    http_response_code(200);
+    echo json_encode(['ok' => true, 'message' => 'Room status updated']);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Error: ' . $e->getMessage()]);

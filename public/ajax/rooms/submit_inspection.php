@@ -42,23 +42,17 @@ try {
     ];
     
     // Update room with inspection data
-    $result = $roomService->update($roomId, array_merge(['condition' => $condition, 'lastInspected' => date('Y-m-d')], $inspectionData));
-    
-    if ($result) {
-        // Log activity
-        ActivityLogService::log(
-            current_user_id() ?? 'unknown',
-            'room_inspection_submitted',
-            'Room ' . $roomId . ' inspection - Condition: ' . $condition,
-            ['roomId' => $roomId, 'condition' => $condition, 'hasIssues' => !empty($issues)]
-        );
-        
-        http_response_code(200);
-        echo json_encode(['ok' => true, 'message' => 'Inspection submitted']);
-    } else {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'Failed to submit inspection']);
-    }
+    $roomService->update($roomId, array_merge(['condition' => $condition, 'lastInspected' => date('Y-m-d')], $inspectionData));
+
+    ActivityLogService::log(
+        current_user_id() ?? 'unknown',
+        'room_inspection_submitted',
+        'Room ' . $roomId . ' inspection - Condition: ' . $condition,
+        ['roomId' => $roomId, 'condition' => $condition, 'hasIssues' => !empty($issues)]
+    );
+
+    http_response_code(200);
+    echo json_encode(['ok' => true, 'message' => 'Inspection submitted']);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Error: ' . $e->getMessage()]);

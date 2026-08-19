@@ -24,6 +24,12 @@ class VisitorService
         }
     }
 
+    public function update(string $id, array $data): bool
+    {
+        $this->firebase->updateDocument($this->collection, $id, $data);
+        return true;
+    }
+
     public function register(array $data): array
     {
         try {
