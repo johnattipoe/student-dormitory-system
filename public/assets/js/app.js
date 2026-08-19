@@ -2,6 +2,8 @@
 window.SDS = window.SDS || {};
 
 document.addEventListener('DOMContentLoaded', function () {
+  SDS.enhancePageChrome();
+
   const toggle = document.getElementById('sidebarToggle');
   const sidebar = document.querySelector('.sidebar');
   if (toggle && sidebar) {
@@ -14,37 +16,72 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Auto-init any table with .data-table, but skip tables that intentionally use empty-state
-  // rows with colspan, since DataTables reports those as "Incorrect column count".
+  // Auto-init useful tables. Empty-state tables are kept plain because colspan
+  // rows make DataTables report "Incorrect column count".
   if (window.jQuery && jQuery.fn.DataTable) {
-    jQuery('.data-table').each(function () {
+    jQuery('table.data-table, table.js-data-table, .content-wrapper table').each(function () {
       const table = this;
       if (table.dataset.noDataTable === 'true' || table.closest('[data-no-data-table="true"]')) {
         return;
       }
 
-      if (table.querySelector('td[colspan], th[colspan]')) {
+      if (!table.tHead || table.querySelector('td[colspan], th[colspan]')) {
         return;
       }
 
       if (!jQuery.fn.DataTable.isDataTable(table)) {
-        jQuery(table).DataTable({ pageLength: 10, order: [], responsive: false });
+        const rowCount = table.tBodies[0] ? table.tBodies[0].rows.length : 0;
+        const shouldExport = table.classList.contains('data-table')
+          || table.classList.contains('js-data-table')
+          || table.dataset.export === 'true'
+          || rowCount >= 8;
+
+        const options = {
+          pageLength: 10,
+          order: [],
+          responsive: true,
+          autoWidth: false,
+          language: {
+            search: '',
+            searchPlaceholder: 'Search records...',
+            lengthMenu: 'Show _MENU_',
+          },
+        };
+
+        if (shouldExport && jQuery.fn.dataTable.Buttons) {
+          options.dom = "<'row align-items-center mb-3'<'col-md-6'B><'col-md-6'f>>" +
+            "<'row'<'col-12'tr>>" +
+            "<'row align-items-center mt-3'<'col-md-5'i><'col-md-7'p>>";
+          options.buttons = [
+            { extend: 'copyHtml5', className: 'btn btn-sm btn-outline-secondary', text: '<i class="bi bi-clipboard me-1"></i>Copy' },
+            { extend: 'csvHtml5', className: 'btn btn-sm btn-outline-success', text: '<i class="bi bi-filetype-csv me-1"></i>CSV' },
+            { extend: 'excelHtml5', className: 'btn btn-sm btn-outline-primary', text: '<i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel' },
+            { extend: 'pdfHtml5', className: 'btn btn-sm btn-outline-danger', text: '<i class="bi bi-filetype-pdf me-1"></i>PDF' },
+            { extend: 'print', className: 'btn btn-sm btn-outline-info', text: '<i class="bi bi-printer me-1"></i>Print' },
+          ];
+        }
+
+        jQuery(table).DataTable(options);
       }
     });
   }
 
   // Auto-init date/time pickers
   if (window.flatpickr) {
-    document.querySelectorAll('.datepicker').forEach(el => {
+    document.querySelectorAll('.datepicker, input[type="date"], input[type="datetime-local"]').forEach(el => {
       if (!el._flatpickr) flatpickr(el);
     });
   }
 
   // Auto-init select2
   if (window.jQuery && jQuery.fn.select2) {
-    jQuery('.select2').each(function () {
+    jQuery('.select2, select.form-select').each(function () {
       if (!jQuery(this).hasClass('select2-hidden-accessible')) {
-        jQuery(this).select2({ width: '100%' });
+        jQuery(this).select2({
+          width: '100%',
+          theme: 'bootstrap-5',
+          minimumResultsForSearch: this.options && this.options.length > 8 ? 0 : Infinity,
+        });
       }
     });
   }
@@ -227,4 +264,37 @@ SDS.getJSON = async function (url, options) {
     if (showSpinner) SDS.hideLoading();
     throw e;
   }
+};
+
+SDS.enhancePageChrome = function () {
+  document.querySelectorAll('.content-wrapper table').forEach(table => {
+    table.classList.add('table', 'table-hover', 'align-middle');
+    if (!table.closest('.table-responsive')) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'table-responsive sds-table-wrap';
+      table.parentNode.insertBefore(wrapper, table);
+      wrapper.appendChild(table);
+    }
+  });
+
+  document.querySelectorAll('.content-wrapper .card:not(.stat-card)').forEach((card, index) => {
+    card.classList.add('sds-card');
+    card.style.setProperty('--sds-card-accent-index', String((index % 5) + 1));
+  });
+
+  document.querySelectorAll('.content-wrapper form').forEach(form => {
+    form.classList.add('sds-form');
+    form.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea').forEach(input => {
+      input.classList.add('form-control');
+    });
+    form.querySelectorAll('select').forEach(select => {
+      select.classList.add('form-select');
+    });
+  });
+
+  document.querySelectorAll('.content-wrapper .card-header, .content-wrapper h5, .content-wrapper h6').forEach(heading => {
+    if (!heading.querySelector('.bi') && heading.classList.contains('card-header')) {
+      heading.classList.add('sds-section-heading');
+    }
+  });
 };

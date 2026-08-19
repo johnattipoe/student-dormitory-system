@@ -1,20 +1,32 @@
 @media (max-width: 991.98px) {
-  .sidebar { position: fixed; left: -260px; top: 0; z-index: 1050; transition: left .2s ease; }
+  .sidebar { position: fixed; left: -260px; top: 0; z-index: 1050; transition: left .2s ease; box-shadow: 18px 0 40px rgba(15, 23, 42, .22); }
   .sidebar.show { left: 0; }
   .content-wrapper { padding: 1rem; }
+  .topbar { padding-left: .75rem !important; padding-right: .75rem !important; }
+  .card { border-radius: 12px; }
 }
 
 @media (max-width: 767.98px) {
   .topbar span.fw-semibold { display: none; }
   .stat-card { text-align: center; }
   .stat-card .d-flex.flex-row { flex-direction: column !important; }
+  .stat-card .stat-icon { margin-left: auto; margin-right: auto; }
   .card.stat-card .table-responsive,
   .card.stat-card table { font-size: .85rem; }
   .btn-group.btn-group-sm .btn { padding: .2rem .4rem; font-size: .75rem; }
+  .content-wrapper > .mb-4 { padding: 1rem; }
+  .table-responsive { margin-bottom: .5rem; }
+  .pagination { flex-wrap: wrap; }
+  .alerts-container .alert { min-width: calc(100vw - 1rem); }
 }
 
 @media (max-width: 575.98px) {
   .login-card { max-width: 100%; }
   .content-wrapper .row.g-3 > [class*="col-"] { margin-bottom: .5rem; }
   .dropdown-menu-end { right: 0; left: auto !important; }
+  .content-wrapper { padding: .85rem; }
+  .card-body { padding: 1rem; }
+  .btn { width: 100%; margin-bottom: .35rem; }
+  .btn-group .btn { width: auto; margin-bottom: 0; }
+  .table { font-size: .84rem; }
 }
