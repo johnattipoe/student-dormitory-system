@@ -31,6 +31,8 @@ $navItems = [
     ['icon' => 'bi-people', 'label' => 'Visitors', 'href' => url('views/security/visitors/visitors.php')],
     ['icon' => 'bi-journal-text', 'label' => 'Visitor History', 'href' => url('views/security/visitor-history/visitor-history.php')],
     ['icon' => 'bi-exclamation-triangle', 'label' => 'Incidents', 'href' => url('views/security/incidents/incidents.php')],
+    ['icon' => 'bi-file-earmark-text', 'label' => 'Visitor Report', 'href' => url('reports/export.php?type=visitors&format=pdf')],
+    ['icon' => 'bi-file-earmark-text', 'label' => 'Incident Report', 'href' => url('reports/export.php?type=incidents&format=pdf')],
     ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/security/notifications/notifications.php')],
 ];
 

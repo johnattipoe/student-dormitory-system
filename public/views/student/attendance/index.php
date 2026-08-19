@@ -73,10 +73,10 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                     <small class="text-muted">View your attendance records and download reports</small>
                 </div>
                 <div class="btn-group" role="group">
-                    <a href="<?= url('views/student/attendance/index.php?format=csv') ?>" class="btn btn-success btn-sm">
+                    <a href="<?= url('reports/export.php?type=student_attendance&format=csv') ?>" class="btn btn-success btn-sm">
                         <i class="bi bi-download"></i> CSV
                     </a>
-                    <a href="<?= url('views/student/attendance/index.php?format=pdf') ?>" class="btn btn-danger btn-sm">
+                    <a href="<?= url('reports/export.php?type=student_attendance&format=pdf') ?>" class="btn btn-danger btn-sm">
                         <i class="bi bi-file-pdf"></i> PDF
                     </a>
                 </div>

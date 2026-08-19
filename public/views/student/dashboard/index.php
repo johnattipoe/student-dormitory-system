@@ -19,6 +19,7 @@ $pageTitle = 'Student Dashboard';
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/student/dashboard/index.php'), 'active' => true],
     ['icon' => 'bi-calendar-check', 'label' => 'Attendance', 'href' => url('views/student/attendance/index.php')],
+    ['icon' => 'bi-file-earmark-text', 'label' => 'Reports', 'href' => url('reports/export.php?type=student_attendance&format=pdf')],
     ['icon' => 'bi-people', 'label' => 'Visitors', 'href' => url('views/student/visitors/index.php')],
     ['icon' => 'bi-flag', 'label' => 'Incidents', 'href' => url('views/student/incidents/index.php')],
     ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/student/notifications/index.php')],

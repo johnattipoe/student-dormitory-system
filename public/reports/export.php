@@ -16,6 +16,7 @@ $allowedReports = [
     'medical' => [ROLE_ADMIN, ROLE_NURSE],
     'house_master' => [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS],
     'houseparent' => [ROLE_HOUSEPARENT],
+    'student_attendance' => [ROLE_STUDENT],
 ];
 
 if (!isset($allowedReports[$type])) {
@@ -35,6 +36,7 @@ $service = new ReportService();
 $data = match ($type) {
     'house_master' => house_master_report_data(),
     'houseparent' => houseparent_report_data(),
+    'student_attendance' => student_attendance_report_data(),
     default => $service->{$type === 'dashboard' ? 'dashboard' : $type}(),
 };
 $title = ucwords(str_replace('_', ' ', $type)) . ' Report';
@@ -171,5 +173,25 @@ function houseparent_report_data(): array
         'attendance' => $summary,
         'visitors' => count($visitors),
         'openIncidents' => count($incidents),
+    ];
+}
+
+function student_attendance_report_data(): array
+{
+    $studentId = (string) (current_user()['uid'] ?? '');
+    $records = App\Services\AttendanceService::history($studentId, 200);
+    $summary = ['present' => 0, 'absent' => 0, 'late' => 0, 'excused' => 0];
+
+    foreach ($records as $record) {
+        $status = (string) ($record['status'] ?? 'absent');
+        if (isset($summary[$status])) {
+            $summary[$status]++;
+        }
+    }
+
+    return [
+        'student' => current_user()['name'] ?? current_user()['email'] ?? 'Student',
+        'attendance' => $summary,
+        'totalRecords' => count($records),
     ];
 }

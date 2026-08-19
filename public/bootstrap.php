@@ -17,7 +17,7 @@ require_once __DIR__ . '/../app/helpers/functions.php';
 // Page routes need the global loading spinner; JSON endpoints must stay JSON-only.
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 $acceptsJson = str_contains(strtolower($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
-if (!str_contains($requestUri, '/ajax/') && !$acceptsJson) {
+if (!str_contains($requestUri, '/ajax/') && !str_contains($requestUri, '/reports/') && !$acceptsJson) {
     if (ob_get_level() === 0) {
         ob_start();
     }
