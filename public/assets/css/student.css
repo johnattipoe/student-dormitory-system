@@ -10,3 +10,40 @@
 
 /* Read-only profile table */
 .table-borderless th { color: #6c757d; font-weight: 500; width: 160px; }
+
+/* Student color layer */
+.content-wrapper > .mb-4 {
+  padding: 1.25rem;
+  border-radius: var(--sds-radius);
+  background: linear-gradient(135deg, #eef2ff, #ecfeff 58%, #f5f3ff);
+  border: 1px solid rgba(124, 58, 237, .15);
+  box-shadow: 0 10px 28px rgba(124, 58, 237, .08);
+}
+
+.content-wrapper > .mb-4 h5,
+.content-wrapper > .mb-4 h4 {
+  color: #5b21b6;
+  font-weight: 800;
+}
+
+.content-wrapper > .mb-4 p {
+  color: #475569 !important;
+}
+
+.border-bottom.py-2 {
+  border-radius: 10px;
+  padding-left: .75rem;
+  padding-right: .75rem;
+}
+
+.border-bottom.py-2:hover {
+  background: linear-gradient(135deg, #eef2ff, #ecfeff);
+}
+
+.list-group-item {
+  background: linear-gradient(90deg, #ffffff, #f8fafc);
+}
+
+.list-group-item:hover {
+  background: #eef2ff;
+}

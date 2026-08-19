@@ -8,3 +8,40 @@
 
 /* Registered-but-not-checked-in visitors */
 .badge.bg-secondary { background-color: #6c757d !important; }
+
+/* Security color layer */
+.content-wrapper > .mb-4 {
+  padding: 1.25rem;
+  border-radius: var(--sds-radius);
+  background: linear-gradient(135deg, #fff7ed, #fef2f2 58%, #f8fafc);
+  border: 1px solid rgba(234, 88, 12, .18);
+  box-shadow: 0 10px 28px rgba(234, 88, 12, .08);
+}
+
+.content-wrapper > .mb-4 h5,
+.content-wrapper > .mb-4 h4 {
+  color: #9a3412;
+  font-weight: 800;
+}
+
+.content-wrapper > .mb-4 p {
+  color: #475569 !important;
+}
+
+#onPremisesTable thead th {
+  background: linear-gradient(135deg, #111827, #374151);
+  color: #fff;
+}
+
+#onPremisesTable tbody tr:hover {
+  background: #fff7ed;
+}
+
+.btn-dark {
+  background: linear-gradient(135deg, #111827, #475569);
+  border-color: transparent;
+}
+
+.badge.bg-secondary {
+  background: linear-gradient(135deg, #64748b, #334155) !important;
+}
