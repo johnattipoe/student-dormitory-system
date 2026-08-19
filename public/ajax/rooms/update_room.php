@@ -32,7 +32,8 @@ try {
     
     if ($result) {
         // Log activity
-        (new ActivityLogService())->log(
+        ActivityLogService::log(
+            current_user_id() ?? 'unknown',
             'room_status_updated',
             'Room ' . $roomId . ' status changed to ' . $status,
             ['roomId' => $roomId, 'status' => $status]

@@ -14,6 +14,13 @@ if (!empty($appConfig['timezone'])) {
 }
 require_once __DIR__ . '/../app/helpers/functions.php';
 
+// Page routes need the global loading spinner; JSON endpoints must stay JSON-only.
+$requestUri = $_SERVER['REQUEST_URI'] ?? '';
+$acceptsJson = str_contains(strtolower($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
+if (!str_contains($requestUri, '/ajax/') && !$acceptsJson) {
+    include __DIR__ . '/../app/views/components/loading.php';
+}
+
 // Define public root for use in views and nested includes
 if (!defined('PUBLIC_ROOT')) {
     define('PUBLIC_ROOT', __DIR__);

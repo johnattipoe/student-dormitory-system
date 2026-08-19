@@ -46,7 +46,8 @@ try {
     
     if ($result) {
         // Log activity
-        (new ActivityLogService())->log(
+        ActivityLogService::log(
+            current_user_id() ?? 'unknown',
             'room_inspection_submitted',
             'Room ' . $roomId . ' inspection - Condition: ' . $condition,
             ['roomId' => $roomId, 'condition' => $condition, 'hasIssues' => !empty($issues)]
