@@ -42,6 +42,24 @@ class NotificationService
         }
     }
 
+    public function findForUser(string $id, ?string $uid): ?array
+    {
+        if ($id === '' || !$uid) {
+            return null;
+        }
+
+        try {
+            $notification = $this->firebase->getDocument($this->collection, $id);
+            if (!$notification || ($notification['userId'] ?? '') !== $uid) {
+                return null;
+            }
+
+            return $notification;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public function create(array $data): array
     {
         try {
