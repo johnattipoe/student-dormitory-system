@@ -16,11 +16,18 @@ $allowedRoles = [ROLE_SECURITY];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\VisitorService;
+use App\Services\FirebaseService;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $visitorId = sanitize($_POST['visitorId'] ?? '');
     if ($visitorId === '') {
         flash('error', 'Visitor ID is required.');
+        redirect(base_url('index.php?route=/views/security/visitor-check-out/visitor-check-out.php'));
+    }
+
+    $visitor = FirebaseService::getInstance()->getDocument(COL_VISITORS, $visitorId);
+    if (!$visitor || ($visitor['status'] ?? '') !== 'inside') {
+        flash('error', 'Visitor was not found or is not currently inside.');
         redirect(base_url('index.php?route=/views/security/visitor-check-out/visitor-check-out.php'));
     }
 
