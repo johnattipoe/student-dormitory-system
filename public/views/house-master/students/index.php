@@ -85,6 +85,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             <div><h5 class="mb-1">Assigned Students</h5><p class="text-muted mb-0"><?= e((string) $activeStudentCount) ?> active students in the current view.</p></div>
             <div class="btn-group" role="group">
                 <a class="btn btn-success btn-sm" href="<?= url('views/house-master/reports/export.php?type=students') ?>"><i class="bi bi-filetype-csv"></i> Export students</a>
+                <a class="btn btn-outline-success btn-sm" href="<?= url('views/house-master/students/bulk-import.php') ?>"><i class="bi bi-file-earmark-arrow-up"></i> Upload CSV/Excel</a>
                 <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#bulkEmailModal">
                     <i class="bi bi-envelope-bulk"></i> Send Bulk Email
                 </button>

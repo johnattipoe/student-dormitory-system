@@ -52,6 +52,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $pageTitle = 'Visitors';
 $visitors = $visitorService->all();
+$search = strtolower(sanitize($_GET['search'] ?? ''));
+$statusFilter = sanitize($_GET['status'] ?? '');
+$visitors = array_values(array_filter($visitors, function ($visitor) use ($search, $statusFilter) {
+    return ($search === '' || str_contains(strtolower((string) ($visitor['visitorName'] ?? '')), $search) || str_contains(strtolower((string) ($visitor['studentId'] ?? '')), $search))
+        && ($statusFilter === '' || ($visitor['status'] ?? '') === $statusFilter);
+}));
 $students = StudentService::all();
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
@@ -68,6 +74,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             <h5 class="mb-0">Visitors</h5>
             <a href="<?= url('views/admin/visitors/reports.php') ?>" class="btn btn-sm btn-outline-primary">Reports</a>
         </div>
+        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-7"><input name="search" class="form-control form-control-sm" placeholder="Search visitor or student" value="<?= e($search) ?>"></div><div class="col-md-3"><select name="status" class="form-select form-select-sm"><option value="">All statuses</option><option value="inside" <?= $statusFilter === 'inside' ? 'selected' : '' ?>>Inside</option><option value="checked_out" <?= $statusFilter === 'checked_out' ? 'selected' : '' ?>>Checked out</option><option value="registered" <?= $statusFilter === 'registered' ? 'selected' : '' ?>>Registered</option></select></div><div class="col-md-2"><button class="btn btn-primary btn-sm">Filter</button></div></form></div>
 
         <div class="card stat-card p-4 mb-4">
             <h6 class="mb-3">Register visitor</h6>
@@ -136,6 +143,9 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <td><?= e($visitor['purpose'] ?? '') ?></td>
                         <td><span class="badge bg-<?= ($visitor['status'] ?? '') === 'inside' ? 'success' : 'secondary' ?>"><?= e($visitor['status'] ?? 'registered') ?></span></td>
                         <td>
+                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/visitors/view.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>">View</a>
+                            <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/visitors/edit.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>">Edit</a>
+                            <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/visitors/delete.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>">Delete</a>
                             <?php if (($visitor['status'] ?? '') === 'inside'): ?>
                                 <form method="POST" action="<?= url('views/admin/visitors/index.php') ?>" class="d-inline">
                                     <input type="hidden" name="action" value="check_out">

@@ -18,6 +18,8 @@ use App\Services\FirebaseService;
 
 $pageTitle = 'Activity Logs';
 $logs = FirebaseService::getInstance()->getCollection(COL_ACTIVITY_LOGS, [], 200);
+$search = strtolower(sanitize($_GET['search'] ?? ''));
+if ($search !== '') $logs = array_values(array_filter($logs, fn($log) => str_contains(strtolower((string) ($log['event'] ?? $log['action'] ?? '')), $search) || str_contains(strtolower((string) ($log['user'] ?? $log['userId'] ?? '')), $search)));
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-list-check', 'label' => 'Activity Logs', 'href' => url('views/admin/activity-logs/index.php'), 'active' => true],
@@ -30,7 +32,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
     <div class="content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">Activity Logs</h5>
+            <div class="d-flex justify-content-between align-items-center"><h5 class="mb-0">Activity Logs</h5><form method="GET" class="d-flex gap-2"><input name="search" class="form-control form-control-sm" placeholder="Search event or user" value="<?= e($search) ?>"><button class="btn btn-primary btn-sm">Filter</button></form></div>
         </div>
         <div class="card stat-card p-3">
             <table class="table table-hover data-table w-100">

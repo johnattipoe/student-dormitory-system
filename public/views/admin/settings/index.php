@@ -61,10 +61,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $settings = $defaultSettings;
+$settingsSource = 'Application defaults';
+$settingsConnected = false;
 try {
     $savedSettings = FirebaseService::getInstance()->getDocument(COL_SETTINGS, 'global');
     if (!empty($savedSettings['values']) && is_array($savedSettings['values'])) {
         $settings = array_merge($settings, $savedSettings['values']);
+        $settingsSource = 'Firebase settings/global';
+        $settingsConnected = true;
     }
 } catch (Throwable $e) {
     // Keep the config defaults available when Firestore is unavailable.
@@ -90,6 +94,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         </div>
 
         <form id="settings-form" method="POST" action="<?= url('views/admin/settings/index.php') ?>">
+            <div class="alert alert-info small d-flex justify-content-between align-items-center"><span><i class="bi bi-cloud-check me-1"></i> Settings persistence: <strong><?= e($settingsSource) ?></strong>.</span><span class="badge bg-<?= $settingsConnected ? 'success' : 'secondary' ?>"><?= $settingsConnected ? 'Firebase connected' : 'Using defaults' ?></span></div>
             <div class="row g-4">
                 <div class="col-lg-6">
                     <div class="card stat-card p-3 h-100">

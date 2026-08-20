@@ -311,11 +311,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <th>Student</th>
                         <th>Status</th>
                         <th>Date</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($todayRecords)): ?>
-                        <tr><td colspan="3" class="text-muted text-center">No attendance records for this date yet.</td></tr>
+                        <tr><td colspan="4" class="text-muted text-center">No attendance records for this date yet.</td></tr>
                     <?php else: ?>
                         <?php foreach ($todayRecords as $record): ?>
                             <?php
@@ -331,6 +332,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td><?= e(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' (' . ($student['admissionNo'] ?? '') . ')') ?: e($record['studentId'] ?? '-') ?></td>
                                 <td><span class="badge bg-<?= ($record['status'] ?? 'present') === 'present' ? 'success' : (($record['status'] ?? '') === 'absent' ? 'danger' : 'warning') ?>"><?= e($record['status'] ?? 'present') ?></span></td>
                                 <td><?= e($record['date'] ?? '-') ?></td>
+                                <td class="text-nowrap"><a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/attendance/view.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/attendance/edit.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/attendance/delete.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">Delete</a></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>

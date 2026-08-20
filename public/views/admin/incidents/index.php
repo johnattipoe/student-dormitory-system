@@ -19,6 +19,8 @@ use App\Services\IncidentService;
 $pageTitle = 'Incidents';
 $incidentService = new IncidentService();
 $incidents = $incidentService->all();
+$search = strtolower(sanitize($_GET['search'] ?? ''));
+if ($search !== '') $incidents = array_values(array_filter($incidents, fn($incident) => str_contains(strtolower((string) ($incident['title'] ?? '')), $search) || str_contains(strtolower((string) ($incident['studentId'] ?? '')), $search)));
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-exclamation-triangle', 'label' => 'Incidents', 'href' => url('views/admin/incidents/index.php'), 'active' => true],
@@ -32,7 +34,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <div class="content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Incidents</h5>
-            <a href="<?= url('views/admin/incidents/reports.php') ?>" class="btn btn-sm btn-outline-primary">Reports</a>
+            <div><a href="<?= url('views/admin/incidents/reports.php') ?>" class="btn btn-sm btn-outline-primary">Reports</a><form method="GET" class="d-inline-flex gap-2 ms-2"><input name="search" class="form-control form-control-sm" placeholder="Search incidents" value="<?= e($search) ?>"><button class="btn btn-primary btn-sm">Filter</button></form></div>
         </div>
         <div class="card stat-card p-3">
             <table class="table table-hover data-table w-100">
@@ -42,6 +44,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                     <th>Priority</th>
                     <th>Status</th>
                     <th>Reported By</th>
+                    <th>Actions</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -51,6 +54,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <td><?= e($incident['priority'] ?? '') ?></td>
                         <td><span class="badge bg-<?= ($incident['status'] ?? '') === 'open' ? 'danger' : 'success' ?>"><?= e($incident['status'] ?? '') ?></span></td>
                         <td><?= e($incident['reportedBy'] ?? '-') ?></td>
+                        <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/incidents/view.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/incidents/edit.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/incidents/delete.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">Delete</a></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

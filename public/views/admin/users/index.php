@@ -22,6 +22,12 @@ use App\Services\UserService;
 $pageTitle = 'Users';
 $userService = new UserService();
 $users = $userService->all();
+$search = strtolower(sanitize($_GET['search'] ?? ''));
+if ($search !== '') {
+    $users = array_values(array_filter($users, function ($user) use ($search) {
+        return str_contains(strtolower(trim(($user['name'] ?? '') . ' ' . ($user['email'] ?? '') . ' ' . ($user['role'] ?? ''))), $search);
+    }));
+}
 $authUsers = [];
 
 if (FirebaseAdminAuthService::credentialsAvailable()) {
@@ -62,6 +68,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 </div>
             </div>
         </div>
+        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-9"><input name="search" class="form-control form-control-sm" placeholder="Search name, email, or role" value="<?= e($search) ?>"></div><div class="col-md-3"><button class="btn btn-primary btn-sm">Filter</button> <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/users/index.php') ?>">Reset</a></div></form></div>
 
         <div class="card stat-card p-3">
             <?php if (!empty($authUsers)): ?>
@@ -113,6 +120,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <td>
                             <a href="<?= url('views/admin/users/view.php?id=' . urlencode($user['id'] ?? $user['uid'] ?? '')) ?>" class="btn btn-sm btn-outline-secondary">View</a>
                             <a href="<?= url('views/admin/users/edit.php?id=' . urlencode($user['id'] ?? $user['uid'] ?? '')) ?>" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <a href="<?= url('views/admin/users/delete.php?id=' . urlencode($user['id'] ?? $user['uid'] ?? '')) ?>" class="btn btn-sm btn-outline-danger">Delete</a>
                         </td>
                     </tr>
                 <?php endforeach; ?>

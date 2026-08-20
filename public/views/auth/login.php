@@ -9,6 +9,19 @@
 <link rel="stylesheet" href="/assets/css/login.css">
 </head>
 <body class="login-body d-flex align-items-center justify-content-center">
+  <div id="startupLoader" class="startup-loader" role="status" aria-live="polite" aria-label="Starting application">
+    <div class="startup-loader-card">
+      <div class="startup-logo">
+        <i class="bi bi-building"></i>
+      </div>
+      <div class="startup-loader-title"><?= e($appConfig['name'] ?? 'Student Dormitory System') ?></div>
+      <div class="startup-loader-text">Preparing your secure portal...</div>
+      <div class="startup-progress" aria-hidden="true">
+        <span></span>
+      </div>
+    </div>
+  </div>
+
   <div class="login-card card shadow-lg border-0">
     <div class="card-body p-4">
       <div class="text-center mb-4">

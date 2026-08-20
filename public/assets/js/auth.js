@@ -1,5 +1,25 @@
 // auth.js - auth page UX: password visibility toggle and caps-lock warning.
 document.addEventListener('DOMContentLoaded', function () {
+  const startupLoader = document.getElementById('startupLoader');
+  if (startupLoader) {
+    const startedAt = Date.now();
+    const hideStartupLoader = function () {
+      const remaining = Math.max(0, 900 - (Date.now() - startedAt));
+      window.setTimeout(function () {
+        startupLoader.classList.add('is-hidden');
+        window.setTimeout(function () {
+          startupLoader.remove();
+        }, 500);
+      }, remaining);
+    };
+
+    if (document.readyState === 'complete') {
+      hideStartupLoader();
+    } else {
+      window.addEventListener('load', hideStartupLoader, { once: true });
+    }
+  }
+
   const passwordInputs = document.querySelectorAll('input[type="password"]');
 
   passwordInputs.forEach(function (passwordInput) {
@@ -59,5 +79,14 @@ document.addEventListener('DOMContentLoaded', function () {
       input.type = 'password';
       toggle.classList.remove('active');
     }
+  });
+
+  document.querySelectorAll('form[action="/login.php"]').forEach(function (form) {
+    form.addEventListener('submit', function () {
+      const loader = document.createElement('div');
+      loader.className = 'startup-loader';
+      loader.innerHTML = '<div class="startup-loader-card"><div class="startup-logo"><i class="bi bi-shield-lock"></i></div><div class="startup-loader-title">Signing you in</div><div class="startup-loader-text">Checking your account securely...</div><div class="startup-progress" aria-hidden="true"><span></span></div></div>';
+      document.body.appendChild(loader);
+    });
   });
 });

@@ -203,6 +203,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             </div>
         </div>
 
+        <div class="card stat-card p-3 mb-4"><div class="d-flex justify-content-between align-items-center mb-3"><div><h6 class="mb-1">Reporting Center</h6><p class="text-muted mb-0">Open detailed operational reports and exports.</p></div><i class="bi bi-bar-chart-line fs-3 text-primary"></i></div><div class="d-flex flex-wrap gap-2"><a class="btn btn-outline-primary btn-sm" href="<?= url('views/admin/attendance/reports.php') ?>">Attendance report</a><a class="btn btn-outline-primary btn-sm" href="<?= url('views/admin/visitors/reports.php') ?>">Visitor report</a><a class="btn btn-outline-primary btn-sm" href="<?= url('views/admin/incidents/reports.php') ?>">Incident report</a><a class="btn btn-outline-primary btn-sm" href="<?= url('views/reports/dashboard.php') ?>">All reports</a></div></div>
+
         <div class="card stat-card p-3">
             <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-3">
                 <div>

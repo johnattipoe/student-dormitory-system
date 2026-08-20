@@ -48,6 +48,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 </div>
             <?php endforeach; ?>
         </div>
+        <div class="card stat-card p-3 mt-4"><div class="d-flex justify-content-between align-items-center mb-3"><h6 class="mb-0">Visitor records</h6><a class="btn btn-success btn-sm" href="<?= url('reports/export.php?type=visitors&format=csv') ?>">Download CSV</a></div><table class="table table-hover"><thead><tr><th>Visitor</th><th>Student</th><th>Status</th><th>Created</th></tr></thead><tbody><?php foreach ($visitors as $visitor): ?><tr><td><?= e($visitor['visitorName'] ?? '-') ?></td><td><?= e($visitor['studentId'] ?? '-') ?></td><td><?= e($visitor['status'] ?? '-') ?></td><td><?= e($visitor['createdAt'] ?? '-') ?></td></tr><?php endforeach; ?></tbody></table></div>
     </div>
 </div>
 <?php require APP_ROOT . '/app/views/components/footer.php'; ?>

@@ -19,6 +19,7 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 use App\Services\StudentService;
 use App\Services\UserService;
 use App\Services\HouseService;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 // Handle CSV template download
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download_template'])) {
@@ -43,22 +44,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if ($action === 'import_students' && !empty($_FILES['students_file'])) {
         $file = $_FILES['students_file'];
-        if ($file['error'] === UPLOAD_ERR_OK && $file['type'] === 'text/csv') {
+        $extension = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+        if ($file['error'] === UPLOAD_ERR_OK && in_array($extension, ['csv', 'xlsx'], true)) {
             try {
-                $handle = fopen($file['tmp_name'], 'r');
-                $header = fgetcsv($handle);
-                
-                while ($row = fgetcsv($handle)) {
-                    if (count($row) < 6) continue; // Skip invalid rows
+                $spreadsheet = IOFactory::load($file['tmp_name']);
+                $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+                $header = array_map(fn($value) => strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $value)), array_shift($rows) ?: []);
+                $headerMap = [];
+                foreach ($header as $index => $name) $headerMap[$name] = $index;
+                $temporaryPassword = trim((string) ($_POST['temporaryPassword'] ?? ''));
+                $createAccounts = !empty($_POST['createAccounts']);
+                $userCount = 0;
+                $processedRows = 0;
+                foreach (array_slice($rows, 0, 1000) as $row) {
+                    $processedRows++;
+                    $value = function (string $name, int $fallback = -1) use ($headerMap, $row) {
+                        $key = strtolower(preg_replace('/[^a-z0-9]/i', '', $name));
+                        return $row[$headerMap[$key]] ?? ($fallback >= 0 ? ($row[$fallback] ?? '') : '');
+                    };
                     
                     $studentData = [
-                        'firstName' => sanitize($row[0] ?? ''),
-                        'lastName' => sanitize($row[1] ?? ''),
-                        'email' => sanitize($row[2] ?? ''),
-                        'phone' => sanitize($row[3] ?? ''),
-                        'admissionNo' => sanitize($row[4] ?? ''),
-                        'course' => sanitize($row[5] ?? ''),
-                        'level' => sanitize($row[6] ?? ''),
+                        'firstName' => sanitize($value('firstname', 0)),
+                        'lastName' => sanitize($value('lastname', 1)),
+                        'email' => sanitize($value('email', 2)),
+                        'phone' => sanitize($value('phone', 3)),
+                        'admissionNo' => sanitize($value('admissionno', 4)),
+                        'course' => sanitize($value('course', 5)),
+                        'level' => sanitize($value('level', 6)),
                         'houseId' => sanitize($_POST['houseId'] ?? ''),
                         'status' => 'active',
                     ];
@@ -66,19 +78,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!empty($studentData['firstName']) && !empty($studentData['admissionNo'])) {
                         StudentService::create($studentData);
                         $successCount++;
+                        if ($createAccounts && $studentData['email'] !== '') {
+                            $accountResult = (new UserService())->create([
+                                'name' => trim($studentData['firstName'] . ' ' . $studentData['lastName']),
+                                'email' => $studentData['email'],
+                                'role' => ROLE_STUDENT,
+                                'houseId' => $studentData['houseId'],
+                                'status' => 'active',
+                                'password' => $temporaryPassword !== '' ? $temporaryPassword : null,
+                            ]);
+                            if (!empty($accountResult['success'])) $userCount++;
+                        }
                     } else {
                         $errors[] = 'Row missing required fields (firstName, admissionNo)';
                     }
                 }
                 
-                fclose($handle);
-                flash('success', "Imported $successCount student(s) successfully");
+                $accountMessage = $createAccounts ? " Created $userCount login account(s)." : '';
+                flash('success', "Imported $successCount student(s) successfully." . $accountMessage);
                 redirect(url('views/admin/students/bulk-import.php'));
             } catch (Exception $e) {
                 $errors[] = 'Import failed: ' . $e->getMessage();
             }
         } else {
-            $errors[] = 'Please upload a valid CSV file';
+            $errors[] = 'Please upload a valid CSV or XLSX file.';
         }
     }
     
@@ -136,7 +159,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             <!-- Import Tab -->
             <div class="tab-pane fade show active" id="import-mode">
                 <div class="card stat-card p-4" style="max-width: 700px;">
-                    <h5 class="mb-3">Import Students from CSV</h5>
+                    <h5 class="mb-3">Import Students from CSV or Excel</h5>
                     
                     <form method="POST" enctype="multipart/form-data" class="mb-4">
                         <input type="hidden" name="action" value="import_students">
@@ -154,12 +177,22 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">CSV File</label>
-                            <input type="file" name="students_file" class="form-control" accept=".csv" required>
+                            <label class="form-label">CSV or XLSX File</label>
+                            <input type="file" name="students_file" class="form-control" accept=".csv,.xlsx" required>
                             <small class="text-muted d-block mt-2">
                                 <strong>CSV Format (6 columns):</strong><br>
                                 FirstName, LastName, Email, Phone, AdmissionNo, Course, Level
                             </small>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-7">
+                                <label class="form-label">Temporary password for new student accounts</label>
+                                <input type="text" name="temporaryPassword" class="form-control" placeholder="Leave blank to use system default">
+                            </div>
+                            <div class="col-md-5 d-flex align-items-end">
+                                <div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="createAccounts" id="createAccounts" value="1"><label class="form-check-label" for="createAccounts">Create login accounts</label></div>
+                            </div>
                         </div>
 
                         <button type="submit" class="btn btn-primary">
@@ -173,9 +206,9 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                     <div class="alert alert-info">
                         <strong>Instructions:</strong>
                         <ul class="mb-0 mt-2">
-                            <li>Create a CSV file with the columns shown above</li>
-                            <li>The first row should contain data (not headers)</li>
+                            <li>Upload CSV or XLSX with headers: FirstName, LastName, Email, Phone, AdmissionNo, Course, Level</li>
                             <li>Admission Number and FirstName are required</li>
+                            <li>Enable “Create login accounts” to create Firebase student users with the temporary password</li>
                             <li>Maximum 1000 students per import</li>
                         </ul>
                     </div>

@@ -2,6 +2,7 @@
 window.SDS = window.SDS || {};
 
 document.addEventListener('DOMContentLoaded', function () {
+  SDS.hidePortalStartupLoader();
   SDS.enhancePageChrome();
 
   const toggle = document.getElementById('sidebarToggle');
@@ -125,9 +126,24 @@ document.addEventListener('DOMContentLoaded', function () {
   if (window.SDS_FLASH) {
     SDS.toast(SDS_FLASH.type || 'success', SDS_FLASH.message);
   }
+
+  document.querySelectorAll('a[href]:not([target]):not([download])').forEach(link => {
+    link.addEventListener('click', function () {
+      const href = link.getAttribute('href') || '';
+      if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:')) {
+        return;
+      }
+
+      const url = new URL(href, window.location.href);
+      if (url.origin === window.location.origin) {
+        SDS.showPortalStartupLoader('Opening page...');
+      }
+    });
+  });
 });
 
 window.addEventListener('pageshow', function () {
+  SDS.hidePortalStartupLoader();
   SDS.hideLoading();
 });
 
@@ -205,6 +221,30 @@ SDS.hideLoading = function () {
     spinner.style.setProperty('display', 'none', 'important');
   }
   document.body.style.overflow = 'auto'; // Restore scrolling
+};
+
+SDS.showPortalStartupLoader = function (message) {
+  const loader = document.getElementById('portalStartupLoader');
+  if (!loader) return;
+  const text = loader.querySelector('.portal-startup-text');
+  if (text && message) text.textContent = message;
+  loader.classList.remove('is-hidden');
+  loader.hidden = false;
+};
+
+SDS.hidePortalStartupLoader = function () {
+  const loader = document.getElementById('portalStartupLoader');
+  if (!loader) return;
+  const startedAt = Number(loader.dataset.startedAt || Date.now());
+  if (!loader.dataset.startedAt) loader.dataset.startedAt = String(startedAt);
+  const remaining = Math.max(0, 650 - (Date.now() - startedAt));
+
+  window.setTimeout(function () {
+    loader.classList.add('is-hidden');
+    window.setTimeout(function () {
+      loader.hidden = true;
+    }, 450);
+  }, remaining);
 };
 
 /** Toast helper — SweetAlert2 toast if available, else a lightweight Bootstrap-style fallback. */

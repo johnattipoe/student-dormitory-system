@@ -78,6 +78,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Houseparent Students</h5>
             <div class="btn-group" role="group">
+                <a class="btn btn-outline-success btn-sm" href="<?= url('views/houseparent/students/bulk-import.php') ?>"><i class="bi bi-file-earmark-arrow-up"></i> Upload CSV/Excel</a>
                 <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#bulkEmailModal">
                     <i class="bi bi-envelope-bulk"></i> Send Bulk Email
                 </button>

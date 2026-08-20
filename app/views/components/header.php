@@ -39,4 +39,30 @@
     <link rel="stylesheet" href="<?= asset('css/responsive.css') ?>">
 </head>
 <body>
+<?php
+$portalLoaderName = 'Student Dormitory System';
+if (str_contains($currentScript, '/views/admin/')) {
+    $portalLoaderName = 'Admin Portal';
+} elseif (str_contains($currentScript, '/views/student/')) {
+    $portalLoaderName = 'Student Portal';
+} elseif (str_contains($currentScript, '/views/house-master/')) {
+    $portalLoaderName = 'House Master Portal';
+} elseif (str_contains($currentScript, '/views/houseparent/')) {
+    $portalLoaderName = 'Senior Houseparent Portal';
+} elseif (str_contains($currentScript, '/views/security/')) {
+    $portalLoaderName = 'Security Portal';
+} elseif (str_contains($currentScript, '/views/nurse/')) {
+    $portalLoaderName = 'Nurse Portal';
+}
+?>
+<div id="portalStartupLoader" class="portal-startup-loader" role="status" aria-live="polite" aria-label="Loading portal">
+    <div class="portal-startup-card">
+        <div class="portal-startup-logo">
+            <i class="bi bi-grid-1x2-fill"></i>
+        </div>
+        <div class="portal-startup-title"><?= e($portalLoaderName) ?></div>
+        <div class="portal-startup-text">Loading page resources...</div>
+        <div class="portal-startup-progress" aria-hidden="true"><span></span></div>
+    </div>
+</div>
 <div class="app-shell d-flex">

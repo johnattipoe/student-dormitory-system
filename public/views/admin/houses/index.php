@@ -18,6 +18,10 @@ use App\Services\HouseService;
 
 $pageTitle = 'Houses';
 $houses = HouseService::all();
+$search = strtolower(sanitize($_GET['search'] ?? ''));
+if ($search !== '') {
+    $houses = array_values(array_filter($houses, fn($house) => str_contains(strtolower((string) ($house['name'] ?? '')), $search) || str_contains(strtolower((string) ($house['location'] ?? '')), $search)));
+}
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-building', 'label' => 'Houses', 'href' => url('views/admin/houses/index.php'), 'active' => true],
@@ -31,8 +35,9 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <div class="content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Houses</h5>
-            <a href="<?= url('views/admin/houses/create.php') ?>" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> New House</a>
+            <div><a href="<?= url('views/admin/houses/bulk-import.php') ?>" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-arrow-up"></i> Upload CSV/Excel</a> <a href="<?= url('views/admin/houses/create.php') ?>" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> New House</a></div>
         </div>
+        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-9"><input name="search" class="form-control form-control-sm" placeholder="Search house or location" value="<?= e($search) ?>"></div><div class="col-md-3"><button class="btn btn-primary btn-sm">Filter</button> <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/houses/index.php') ?>">Reset</a></div></form></div>
         <div class="card stat-card p-3">
             <table class="table table-hover data-table w-100">
                 <thead>
@@ -56,6 +61,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <td>
                             <a href="<?= url('views/admin/houses/view.php?id=' . urlencode($house['id'] ?? '')) ?>" class="btn btn-sm btn-outline-secondary">View</a>
                             <a href="<?= url('views/admin/houses/edit.php?id=' . urlencode($house['id'] ?? '')) ?>" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <a href="<?= url('views/admin/houses/delete.php?id=' . urlencode($house['id'] ?? '')) ?>" class="btn btn-sm btn-outline-danger">Delete</a>
                         </td>
                     </tr>
                 <?php endforeach; ?>
