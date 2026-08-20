@@ -24,9 +24,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'bulk_mark_read' && !empty($notificationIds)) {
         $notificationService = new NotificationService();
+        $userId = current_user()['uid'] ?? current_user()['id'] ?? null;
+        $allowedNotificationIds = array_map(fn($notification) => (string) ($notification['id'] ?? ''), $notificationService->forUser($userId));
+        $notificationIds = array_values(array_intersect(array_map('strval', $notificationIds), $allowedNotificationIds));
         try {
             foreach ($notificationIds as $nId) {
-                $notificationService->markAsReadById((string) $nId);
+                $notificationService->markAsRead((string) $nId, $userId);
             }
             flash('success', 'Marked ' . count($notificationIds) . ' notification(s) as read');
             redirect(url('views/student/notifications/index.php'));
@@ -41,6 +44,12 @@ $userId = current_user()['uid'] ?? null;
 $notificationService = new NotificationService();
 $notifications = $userId ? $notificationService->forUser($userId) : [];
 $notifications = array_values(array_filter($notifications, fn($note) => (string) ($note['userId'] ?? '') === (string) $userId));
+$notificationSearch = strtolower(sanitize($_GET['search'] ?? ''));
+$notificationRead = sanitize($_GET['read'] ?? '');
+$notifications = array_values(array_filter($notifications, function ($notification) use ($notificationSearch, $notificationRead) {
+    return ($notificationSearch === '' || str_contains(strtolower((string) ($notification['title'] ?? '')), $notificationSearch) || str_contains(strtolower((string) ($notification['message'] ?? '')), $notificationSearch))
+        && ($notificationRead === '' || ($notificationRead === 'unread' ? empty($notification['read']) : !empty($notification['read'])));
+}));
 $unreadNotifications = array_values(array_filter($notifications, fn($n) => empty($n['read'])));
 $readNotifications = array_values(array_filter($notifications, fn($n) => !empty($n['read'])));
 
@@ -79,6 +88,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 </button>
             </div>
         </div>
+
+        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-7"><input name="search" class="form-control form-control-sm" placeholder="Search notifications" value="<?= e($notificationSearch) ?>"></div><div class="col-md-3"><select name="read" class="form-select form-select-sm"><option value="">All</option><option value="unread" <?= $notificationRead === 'unread' ? 'selected' : '' ?>>Unread</option><option value="read" <?= $notificationRead === 'read' ? 'selected' : '' ?>>Read</option></select></div><div class="col-md-2"><button class="btn btn-primary btn-sm">Filter</button></div></form></div>
 
         <div class="row g-3 mb-3">
             <div class="col-md-3">
@@ -135,7 +146,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td>
                                     <input type="checkbox" class="form-check-input notification-checkbox" data-notification-id="<?= e((string) ($note['id'] ?? '')) ?>">
                                 </td>
-                                <td><?= e((string) ($note['title'] ?? '')) ?></td>
+                                <td><a class="fw-semibold text-decoration-none" href="<?= url('views/student/notifications/view.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>"><?= e((string) ($note['title'] ?? '')) ?></a></td>
                                 <td><?= e((string) ($note['type'] ?? 'info')) ?></td>
                                 <td>
                                     <?php if (empty($note['read'])): ?>
