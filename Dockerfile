@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     make \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" gd zip \
-    && pecl install grpc \
+    && MAKEFLAGS="-j$(nproc)" pecl install grpc \
     && docker-php-ext-enable grpc \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,7 +31,7 @@ RUN composer install \
     --no-dev \
     --optimize-autoloader \
     --no-interaction \
-    --prefer-source
+    --prefer-dist
 
 RUN sed -i 's#DocumentRoot /var/www/html#DocumentRoot /var/www/html/public#' /etc/apache2/sites-available/000-default.conf
 
