@@ -42,6 +42,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pageTitle = 'Houseparent Notifications';
 $currentUserId = current_user()['uid'] ?? current_user()['id'] ?? null;
 $notifications = $currentUserId ? $notificationService->forUser($currentUserId) : [];
+$notificationSearch = strtolower(sanitize($_GET['search'] ?? ''));
+$notificationRead = sanitize($_GET['read'] ?? '');
+if ($notificationSearch !== '' || $notificationRead !== '') {
+    $notifications = array_values(array_filter($notifications, function ($notification) use ($notificationSearch, $notificationRead) {
+        return ($notificationSearch === '' || str_contains(strtolower((string) ($notification['title'] ?? '')), $notificationSearch) || str_contains(strtolower((string) ($notification['message'] ?? '')), $notificationSearch))
+            && ($notificationRead === '' || ($notificationRead === 'unread' ? empty($notification['read']) : !empty($notification['read'])));
+    }));
+}
 $unreadNotifications = array_values(array_filter($notifications, fn($note) => empty($note['read'])));
 $readNotifications = array_values(array_filter($notifications, fn($note) => !empty($note['read'])));
 $notificationCount = count($notifications);
@@ -81,6 +89,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 </form>
             <?php endif; ?>
         </div>
+
+        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-7"><input name="search" class="form-control form-control-sm" placeholder="Search title or message" value="<?= e($notificationSearch) ?>"></div><div class="col-md-3"><select name="read" class="form-select form-select-sm"><option value="">All notifications</option><option value="unread" <?= $notificationRead === 'unread' ? 'selected' : '' ?>>Unread</option><option value="read" <?= $notificationRead === 'read' ? 'selected' : '' ?>>Read</option></select></div><div class="col-md-2"><button class="btn btn-primary btn-sm">Filter</button></div></form></div>
 
         <div class="row g-3 mb-4">
             <div class="col-md-4">

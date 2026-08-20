@@ -50,6 +50,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['action'])) {
 }
 
 $students = StudentService::all(current_user()['houseId'] ?? null);
+$studentSearch = strtolower(sanitize($_GET['search'] ?? ''));
+if ($studentSearch !== '') {
+    $students = array_values(array_filter($students, function ($student) use ($studentSearch) {
+        return str_contains(strtolower(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' ' . ($student['admissionNo'] ?? '') . ' ' . ($student['email'] ?? ''))), $studentSearch);
+    }));
+}
 
 $pageTitle = 'Houseparent Students';
 $navItems = [
@@ -78,8 +84,10 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <a href="<?= url('views/houseparent/students/bulk-flags.php') ?>" class="btn btn-warning btn-sm">
                     <i class="bi bi-exclamation-triangle"></i> Manage Flags
                 </a>
+                <a href="<?= url('views/houseparent/students/index.php') ?>" class="btn btn-outline-primary btn-sm">Student search</a>
             </div>
         </div>
+        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-9"><input name="search" class="form-control form-control-sm" placeholder="Search name, admission number, or email" value="<?= e($studentSearch) ?>"></div><div class="col-md-3"><button class="btn btn-primary btn-sm">Filter</button> <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/houseparent/students/index.php') ?>">Reset</a></div></form></div>
         <div class="card stat-card p-3">
             <table class="table table-hover data-table w-100">
                 <thead>

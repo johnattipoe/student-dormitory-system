@@ -17,11 +17,15 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\StudentService;
 
+$houseId = current_user()['houseId'] ?? null;
+
 // Handle bulk flag operations
 $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = sanitize($_POST['action'] ?? '');
     $studentIds = (array) ($_POST['studentIds'] ?? []);
+    $allowedStudentIds = array_map(fn($student) => (string) ($student['id'] ?? ''), StudentService::all($houseId));
+    $studentIds = array_values(array_intersect(array_map('strval', $studentIds), $allowedStudentIds));
     
     if ($action === 'bulk_flag' && !empty($studentIds)) {
         $flagType = sanitize($_POST['flagType'] ?? '');
@@ -59,12 +63,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$houseId = current_user()['houseId'] ?? null;
 $students = StudentService::all($houseId);
+$studentIdsInHouse = array_map(fn($student) => (string) ($student['id'] ?? ''), $students);
 $flaggedStudents = array_filter($students, fn($s) => ($s['flagged'] ?? false) == true);
 $unflaggedStudents = array_filter($students, fn($s) => ($s['flagged'] ?? false) != true);
 
 $filterType = sanitize($_GET['type'] ?? 'all');
+$search = strtolower(sanitize($_GET['search'] ?? ''));
 if ($filterType === 'flagged') {
     $displayStudents = $flaggedStudents;
 } elseif ($filterType === 'unflagged') {
@@ -72,6 +77,13 @@ if ($filterType === 'flagged') {
 } else {
     $displayStudents = $students;
 }
+if ($search !== '') {
+    $displayStudents = array_values(array_filter($displayStudents, function ($student) use ($search) {
+        $haystack = strtolower(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' ' . ($student['admissionNo'] ?? '') . ' ' . ($student['email'] ?? '') . ' ' . ($student['flagType'] ?? '')));
+        return str_contains($haystack, $search);
+    }));
+}
+$flagTypeCounts = array_count_values(array_map(fn($student) => (string) ($student['flagType'] ?? 'Unclassified'), $flaggedStudents));
 
 $pageTitle = 'Bulk Flag Management';
 $navItems = [
@@ -94,8 +106,11 @@ require APP_ROOT . '/app/views/components/sidebar.php';
 
     <div class="content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">Bulk Flag Management</h5>
+            <div><h5 class="mb-1">Bulk Flag Management</h5><p class="text-muted mb-0">Track student concerns and follow-up needs for your house.</p></div>
+            <div><a class="btn btn-success btn-sm" href="<?= url('views/house-master/reports/export.php?type=flags') ?>"><i class="bi bi-filetype-csv"></i> CSV</a> <a class="btn btn-outline-primary btn-sm" href="<?= url('views/house-master/students/index.php') ?>">Student directory</a></div>
         </div>
+
+        <div class="row g-3 mb-3"><div class="col-md-4"><div class="card stat-card p-3"><small class="text-muted">Students</small><strong class="fs-3"><?= e((string) count($students)) ?></strong></div></div><div class="col-md-4"><div class="card stat-card p-3"><small class="text-muted">Flagged</small><strong class="fs-3 text-warning"><?= e((string) count($flaggedStudents)) ?></strong></div></div><div class="col-md-4"><div class="card stat-card p-3"><small class="text-muted">Flag rate</small><strong class="fs-3"><?= e((string) (count($students) ? round(count($flaggedStudents) / count($students) * 100) : 0)) ?>%</strong></div></div></div>
 
         <!-- Filter Tabs -->
         <div class="mb-3">
@@ -111,6 +126,10 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 </a>
             </div>
         </div>
+
+        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><input type="hidden" name="type" value="<?= e($filterType) ?>"><div class="col-md-8"><input name="search" class="form-control form-control-sm" placeholder="Search name, admission number, email, or flag type" value="<?= e($search) ?>"></div><div class="col-md-4"><button class="btn btn-primary btn-sm">Search</button> <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/students/bulk-flags.php?type=' . urlencode($filterType)) ?>">Reset</a></div></form></div>
+
+        <?php if ($flagTypeCounts): ?><div class="d-flex flex-wrap gap-2 mb-3"><?php foreach ($flagTypeCounts as $type => $count): ?><span class="badge bg-warning text-dark px-3 py-2"><?= e(ucwords(str_replace('_', ' ', $type))) ?>: <?= e((string) $count) ?></span><?php endforeach; ?></div><?php endif; ?>
 
         <div class="card stat-card p-3">
             <div class="d-flex justify-content-between mb-3">
@@ -142,6 +161,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                             <th>Status</th>
                             <th>Flag Type</th>
                             <th>Reason</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -163,11 +183,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                     </td>
                                     <td><?= e($student['flagType'] ?? '—') ?></td>
                                     <td><?= e(substr($student['flagReason'] ?? '', 0, 30)) ?></td>
+                                    <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/students/profile.php?studentId=' . urlencode((string) ($student['id'] ?? ''))) ?>">View</a></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="7" class="text-center text-muted">No students found.</td>
+                                <td colspan="8" class="text-center text-muted">No students found.</td>
                             </tr>
                         <?php endif; ?>
                     </tbody>

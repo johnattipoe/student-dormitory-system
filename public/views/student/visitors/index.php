@@ -17,44 +17,40 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\FirebaseService;
 
-// Get filter parameters
 $search = sanitize($_GET['search'] ?? '');
 $dateFrom = sanitize($_GET['dateFrom'] ?? '');
 $dateTo = sanitize($_GET['dateTo'] ?? '');
 $status = sanitize($_GET['status'] ?? '');
 
-$studentId = current_user()['uid'];
+$studentId = current_user()['studentId'] ?? current_user()['uid'] ?? null;
 $firebaseService = FirebaseService::getInstance();
-$allVisitors = $firebaseService->getCollection(COL_VISITORS) ?? [];
-$visitors = array_filter($allVisitors, fn($v) => ((string) ($v['studentId'] ?? '')) === ((string) $studentId));
+$allVisitors = $firebaseService->getCollection(COL_VISITOR_REQUESTS) ?? [];
+$visitors = array_values(array_filter($allVisitors, fn($v) => ((string) ($v['studentId'] ?? '')) === ((string) $studentId)));
 
-// Apply search filter
 if (!empty($search)) {
-    $search_lower = strtolower($search);
-    $visitors = array_filter($visitors, fn($v) => 
-        strpos(strtolower($v['visitorName'] ?? ''), $search_lower) !== false ||
-        strpos(strtolower($v['relationship'] ?? ''), $search_lower) !== false ||
-        strpos(strtolower($v['purpose'] ?? ''), $search_lower) !== false
-    );
+    $searchLower = strtolower($search);
+    $visitors = array_values(array_filter($visitors, fn($v) =>
+        str_contains(strtolower((string) ($v['visitorName'] ?? '')), $searchLower) ||
+        str_contains(strtolower((string) ($v['relationship'] ?? '')), $searchLower) ||
+        str_contains(strtolower((string) ($v['purpose'] ?? '')), $searchLower)
+    ));
 }
 
-// Apply date range filter
 if (!empty($dateFrom)) {
-    $visitors = array_filter($visitors, fn($v) => strtotime($v['visitDate'] ?? '') >= strtotime($dateFrom));
+    $visitors = array_values(array_filter($visitors, fn($v) => strtotime((string) ($v['visitDate'] ?? '')) >= strtotime($dateFrom)));
 }
 if (!empty($dateTo)) {
-    $visitors = array_filter($visitors, fn($v) => strtotime($v['visitDate'] ?? '') <= strtotime($dateTo) + 86400);
+    $visitors = array_values(array_filter($visitors, fn($v) => strtotime((string) ($v['visitDate'] ?? '')) <= strtotime($dateTo) + 86400));
 }
 
-// Apply status filter
 if (!empty($status)) {
-    $visitors = array_filter($visitors, fn($v) => ($v['status'] ?? '') === $status);
+    $visitors = array_values(array_filter($visitors, fn($v) => ($v['status'] ?? '') === $status));
 }
 
-// Count by status for header
 $approved = count(array_filter($visitors, fn($v) => ($v['status'] ?? '') === 'approved'));
 $pending = count(array_filter($visitors, fn($v) => ($v['status'] ?? '') === 'pending'));
 $rejected = count(array_filter($visitors, fn($v) => ($v['status'] ?? '') === 'rejected'));
+$total = count($visitors);
 
 $pageTitle = 'Student Visitors';
 $navItems = [
@@ -78,18 +74,40 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
                 <h5 class="mb-0">My Visitors</h5>
-                <small class="text-muted">
-                    Approved: <strong><?= $approved ?></strong> | 
-                    Pending: <strong><?= $pending ?></strong> | 
-                    Rejected: <strong><?= $rejected ?></strong>
-                </small>
+                <small class="text-muted">Keep track of all visitor requests and approvals.</small>
             </div>
             <a href="<?= url('views/student/visitors/requests.php') ?>" class="btn btn-primary btn-sm">
                 <i class="bi bi-plus-lg"></i> Request Visitor
             </a>
         </div>
 
-        <!-- Advanced Filters -->
+        <div class="row g-3 mb-3">
+            <div class="col-md-3">
+                <div class="card stat-card p-3 text-center h-100">
+                    <div class="text-muted small">Total</div>
+                    <div class="fs-3 fw-bold"><?= e((string) $total) ?></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card p-3 text-center h-100">
+                    <div class="text-muted small">Approved</div>
+                    <div class="fs-3 fw-bold text-success"><?= e((string) $approved) ?></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card p-3 text-center h-100">
+                    <div class="text-muted small">Pending</div>
+                    <div class="fs-3 fw-bold text-warning"><?= e((string) $pending) ?></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card p-3 text-center h-100">
+                    <div class="text-muted small">Rejected</div>
+                    <div class="fs-3 fw-bold text-danger"><?= e((string) $rejected) ?></div>
+                </div>
+            </div>
+        </div>
+
         <div class="card stat-card p-3 mb-3">
             <form method="GET" class="row g-3">
                 <input type="hidden" name="route" value="/views/student/visitors/index.php">
@@ -144,6 +162,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <th>Visit Date</th>
                         <th>Purpose</th>
                         <th>Status</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -164,11 +183,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                         <?= e(ucfirst($visitor['status'] ?? 'pending')) ?>
                                     </span>
                                 </td>
+                                <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/student/visitors/view.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/student/visitors/edit.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>">Edit</a></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="5" class="text-center text-muted">No visitor records matching your filters.</td>
+                            <td colspan="6" class="text-center text-muted">No visitor records matching your filters.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>

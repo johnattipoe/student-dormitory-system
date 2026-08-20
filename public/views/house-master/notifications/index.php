@@ -18,8 +18,11 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 use App\Services\NotificationService;
 
 $notificationService = new NotificationService();
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_read') {
-    $result = $notificationService->markAsReadById(sanitize($_POST['id'] ?? ''));
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['mark_read', 'mark_all_read'], true)) {
+    $currentUserId = current_user()['uid'] ?? current_user()['id'] ?? null;
+    $result = ($_POST['action'] ?? '') === 'mark_all_read'
+        ? $notificationService->markAllAsRead($currentUserId)
+        : $notificationService->markAsRead(sanitize($_POST['id'] ?? ''), $currentUserId);
     flash($result['success'] ? 'success' : 'error', $result['message']);
     redirect(base_url('index.php?route=/views/house-master/notifications/index.php'));
 }
@@ -27,6 +30,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_
 $pageTitle = 'House Master Notifications';
 $currentUserId = current_user()['uid'] ?? current_user()['id'] ?? null;
 $notifications = $currentUserId ? $notificationService->forUser($currentUserId) : [];
+$notificationType = sanitize($_GET['type'] ?? '');
+$notificationRead = sanitize($_GET['read'] ?? '');
+$notificationSearch = strtolower(sanitize($_GET['search'] ?? ''));
+$notifications = array_values(array_filter($notifications, function ($note) use ($notificationType, $notificationRead, $notificationSearch) {
+    return ($notificationType === '' || ($note['type'] ?? '') === $notificationType)
+        && ($notificationRead === '' || (($notificationRead === 'unread') === empty($note['read'])))
+        && ($notificationSearch === '' || str_contains(strtolower((string) ($note['title'] ?? '')), $notificationSearch) || str_contains(strtolower((string) ($note['message'] ?? '')), $notificationSearch));
+}));
+$unreadCount = count(array_filter($notifications, fn($note) => empty($note['read'])));
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/house-master/dashboard/index.php')],
     ['icon' => 'bi-mortarboard', 'label' => 'Students', 'href' => url('views/house-master/students/index.php')],
@@ -48,8 +60,10 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <div class="content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Notifications</h5>
-            <span class="badge bg-secondary bg-opacity-10 text-secondary"><?= count($notifications) ?> items</span>
+            <div><span class="badge bg-secondary bg-opacity-10 text-secondary"><?= count($notifications) ?> items</span> <span class="badge bg-warning text-dark"><?= $unreadCount ?> unread</span><form method="POST" class="d-inline ms-2"><input type="hidden" name="action" value="mark_all_read"><button class="btn btn-sm btn-outline-primary">Mark all read</button></form></div>
         </div>
+
+        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-5"><input name="search" class="form-control form-control-sm" placeholder="Search notifications" value="<?= e($notificationSearch) ?>"></div><div class="col-md-3"><select name="type" class="form-select form-select-sm"><option value="">All types</option><?php foreach (['info','success','warning','danger'] as $type): ?><option value="<?= e($type) ?>" <?= $notificationType === $type ? 'selected' : '' ?>><?= e(ucfirst($type)) ?></option><?php endforeach; ?></select></div><div class="col-md-2"><select name="read" class="form-select form-select-sm"><option value="">All</option><option value="unread" <?= $notificationRead === 'unread' ? 'selected' : '' ?>>Unread</option><option value="read" <?= $notificationRead === 'read' ? 'selected' : '' ?>>Read</option></select></div><div class="col-md-2"><button class="btn btn-primary btn-sm">Filter</button> <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/notifications/index.php') ?>">Reset</a></div></form></div>
 
         <div class="card stat-card p-3">
             <table class="table table-hover data-table w-100">
@@ -71,6 +85,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td><?= e($note['message'] ?? '') ?></td>
                                 <td><?= !empty($note['read']) ? 'Yes' : 'No' ?></td>
                                 <td>
+                                    <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/house-master/notifications/view.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>">View</a>
                                     <?php if (empty($note['read'])): ?>
                                         <form method="POST" action="<?= url('views/house-master/notifications/index.php') ?>" class="d-inline">
                                             <input type="hidden" name="action" value="mark_read">

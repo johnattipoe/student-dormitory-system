@@ -24,6 +24,19 @@ class VisitorService
         }
     }
 
+    public function find(?string $id): ?array
+    {
+        if (!$id) {
+            return null;
+        }
+
+        try {
+            return $this->firebase->getDocument($this->collection, $id);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public function update(string $id, array $data): bool
     {
         $this->firebase->updateDocument($this->collection, $id, $data);

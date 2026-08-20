@@ -17,7 +17,7 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\AttendanceService;
 
-$studentId = current_user()['uid'];
+$studentId = current_user()['studentId'] ?? current_user()['uid'] ?? null;
 $date = sanitize($_GET['date'] ?? date('Y-m-d'));
 $dateFrom = sanitize($_GET['dateFrom'] ?? '');
 $dateTo = sanitize($_GET['dateTo'] ?? '');
@@ -157,6 +157,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <th>Date</th>
                         <th>Status</th>
                         <th>Reason</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -176,11 +177,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                     </span>
                                 </td>
                                 <td><?= e($entry['reason'] ?? $entry['notes'] ?? '—') ?></td>
+                                <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/student/attendance/view.php?id=' . urlencode((string) ($entry['id'] ?? ''))) ?>">View</a></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="3" class="text-center text-muted">No attendance records matching your filters.</td>
+                            <td colspan="4" class="text-center text-muted">No attendance records matching your filters.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>

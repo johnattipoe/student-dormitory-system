@@ -15,6 +15,8 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
+use App\Services\FirebaseService;
+
 $pageTitle = 'Settings';
 $appConfig = require APP_ROOT . '/app/config/app.php';
 $defaultSettings = [
@@ -46,14 +48,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'timezone' => trim((string) ($_POST['timezone'] ?? $defaultSettings['timezone'])),
     ];
 
-    // Settings managed via Firestore (settings collection)
-    // TODO: Implement Firebase write for admin settings
-    flash('info', 'Settings management via Firestore coming soon.');
+    try {
+        FirebaseService::getInstance()->addDocument(COL_SETTINGS, [
+            'values' => $settings,
+            'updatedBy' => current_user()['uid'] ?? current_user()['id'] ?? 'admin',
+        ], 'global');
+        flash('success', 'Settings saved successfully.');
+    } catch (Throwable $e) {
+        flash('error', 'Unable to save settings: ' . $e->getMessage());
+    }
     redirect(url('views/admin/settings/index.php'));
 }
 
 $settings = $defaultSettings;
-// Load custom settings from Firestore when integration is complete
+try {
+    $savedSettings = FirebaseService::getInstance()->getDocument(COL_SETTINGS, 'global');
+    if (!empty($savedSettings['values']) && is_array($savedSettings['values'])) {
+        $settings = array_merge($settings, $savedSettings['values']);
+    }
+} catch (Throwable $e) {
+    // Keep the config defaults available when Firestore is unavailable.
+}
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],

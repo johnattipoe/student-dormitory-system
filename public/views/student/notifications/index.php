@@ -17,17 +17,16 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\NotificationService;
 
-// Handle bulk actions
 $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = sanitize($_POST['action'] ?? '');
     $notificationIds = (array) ($_POST['notificationIds'] ?? []);
-    
+
     if ($action === 'bulk_mark_read' && !empty($notificationIds)) {
         $notificationService = new NotificationService();
         try {
             foreach ($notificationIds as $nId) {
-                $notificationService->markAsReadById($nId);
+                $notificationService->markAsReadById((string) $nId);
             }
             flash('success', 'Marked ' . count($notificationIds) . ' notification(s) as read');
             redirect(url('views/student/notifications/index.php'));
@@ -38,9 +37,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $pageTitle = 'Student Notifications';
-$notifications = (new NotificationService())->all();
-$unreadNotifications = array_filter($notifications, fn($n) => empty($n['read']));
-$readNotifications = array_filter($notifications, fn($n) => !empty($n['read']));
+$userId = current_user()['uid'] ?? null;
+$notificationService = new NotificationService();
+$notifications = $userId ? $notificationService->forUser($userId) : [];
+$notifications = array_values(array_filter($notifications, fn($note) => (string) ($note['userId'] ?? '') === (string) $userId));
+$unreadNotifications = array_values(array_filter($notifications, fn($n) => empty($n['read'])));
+$readNotifications = array_values(array_filter($notifications, fn($n) => !empty($n['read'])));
+
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/student/dashboard/index.php')],
     ['icon' => 'bi-calendar-check', 'label' => 'Attendance', 'href' => url('views/student/attendance/index.php')],
@@ -77,11 +80,38 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             </div>
         </div>
 
+        <div class="row g-3 mb-3">
+            <div class="col-md-3">
+                <div class="card stat-card p-3 text-center h-100">
+                    <div class="text-muted small">Total</div>
+                    <div class="fs-3 fw-bold"><?= e((string) count($notifications)) ?></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card p-3 text-center h-100">
+                    <div class="text-muted small">Unread</div>
+                    <div class="fs-3 fw-bold text-warning"><?= e((string) count($unreadNotifications)) ?></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card p-3 text-center h-100">
+                    <div class="text-muted small">Read</div>
+                    <div class="fs-3 fw-bold text-success"><?= e((string) count($readNotifications)) ?></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card p-3 text-center h-100">
+                    <div class="text-muted small">Priority</div>
+                    <div class="fs-3 fw-bold text-info"><?= e((string) count(array_filter($notifications, fn($n) => ($n['type'] ?? '') === 'urgent'))) ?></div>
+                </div>
+            </div>
+        </div>
+
         <div class="card stat-card p-3">
             <div class="mb-3 d-flex justify-content-between align-items-center">
                 <div>
                     <strong id="selectedCount">0</strong> notification(s) selected
-                    <a href="#" id="selectAllLink" class="ms-2 small">Select all</a> | 
+                    <a href="#" id="selectAllLink" class="ms-2 small">Select all</a> |
                     <a href="#" id="clearAllLink" class="ms-2 small">Clear all</a>
                 </div>
             </div>
@@ -105,8 +135,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td>
                                     <input type="checkbox" class="form-check-input notification-checkbox" data-notification-id="<?= e((string) ($note['id'] ?? '')) ?>">
                                 </td>
-                                <td><?= e($note['title'] ?? '') ?></td>
-                                <td><?= e($note['type'] ?? '') ?></td>
+                                <td><?= e((string) ($note['title'] ?? '')) ?></td>
+                                <td><?= e((string) ($note['type'] ?? 'info')) ?></td>
                                 <td>
                                     <?php if (empty($note['read'])): ?>
                                         <span class="badge bg-warning">Unread</span>
@@ -114,7 +144,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                         <span class="badge bg-secondary">Read</span>
                                     <?php endif; ?>
                                 </td>
-                                <td><?= e($note['createdAt'] ?? '') ?></td>
+                                <td><?= e((string) ($note['createdAt'] ?? '')) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
@@ -127,7 +157,6 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         </div>
     </div>
 
-    <!-- Bulk Action Modal -->
     <div class="modal fade" id="bulkActionModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -153,7 +182,6 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <script>
         const selectedNotifications = new Set();
 
-        // Select all checkbox
         document.getElementById('selectAllCheckbox')?.addEventListener('change', function() {
             document.querySelectorAll('.notification-checkbox').forEach(checkbox => {
                 checkbox.checked = this.checked;
@@ -161,12 +189,10 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             updateSelection();
         });
 
-        // Individual checkboxes
         document.querySelectorAll('.notification-checkbox').forEach(checkbox => {
             checkbox.addEventListener('change', updateSelection);
         });
 
-        // Select all link
         document.getElementById('selectAllLink')?.addEventListener('click', function(e) {
             e.preventDefault();
             document.querySelectorAll('.notification-checkbox').forEach(checkbox => {
@@ -175,7 +201,6 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             updateSelection();
         });
 
-        // Clear all link
         document.getElementById('clearAllLink')?.addEventListener('click', function(e) {
             e.preventDefault();
             document.querySelectorAll('.notification-checkbox').forEach(checkbox => {

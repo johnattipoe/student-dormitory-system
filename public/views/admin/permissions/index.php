@@ -15,9 +15,10 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
+use App\Services\FirebaseService;
+
 $pageTitle = 'Permissions';
 $permissions = require APP_ROOT . '/app/config/permissions.php';
-// Custom permissions and custom roles managed via Firestore
 $roles = [
     ROLE_ADMIN => 'Admin',
     ROLE_HOUSE_MASTER => 'House Master',
@@ -27,6 +28,19 @@ $roles = [
     ROLE_NURSE => 'Nurse',
     ROLE_STUDENT => 'Student',
 ];
+
+try {
+    $savedPermissions = FirebaseService::getInstance()->getCollection(COL_PERMISSIONS, [], 200);
+    foreach ($savedPermissions as $savedPermission) {
+        $roleKey = (string) ($savedPermission['role'] ?? '');
+        if ($roleKey !== '' && !empty($savedPermission['levels']) && is_array($savedPermission['levels'])) {
+            $permissions[$roleKey] = $savedPermission['levels'];
+            $roles[$roleKey] = ucwords(str_replace('_', ' ', $roleKey));
+        }
+    }
+} catch (Throwable $e) {
+    // The built-in permission matrix remains available when Firestore is unavailable.
+}
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],

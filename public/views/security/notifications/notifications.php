@@ -18,7 +18,8 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 use App\Services\NotificationService;
 
 $pageTitle = 'Security Notifications';
-$notifications = (new NotificationService())->all();
+$currentUserId = current_user()['uid'] ?? current_user()['id'] ?? null;
+$notifications = $currentUserId ? (new NotificationService())->forUser($currentUserId) : [];
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/security/dashboard/dashboard.php')],
     ['icon' => 'bi-people', 'label' => 'Visitors', 'href' => url('views/security/visitors/visitors.php')],

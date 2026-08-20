@@ -23,6 +23,10 @@ $statusFilter = sanitize($_GET['status'] ?? '');
 $houseId = current_user()['houseId'] ?? null;
 $students = StudentService::all($houseId);
 $attendance = AttendanceService::forDate($date, $houseId);
+$studentFilter = sanitize($_GET['studentId'] ?? '');
+if ($studentFilter !== '') {
+    $attendance = array_values(array_filter($attendance, fn($record) => (string) ($record['studentId'] ?? '') === $studentFilter));
+}
 
 if ($statusFilter) {
     $attendance = array_filter($attendance, fn($record) => ($record['status'] ?? 'present') === $statusFilter);
@@ -53,6 +57,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <form method="GET" class="d-flex gap-2 align-items-center flex-wrap">
                     <input type="hidden" name="route" value="/views/houseparent/attendance/history.php">
                     <input type="date" name="date" class="form-control" value="<?= e($date) ?>">
+                    <select name="studentId" class="form-select form-select-sm"><option value="">All Students</option><?php foreach ($students as $student): ?><option value="<?= e((string) ($student['id'] ?? '')) ?>" <?= $studentFilter === (string) ($student['id'] ?? '') ? 'selected' : '' ?>><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?></option><?php endforeach; ?></select>
                     <select name="status" class="form-select form-select-sm" style="max-width: 120px;">
                         <option value="">All Statuses</option>
                         <option value="present" <?= $statusFilter === 'present' ? 'selected' : '' ?>>Present</option>
@@ -93,12 +98,13 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                             <th>Student</th>
                             <th>Status</th>
                             <th>Marked By</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($attendance)): ?>
                             <tr>
-                                <td colspan="4" class="text-center text-muted">No attendance history found for this date.</td>
+                                <td colspan="5" class="text-center text-muted">No attendance history found for this date.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($attendance as $record): ?>
@@ -116,6 +122,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                     <td><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?: e($record['studentId'] ?? '-') ?></td>
                                     <td><span class="badge bg-<?= ($record['status'] ?? 'present') === 'present' ? 'success' : (($record['status'] ?? '') === 'absent' ? 'danger' : 'warning') ?>"><?= e($record['status'] ?? 'present') ?></span></td>
                                     <td><?= e($record['markedBy'] ?? '—') ?></td>
+                                    <td class="text-nowrap"><a class="btn btn-sm btn-outline-primary" href="<?= url('views/houseparent/attendance/view.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/houseparent/attendance/edit.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/houseparent/attendance/delete.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">Delete</a></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>

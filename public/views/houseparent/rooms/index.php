@@ -20,6 +20,10 @@ use App\Services\RoomService;
 $houseId = current_user()['houseId'] ?? null;
 $rooms = RoomService::all($houseId);
 $roomStats = RoomService::occupancyStats($houseId);
+$roomSearch = strtolower(sanitize($_GET['search'] ?? ''));
+if ($roomSearch !== '') {
+    $rooms = array_values(array_filter($rooms, fn($room) => str_contains(strtolower((string) ($room['roomNumber'] ?? '')), $roomSearch)));
+}
 
 $pageTitle = 'Houseparent Rooms';
 $navItems = [
@@ -41,8 +45,10 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <div class="content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">House Rooms</h5>
-            <span class="badge bg-secondary bg-opacity-10 text-secondary"><?= e((string) $roomStats['rooms']) ?> rooms</span>
+            <div><a href="<?= url('views/houseparent/reports/occupancy.php') ?>" class="btn btn-outline-primary btn-sm">Occupancy report</a> <span class="badge bg-secondary bg-opacity-10 text-secondary"><?= e((string) $roomStats['rooms']) ?> rooms</span></div>
         </div>
+
+        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-8"><input name="search" class="form-control form-control-sm" placeholder="Search room number" value="<?= e($roomSearch) ?>"></div><div class="col-md-4"><button class="btn btn-primary btn-sm">Filter</button> <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/houseparent/rooms/index.php') ?>">Reset</a></div></form></div>
 
         <div class="row g-3 mb-4">
             <div class="col-md-3">
@@ -80,6 +86,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <th>Occupied</th>
                         <th>Vacant</th>
                         <th>Status</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -92,11 +99,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td><?= e((string) $occupied) ?></td>
                                 <td><?= e((string) $vacant) ?></td>
                                 <td><span class="badge bg-<?= ($occupied >= $capacity) ? 'secondary' : 'success' ?>"><?= e((string) ($room['status'] ?? ($occupied >= $capacity ? 'full' : 'available'))) ?></span></td>
+                                <td class="text-nowrap"><a class="btn btn-sm btn-outline-primary" href="<?= url('views/houseparent/rooms/view.php?id=' . urlencode((string) ($room['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/houseparent/rooms/edit.php?id=' . urlencode((string) ($room['id'] ?? ''))) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/houseparent/rooms/delete.php?id=' . urlencode((string) ($room['id'] ?? ''))) ?>">Delete</a></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="5" class="text-center text-muted">No room data available.</td>
+                            <td colspan="6" class="text-center text-muted">No room data available.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>

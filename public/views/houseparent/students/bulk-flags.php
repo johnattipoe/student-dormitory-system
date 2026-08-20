@@ -17,11 +17,15 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\StudentService;
 
+$houseId = current_user()['houseId'] ?? null;
+$allowedStudentIds = array_map(fn($student) => (string) ($student['id'] ?? ''), StudentService::all($houseId));
+
 // Handle bulk flag operations
 $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = sanitize($_POST['action'] ?? '');
     $studentIds = (array) ($_POST['studentIds'] ?? []);
+    $studentIds = array_values(array_intersect(array_map('strval', $studentIds), $allowedStudentIds));
     
     if ($action === 'bulk_flag' && !empty($studentIds)) {
         $flagType = sanitize($_POST['flagType'] ?? '');
@@ -65,12 +69,18 @@ $flaggedStudents = array_filter($students, fn($s) => ($s['flagged'] ?? false) ==
 $unflaggedStudents = array_filter($students, fn($s) => ($s['flagged'] ?? false) != true);
 
 $filterType = sanitize($_GET['type'] ?? 'all');
+$search = strtolower(sanitize($_GET['search'] ?? ''));
 if ($filterType === 'flagged') {
     $displayStudents = $flaggedStudents;
 } elseif ($filterType === 'unflagged') {
     $displayStudents = $unflaggedStudents;
 } else {
     $displayStudents = $students;
+}
+if ($search !== '') {
+    $displayStudents = array_values(array_filter($displayStudents, function ($student) use ($search) {
+        return str_contains(strtolower(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' ' . ($student['admissionNo'] ?? '') . ' ' . ($student['email'] ?? '') . ' ' . ($student['flagType'] ?? ''))), $search);
+    }));
 }
 
 $pageTitle = 'Bulk Flag Management';
@@ -93,8 +103,11 @@ require APP_ROOT . '/app/views/components/sidebar.php';
 
     <div class="content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">Bulk Flag Management</h5>
+            <div><h5 class="mb-1">Bulk Flag Management</h5><p class="text-muted mb-0">Review and manage student concerns.</p></div>
+            <span class="badge bg-warning text-dark"><?= e((string) count($flaggedStudents)) ?> flagged</span>
         </div>
+
+        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><input type="hidden" name="type" value="<?= e($filterType) ?>"><div class="col-md-9"><input name="search" class="form-control form-control-sm" placeholder="Search student, admission number, or flag type" value="<?= e($search) ?>"></div><div class="col-md-3"><button class="btn btn-primary btn-sm">Search</button> <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/houseparent/students/bulk-flags.php?type=' . urlencode($filterType)) ?>">Reset</a></div></form></div>
 
         <!-- Filter Tabs -->
         <div class="mb-3">

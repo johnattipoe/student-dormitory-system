@@ -18,6 +18,8 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 use App\Services\IncidentService;
 
 $incidents = (new IncidentService())->all();
+$search = strtolower(sanitize($_GET['search'] ?? ''));
+if ($search !== '') $incidents = array_values(array_filter($incidents, fn($incident) => str_contains(strtolower((string) ($incident['title'] ?? '')), $search) || str_contains(strtolower((string) ($incident['studentId'] ?? '')), $search)));
 
 $pageTitle = 'Security Incidents';
 $navItems = [
@@ -37,7 +39,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
     <div class="content-wrapper">
         <div class="card stat-card p-3">
-            <h5 class="mb-3">Incident Log</h5>
+            <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">Incident Log</h5><form method="GET" class="d-flex gap-2"><input name="search" class="form-control form-control-sm" placeholder="Search incidents" value="<?= e($search) ?>"><button class="btn btn-primary btn-sm">Filter</button></form></div>
             <table class="table table-hover data-table w-100">
                 <thead>
                     <tr>
@@ -45,6 +47,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <th>Student</th>
                         <th>Priority</th>
                         <th>Status</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -55,11 +58,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td><?= e($incident['studentId'] ?? '—') ?></td>
                                 <td><?= e($incident['priority'] ?? 'medium') ?></td>
                                 <td><span class="badge bg-warning"><?= e($incident['status'] ?? 'open') ?></span></td>
+                                <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/security/incidents/view.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/security/incidents/edit.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/security/incidents/delete.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">Delete</a></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="4" class="text-center text-muted">No incidents recorded.</td>
+                            <td colspan="5" class="text-center text-muted">No incidents recorded.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>

@@ -22,13 +22,23 @@ use App\Services\StudentService;
 use App\Services\VisitorService;
 
 $houseId = current_user()['houseId'] ?? null;
+$students = StudentService::all($houseId);
+$studentMap = [];
+foreach ($students as $student) {
+    $studentMap[(string) ($student['id'] ?? '')] = $student;
+}
+$todayAttendance = AttendanceService::todayByHouse($houseId);
+$todayVisitors = (new VisitorService())->todayByHouse($houseId);
+$openIncidents = (new IncidentService())->byHouse($houseId, true);
 $stats = [
-    'students' => StudentService::count($houseId),
+    'students' => count($students),
     'rooms' => RoomService::count($houseId),
-    'attendance' => count(AttendanceService::todayByHouse($houseId)),
-    'visitors' => count((new VisitorService())->todayByHouse($houseId)),
-    'incidents' => (new IncidentService())->openByHouse($houseId),
+    'attendance' => count($todayAttendance),
+    'visitors' => count($todayVisitors),
+    'incidents' => count($openIncidents),
 ];
+$attendanceSummary = AttendanceService::summary(date('Y-m-d'), $houseId);
+$roomStats = RoomService::occupancyStats($houseId);
 
 $pageTitle = 'House Master Dashboard';
 $navItems = [
@@ -87,6 +97,13 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             </div>
         </div>
 
+        <div class="row g-3 mt-1 mb-4">
+            <div class="col-md-3"><div class="card stat-card p-3"><small class="text-muted">Present today</small><strong class="fs-3 text-success"><?= e((string) ($attendanceSummary['present'] ?? 0)) ?></strong></div></div>
+            <div class="col-md-3"><div class="card stat-card p-3"><small class="text-muted">Absent today</small><strong class="fs-3 text-danger"><?= e((string) ($attendanceSummary['absent'] ?? 0)) ?></strong></div></div>
+            <div class="col-md-3"><div class="card stat-card p-3"><small class="text-muted">Vacant spaces</small><strong class="fs-3"><?= e((string) ($roomStats['vacant'] ?? 0)) ?></strong></div></div>
+            <div class="col-md-3"><div class="card stat-card p-3"><small class="text-muted">Occupancy rate</small><strong class="fs-3"><?= e((string) ($roomStats['occupancyRate'] ?? 0)) ?>%</strong></div></div>
+        </div>
+
         <br>
 
         <div class="row g-3">
@@ -103,14 +120,17 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                         <th>Student</th>
                                         <th>Room</th>
                                         <th>Status</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach (AttendanceService::todayByHouse($houseId) as $attendance):   ?>
                                         <tr>
-                                            <td><?= e($attendance['studentName'] ?? $attendance['studentId'] ?? '-') ?></td>
+                                            <?php $attendanceStudent = $studentMap[(string) ($attendance['studentId'] ?? '')] ?? []; ?>
+                                            <td><?= e(trim(($attendanceStudent['firstName'] ?? '') . ' ' . ($attendanceStudent['lastName'] ?? '')) ?: ($attendance['studentName'] ?? $attendance['studentId'] ?? '-')) ?></td>
                                             <td><?= e($attendance['roomNumber'] ?? '-') ?></td>
                                             <td><?= e($attendance['status'] ?? '-') ?></td>
+                                            <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/attendance/view.php?id=' . urlencode((string) ($attendance['id'] ?? ''))) ?>">View</a></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -131,6 +151,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                     <tr>
                                         <th>Name</th>
                                         <th>Room</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -138,6 +159,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                         <tr>
                                             <td><?= e($visitor['name'] ?? $visitor['visitorName'] ?? '-') ?></td>
                                             <td><?= e($visitor['roomNumber'] ?? '-') ?></td>
+                                            <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/visitors/view.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>">View</a></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -163,6 +185,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                     <tr>
                                         <th>Incident</th>
                                         <th>Room</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -170,6 +193,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                         <tr>
                                             <td><?= e($incident['title'] ?? 'Incident') ?></td>
                                             <td><?= e($incident['roomNumber'] ?? '-') ?></td>
+                                            <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/incidents/index.php') ?>">View log</a></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>

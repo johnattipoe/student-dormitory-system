@@ -53,6 +53,7 @@ foreach ($students as $student) {
 }
 
 $statusFilter = sanitize($_GET['status'] ?? '');
+$requestSearch = strtolower(sanitize($_GET['search'] ?? ''));
 $visitorRequests = FirebaseService::getInstance()->getCollection(\COL_VISITOR_REQUESTS, [], 500);
 $filteredRequests = [];
 foreach ($visitorRequests as $request) {
@@ -61,6 +62,9 @@ foreach ($visitorRequests as $request) {
         continue;
     }
     if ($statusFilter && ($request['status'] ?? 'pending') !== $statusFilter) {
+        continue;
+    }
+    if ($requestSearch !== '' && !str_contains(strtolower((string) ($request['visitorName'] ?? '')), $requestSearch) && !str_contains(strtolower(trim(($studentMap[$studentId]['firstName'] ?? '') . ' ' . ($studentMap[$studentId]['lastName'] ?? ''))), $requestSearch)) {
         continue;
     }
     if (!$houseId || (($request['houseId'] ?? null) === $houseId) || !empty($studentMap[$studentId])) {
@@ -94,6 +98,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             <h5 class="mb-0">Visitor Requests</h5>
             <form method="GET" class="d-flex gap-2">
                 <input type="hidden" name="route" value="/views/houseparent/visitors/requests.php">
+                <input name="search" class="form-control form-control-sm" placeholder="Search visitor or student" value="<?= e($requestSearch) ?>">
                 <select name="status" class="form-select form-select-sm" style="max-width: 150px;" onchange="this.form.submit()">
                     <option value="">All Requests</option>
                     <option value="pending" <?= $statusFilter === 'pending' ? 'selected' : '' ?>>Pending</option>
@@ -151,6 +156,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td><?= e($request['relationship'] ?? '—') ?></td>
                                 <td><span class="badge bg-<?= ($request['status'] ?? '') === 'approved' ? 'success' : (($request['status'] ?? '') === 'rejected' ? 'danger' : 'warning') ?>"><?= e($request['status'] ?? 'pending') ?></span></td>
                                 <td>
+                                    <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/houseparent/visitors/request-view.php?id=' . urlencode((string) ($request['id'] ?? ''))) ?>">View</a>
                                     <?php if (($request['status'] ?? 'pending') === 'pending'): ?>
                                         <div class="btn-group btn-group-sm" role="group">
                                             <form method="POST" style="display:inline;">

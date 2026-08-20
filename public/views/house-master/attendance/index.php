@@ -84,6 +84,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <i class="bi bi-check2-square"></i> Bulk Mark
                     </a>
                     <a href="<?= url('views/house-master/attendance/history.php') ?>" class="btn btn-outline-secondary btn-sm">History</a>
+                    <a href="<?= url('views/house-master/reports/export.php?type=attendance&date=' . urlencode($date)) ?>" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-csv"></i> CSV</a>
                 </div>
             </div>
         </div>
@@ -187,12 +188,13 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <th>Student</th>
                         <th>Status</th>
                         <th>Marked By</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($attendance)): ?>
                         <tr>
-                            <td colspan="4" class="text-center text-muted">No attendance records matching your filters.</td>
+                            <td colspan="5" class="text-center text-muted">No attendance records matching your filters.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($attendance as $record): ?>
@@ -210,6 +212,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td><?= e(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' (' . ($student['admissionNo'] ?? '') . ')') ?: e($record['studentId'] ?? '-') ?></td>
                                 <td><span class="badge bg-<?= ($record['status'] ?? 'present') === 'present' ? 'success' : (($record['status'] ?? '') === 'absent' ? 'danger' : 'warning') ?>"><?= e($record['status'] ?? 'present') ?></span></td>
                                 <td><?= e($record['markedBy'] ?? '—') ?></td>
+                                <td class="text-nowrap"><a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/attendance/view.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/house-master/attendance/edit.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/house-master/attendance/delete.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">Delete</a></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>

@@ -95,7 +95,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         <div class="card stat-card p-4">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                 <h5 class="mb-0">Student Profile</h5>
-                <a href="<?= url('views/houseparent/students/index.php') ?>" class="btn btn-outline-secondary btn-sm">Back to students</a>
+                <div><a href="<?= url('views/houseparent/students/index.php') ?>" class="btn btn-outline-secondary btn-sm">Back to students</a><?php if ($student): ?> <a href="<?= url('views/houseparent/students/edit.php?studentId=' . urlencode($studentId)) ?>" class="btn btn-primary btn-sm">Edit profile</a><?php endif; ?></div>
             </div>
 
             <?php if (!$student): ?>

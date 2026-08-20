@@ -62,6 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $houseId = current_user()['houseId'] ?? null;
 $students = StudentService::all($houseId);
+$studentSearch = strtolower(sanitize($_GET['search'] ?? ''));
+if ($studentSearch !== '') {
+    $students = array_values(array_filter($students, function ($student) use ($studentSearch) {
+        return str_contains(strtolower(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' ' . ($student['admissionNo'] ?? '') . ' ' . ($student['roomId'] ?? ''))), $studentSearch);
+    }));
+}
 
 $pageTitle = 'Mark Attendance';
 $navItems = [
@@ -85,6 +91,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <div class="content-wrapper">
         <div class="card stat-card p-4" style="max-width:900px;">
             <h5 class="mb-3">Mark Attendance</h5>
+            <div class="alert alert-light border d-flex justify-content-between align-items-center"><span><strong><?= e((string) count($students)) ?></strong> students available for this house.</span><a href="<?= url('views/house-master/attendance/history.php') ?>" class="btn btn-sm btn-outline-primary">View history</a></div>
             
             <!-- Tab Navigation -->
             <ul class="nav nav-tabs mb-4" role="tablist">
@@ -164,6 +171,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <div class="alert alert-info">
                             <small>Select students below to mark their attendance with the status above.</small>
                         </div>
+
+                        <div class="mb-3"><form method="GET" class="row g-2"><div class="col-md-9"><input name="search" class="form-control form-control-sm" placeholder="Filter students by name, admission number, or room" value="<?= e($studentSearch) ?>"></div><div class="col-md-3"><button class="btn btn-outline-primary btn-sm">Filter list</button></div></form></div>
 
                         <div class="table-responsive mb-3" style="max-height: 400px; overflow-y: auto;">
                             <table class="table table-hover table-sm">
