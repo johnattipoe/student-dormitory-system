@@ -83,6 +83,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                             <th>Dashboard</th>
                             <th>House Access</th>
                             <th>Description</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -105,6 +106,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td><?= e($role['dashboard']) ?></td>
                                 <td><?= e($role['house_access']) ?></td>
                                 <td><?= e($role['description']) ?></td>
+                                <td><?php if (!in_array($role['key'], ALL_ROLES, true)): ?><a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/roles/edit.php?id=' . urlencode($role['key'])) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/roles/delete.php?id=' . urlencode($role['key'])) ?>">Delete</a><?php else: ?><span class="text-muted small">Built-in</span><?php endif; ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

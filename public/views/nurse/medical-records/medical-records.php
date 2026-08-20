@@ -36,7 +36,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <div class="content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Medical Records</h5>
-            <a href="<?= url('views/nurse/create-record/create-record.php') ?>" class="btn btn-primary btn-sm">New Record</a>
+            <div><a href="<?= url('views/nurse/medical-records/bulk-import.php') ?>" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-arrow-up"></i> Upload CSV/Excel</a> <a href="<?= url('views/nurse/create-record/create-record.php') ?>" class="btn btn-primary btn-sm">New Record</a></div>
         </div>
         <div class="card stat-card p-3">
             <table class="table table-hover data-table w-100">

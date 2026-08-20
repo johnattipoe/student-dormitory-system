@@ -118,8 +118,4 @@ require APP_ROOT . '/app/views/components/sidebar.php';
 require __DIR__ . '/../../../bootstrap.php';
 $allowedRoles = [ROLE_ADMIN];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
-// TODO: CSV bulk-import — parse uploaded file, map columns, batch-create via StudentService::create().
-$pageTitle = 'Import Students';
-require APP_ROOT . '/app/views/components/header.php';
-echo '<div class="p-4">CSV import form goes here — same layout pattern as create.php.</div>';
-require APP_ROOT . '/app/views/components/footer.php';
+redirect(url('views/admin/students/bulk-import.php'));

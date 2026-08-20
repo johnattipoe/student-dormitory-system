@@ -17,7 +17,8 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 use App\Services\AttendanceService;
 
 $pageTitle = 'Attendance Reports';
-$summary = AttendanceService::summary(date('Y-m-d'));
+$date = sanitize($_GET['date'] ?? date('Y-m-d'));
+$summary = AttendanceService::summary($date);
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-bar-chart', 'label' => 'Attendance Reports', 'href' => url('views/admin/attendance/reports.php'), 'active' => true],
@@ -30,7 +31,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <div class="content-wrapper">
         <div class="mb-4">
             <h5 class="mb-1">Attendance Reports</h5>
-            <p class="text-muted">Weekly and daily attendance metrics.</p>
+            <p class="text-muted">Daily attendance metrics and export-ready summaries.</p>
+            <form method="GET" class="d-flex gap-2 mb-3"><input type="date" name="date" class="form-control" value="<?= e($date) ?>"><button class="btn btn-primary btn-sm">View</button><a class="btn btn-success btn-sm" href="<?= url('reports/export.php?type=attendance&format=csv') ?>">CSV</a></form>
         </div>
         <div class="row g-3">
             <div class="col-md-6">
@@ -45,6 +47,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                     <p class="display-6 mb-0"><?= e($summary['absent'] ?? 0) ?></p>
                 </div>
             </div>
+            <div class="col-md-6"><div class="card stat-card p-3"><h6>Late</h6><p class="display-6 mb-0"><?= e($summary['late'] ?? 0) ?></p></div></div>
+            <div class="col-md-6"><div class="card stat-card p-3"><h6>Excused</h6><p class="display-6 mb-0"><?= e($summary['excused'] ?? 0) ?></p></div></div>
         </div>
     </div>
 </div>

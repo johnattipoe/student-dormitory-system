@@ -19,6 +19,13 @@ use App\Services\StudentService;
 
 $pageTitle = 'Students';
 $students = StudentService::all(current_role() === ROLE_ADMIN ? null : current_user()['houseId']);
+$search = strtolower(sanitize($_GET['search'] ?? ''));
+if ($search !== '') {
+    $students = array_values(array_filter($students, function ($student) use ($search) {
+        $haystack = strtolower(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' ' . ($student['admissionNo'] ?? '') . ' ' . ($student['email'] ?? '')));
+        return str_contains($haystack, $search);
+    }));
+}
 
 if (isset($_GET['created'])) $_SESSION['_flash'] = ['type' => 'success', 'message' => 'Student created.'];
 if (isset($_GET['updated'])) $_SESSION['_flash'] = ['type' => 'success', 'message' => 'Student updated.'];
@@ -42,9 +49,10 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Students</h5>
             <?php if (can('students', 'own') || current_role() !== ROLE_STUDENT): ?>
-                <a href="<?= url('views/admin/students/create.php') ?>" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Student</a>
+                <div><a href="<?= url('views/admin/students/bulk-import.php') ?>" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-arrow-up"></i> Upload CSV/Excel</a> <a href="<?= url('views/admin/students/create.php') ?>" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Student</a></div>
             <?php endif; ?>
         </div>
+        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-9"><input name="search" class="form-control form-control-sm" placeholder="Search name, admission number, or email" value="<?= e($search) ?>"></div><div class="col-md-3"><button class="btn btn-primary btn-sm">Filter</button> <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/students/index.php') ?>">Reset</a></div></form></div>
 
         <div class="card stat-card p-3">
             <table class="table table-hover data-table w-100">

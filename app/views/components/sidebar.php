@@ -8,8 +8,8 @@ $navItems = $navItems ?? [];
 <aside class="sidebar">
     <div class="sidebar-inner d-flex flex-column h-100">
         <div class="sidebar-brand d-flex align-items-center gap-2 px-3 py-3">
-            <img src="<?= asset('images/logo.svg') ?>" alt="SDS logo" width="32" height="32" onerror="this.remove()">
-            <span class="fw-bold sidebar-brand-text">SDS</span>
+            <img src="<?= asset('images/logo.svg') ?>" alt="STUDENT logo" width="32" height="32" onerror="this.remove()">
+            <span class="fw-bold sidebar-brand-text">STUDENT DORMITORY SYSTEM</span>
         </div>
 
         <?php

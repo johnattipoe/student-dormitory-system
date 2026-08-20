@@ -43,7 +43,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <div class="content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Visitors</h5>
-            <div><a href="<?= url('views/security/visitor-history/visitor-history.php') ?>" class="btn btn-outline-primary btn-sm">History</a> <a href="<?= url('views/security/register-visitor/register-visitor.php') ?>" class="btn btn-primary btn-sm">Register Visitor</a></div>
+            <div><a href="<?= url('views/security/visitors/bulk-import.php') ?>" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-arrow-up"></i> Upload CSV/Excel</a> <a href="<?= url('views/security/visitor-history/visitor-history.php') ?>" class="btn btn-outline-primary btn-sm">History</a> <a href="<?= url('views/security/register-visitor/register-visitor.php') ?>" class="btn btn-primary btn-sm">Register Visitor</a></div>
         </div>
         <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-7"><input name="search" class="form-control form-control-sm" placeholder="Search visitor or student" value="<?= e($search) ?>"></div><div class="col-md-3"><select name="status" class="form-select form-select-sm"><option value="">All statuses</option><option value="inside" <?= $statusFilter === 'inside' ? 'selected' : '' ?>>Inside</option><option value="checked_out" <?= $statusFilter === 'checked_out' ? 'selected' : '' ?>>Checked out</option><option value="registered" <?= $statusFilter === 'registered' ? 'selected' : '' ?>>Registered</option></select></div><div class="col-md-2"><button class="btn btn-primary btn-sm">Filter</button></div></form></div>
         <div class="card stat-card p-3">

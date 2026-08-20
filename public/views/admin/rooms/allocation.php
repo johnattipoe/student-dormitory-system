@@ -46,7 +46,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <?= e($room['occupied'] ?? 0) ?>/<?= e($room['capacity'] ?? 0) ?>
                             </span>
                         </div>
-                        <span class="badge bg-secondary bg-opacity-10 text-secondary">Status: <?= e($room['status'] ?? 'unknown') ?></span>
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary">Status: <?= e($room['status'] ?? 'unknown') ?></span>
+                            <div class="mt-3"><a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/rooms/view.php?id=' . urlencode((string) ($room['id'] ?? ''))) ?>">View room</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/rooms/edit.php?id=' . urlencode((string) ($room['id'] ?? ''))) ?>">Edit</a></div>
                     </div>
                 </div>
             <?php endforeach; ?>

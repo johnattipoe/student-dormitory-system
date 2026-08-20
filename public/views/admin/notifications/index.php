@@ -21,6 +21,13 @@ use App\Services\UserService;
 $notificationService = new NotificationService();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (($_POST['action'] ?? '') === 'mark_all_read') {
+        foreach ($notificationService->all() as $notification) {
+            if (!empty($notification['id'])) $notificationService->markAsReadById((string) $notification['id']);
+        }
+        flash('success', 'All notifications marked as read.');
+        redirect(base_url('index.php?route=/views/admin/notifications/index.php'));
+    }
     if (($_POST['action'] ?? '') === 'mark_read') {
         $result = $notificationService->markAsReadById(sanitize($_POST['id'] ?? ''));
         flash($result['success'] ? 'success' : 'error', $result['message']);
@@ -43,7 +50,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $pageTitle = 'Notifications';
 $notifications = $notificationService->all();
+$search = strtolower(sanitize($_GET['search'] ?? ''));
+$readFilter = sanitize($_GET['read'] ?? '');
+if ($search !== '' || $readFilter !== '') {
+    $notifications = array_values(array_filter($notifications, function ($notification) use ($search, $readFilter) {
+        return ($search === '' || str_contains(strtolower((string) ($notification['title'] ?? '')), $search) || str_contains(strtolower((string) ($notification['message'] ?? '')), $search))
+            && ($readFilter === '' || ($readFilter === 'unread' ? empty($notification['read']) : !empty($notification['read'])));
+    }));
+}
 $users = (new UserService())->all();
+$unreadCount = count(array_filter($notifications, fn($notification) => empty($notification['read'])));
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/admin/notifications/index.php'), 'active' => true],
@@ -58,8 +74,9 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <div class="content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Notifications</h5>
-            <span class="badge bg-secondary bg-opacity-10 text-secondary"><?= count($notifications) ?> items</span>
+            <div><span class="badge bg-secondary bg-opacity-10 text-secondary"><?= count($notifications) ?> items</span> <span class="badge bg-warning text-dark"><?= $unreadCount ?> unread</span><?php if ($unreadCount > 0): ?><form method="POST" class="d-inline ms-2"><input type="hidden" name="action" value="mark_all_read"><button class="btn btn-sm btn-outline-primary">Mark all read</button></form><?php endif; ?></div>
         </div>
+        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-8"><input name="search" class="form-control form-control-sm" placeholder="Search notifications" value="<?= e($search) ?>"></div><div class="col-md-2"><select name="read" class="form-select form-select-sm"><option value="">All</option><option value="unread" <?= $readFilter === 'unread' ? 'selected' : '' ?>>Unread</option><option value="read" <?= $readFilter === 'read' ? 'selected' : '' ?>>Read</option></select></div><div class="col-md-2"><button class="btn btn-primary btn-sm">Filter</button></div></form></div>
 
         <div class="card stat-card p-4 mb-4">
             <h6 class="mb-3">Create notification</h6>
@@ -128,7 +145,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <tbody>
                 <?php foreach ($notifications as $note): ?>
                     <tr>
-                        <td><?= e($note['title'] ?? '') ?></td>
+                        <td><a class="fw-semibold text-decoration-none" href="<?= url('views/admin/notifications/view.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>"><?= e($note['title'] ?? '') ?></a></td>
                         <td><?= e($note['type'] ?? 'info') ?></td>
                         <td><?= e($note['message'] ?? '') ?></td>
                         <td><?= !empty($note['read']) ? 'Yes' : 'No' ?></td>
