@@ -6,13 +6,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     unzip \
     libzip-dev \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    libpng-dev \
     zlib1g-dev \
     libssl-dev \
     pkg-config \
     autoconf \
     g++ \
     make \
-    && docker-php-ext-install zip \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j"$(nproc)" gd zip \
     && pecl install grpc \
     && docker-php-ext-enable grpc \
     && rm -rf /var/lib/apt/lists/*
