@@ -41,10 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$studentId = current_user()['uid'];
+$studentId = current_user()['studentId'] ?? current_user()['uid'] ?? null;
 $firebaseService = FirebaseService::getInstance();
-$allRequests = $firebaseService->getCollection(COL_VISITOR_REQUESTS);
-$visitorRequests = array_filter($allRequests, fn($r) => ((string) ($r['studentId'] ?? '')) === ((string) $studentId));
+$allRequests = $firebaseService->getCollection(COL_VISITOR_REQUESTS) ?? [];
+$visitorRequests = $studentId ? array_values(array_filter($allRequests, fn($r) => ((string) ($r['studentId'] ?? '')) === ((string) $studentId))) : [];
 $pendingRequests = array_filter($visitorRequests, fn($r) => ($r['status'] ?? 'pending') === 'pending');
 $approvedRequests = array_filter($visitorRequests, fn($r) => ($r['status'] ?? '') === 'approved');
 $rejectedRequests = array_filter($visitorRequests, fn($r) => ($r['status'] ?? '') === 'rejected');

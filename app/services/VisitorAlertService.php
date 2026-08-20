@@ -23,7 +23,7 @@ class VisitorAlertService
      * Check for visitor overstays and create alerts
      * Typically called periodically (every 30 minutes)
      */
-    public function checkForOvrstays(?int $thresholdHours = 2): array
+    public function checkForOverstays(?int $thresholdHours = 2): array
     {
         $alerts = [];
         
@@ -46,6 +46,11 @@ class VisitorAlertService
         }
 
         return $alerts;
+    }
+
+    public function checkForOvrstays(?int $thresholdHours = 2): array
+    {
+        return $this->checkForOverstays($thresholdHours);
     }
 
     /**

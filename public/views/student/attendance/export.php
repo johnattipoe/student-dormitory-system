@@ -25,8 +25,8 @@ $dateTo = sanitize($_GET['dateTo'] ?? '');
 $statusFilter = sanitize($_GET['status'] ?? '');
 
 // Get student's attendance
-$studentId = current_user()['uid'];
-$attendance = AttendanceService::history($studentId, 1000);
+$studentId = current_user()['studentId'] ?? current_user()['uid'] ?? null;
+$attendance = $studentId ? AttendanceService::history($studentId, 1000) : [];
 
 // Apply filters
 if (!empty($dateFrom)) {

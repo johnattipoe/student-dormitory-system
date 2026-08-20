@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if ($action === 'submit_batch_requests') {
         $visitors = $_POST['visitors'] ?? [];
-        $studentId = current_user()['uid'];
+        $studentId = current_user()['studentId'] ?? current_user()['uid'] ?? null;
         
         if (empty($visitors)) {
             $errors[] = 'Please add at least one visitor request';
@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $visitDate = sanitize($visitor['visitDate'] ?? '');
                     $purpose = sanitize($visitor['purpose'] ?? '');
                     
-                    if (!empty($visitorName) && !empty($visitDate)) {
+                    if ($studentId && !empty($visitorName) && !empty($visitDate)) {
                         $firebaseService->addDocument(COL_VISITOR_REQUESTS, [
                             'studentId' => $studentId,
                             'visitorName' => $visitorName,

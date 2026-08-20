@@ -33,6 +33,7 @@ $navItems = [
     ['icon' => 'bi-exclamation-triangle', 'label' => 'Incidents', 'href' => url('views/security/incidents/incidents.php')],
     ['icon' => 'bi-file-earmark-text', 'label' => 'Visitor Report', 'href' => url('reports/export.php?type=visitors&format=pdf')],
     ['icon' => 'bi-file-earmark-text', 'label' => 'Incident Report', 'href' => url('reports/export.php?type=incidents&format=pdf')],
+    ['icon' => 'bi-bar-chart', 'label' => 'Reports', 'href' => url('views/security/reports/index.php')],
     ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/security/notifications/notifications.php')],
 ];
 
@@ -86,11 +87,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <th>Student</th>
                         <th>Purpose</th>
                         <th>Status</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($visitors)): ?>
-                        <tr><td colspan="4" class="text-center text-muted">No visitors registered.</td></tr>
+                        <tr><td colspan="5" class="text-center text-muted">No visitors registered.</td></tr>
                     <?php else: ?>
                         <?php foreach (array_slice($visitors, 0, 8) as $visitor): ?>
                             <tr>
@@ -98,6 +100,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td><?= e($visitor['studentId'] ?? '—') ?></td>
                                 <td><?= e($visitor['purpose'] ?? '—') ?></td>
                                 <td><span class="badge bg-<?= ($visitor['status'] ?? '') === 'inside' ? 'success' : 'secondary' ?>"><?= e($visitor['status'] ?? 'pending') ?></span></td>
+                                <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/security/visitors/view.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>">View</a></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>

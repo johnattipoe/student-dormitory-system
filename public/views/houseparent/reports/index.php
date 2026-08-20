@@ -55,6 +55,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             </form>
         </div>
         <?php $reportType = 'houseparent'; require APP_ROOT . '/app/views/components/report-downloads.php'; ?>
+        <div class="d-flex flex-wrap gap-2 mb-3"><a class="btn btn-outline-primary btn-sm" href="<?= url('views/houseparent/reports/attendance.php?date=' . urlencode($date)) ?>">Attendance detail</a><a class="btn btn-outline-primary btn-sm" href="<?= url('views/houseparent/reports/occupancy.php') ?>">Occupancy detail</a><a class="btn btn-outline-primary btn-sm" href="<?= url('views/houseparent/reports/visitors.php') ?>">Visitor detail</a><a class="btn btn-outline-primary btn-sm" href="<?= url('views/houseparent/reports/incidents.php') ?>">Incident detail</a></div>
 
         <div class="card stat-card p-4">
             <div class="row g-3 mt-1">

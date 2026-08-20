@@ -15,6 +15,8 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
+use App\Services\FirebaseService;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $roleKey = strtolower(trim((string) ($_POST['role_key'] ?? '')));
     $roleName = trim((string) ($_POST['name'] ?? ''));
@@ -27,9 +29,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(url('views/admin/roles/create.php'));
     }
 
-    // Roles managed via Firestore (roles collection)
-    // TODO: Implement Firebase write for custom roles
-    flash('info', 'Custom role management via Firestore coming soon.');
+    if (!preg_match('/^[a-z][a-z0-9_]*$/', $roleKey)) {
+        flash('error', 'Role key must start with a letter and contain only lowercase letters, numbers, and underscores.');
+        redirect(url('views/admin/roles/create.php'));
+    }
+
+    try {
+        FirebaseService::getInstance()->addDocument(COL_ROLES, [
+            'key' => $roleKey,
+            'name' => $roleName,
+            'dashboard' => $dashboard,
+            'house_access' => $houseAccess,
+            'description' => $description,
+            'createdBy' => current_user()['uid'] ?? current_user()['id'] ?? 'admin',
+        ], $roleKey);
+        flash('success', 'Custom role created successfully.');
+    } catch (Throwable $e) {
+        flash('error', 'Unable to create role: ' . $e->getMessage());
+    }
     redirect(url('views/admin/roles/index.php'));
 }
 

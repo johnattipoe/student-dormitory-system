@@ -20,6 +20,7 @@ use App\Services\AttendanceService;
 use App\Services\IncidentService;
 use App\Services\StudentService;
 use App\Services\VisitorService;
+use App\Services\RoomService;
 
 $houseId = current_user()['houseId'] ?? null;
 $students = StudentService::all($houseId);
@@ -37,6 +38,8 @@ $stats = [
 
 $attendance = AttendanceService::todayByHouse($houseId);
 $visitors = (new VisitorService())->todayByHouse($houseId);
+$roomStats = RoomService::occupancyStats($houseId);
+$attendanceSummary = AttendanceService::summary(date('Y-m-d'), $houseId);
 
 $pageTitle = 'Senior Houseparent Dashboard';
 $navItems = [
@@ -87,6 +90,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 </div>
             </div>
         </div>
+
+        <div class="row g-3 mb-4"><div class="col-md-3"><div class="card stat-card p-3"><small class="text-muted">Present today</small><strong class="fs-2 text-success"><?= e((string) ($attendanceSummary['present'] ?? 0)) ?></strong></div></div><div class="col-md-3"><div class="card stat-card p-3"><small class="text-muted">Absent today</small><strong class="fs-2 text-danger"><?= e((string) ($attendanceSummary['absent'] ?? 0)) ?></strong></div></div><div class="col-md-3"><div class="card stat-card p-3"><small class="text-muted">Vacant spaces</small><strong class="fs-2"><?= e((string) ($roomStats['vacant'] ?? 0)) ?></strong></div></div><div class="col-md-3"><div class="card stat-card p-3"><small class="text-muted">Occupancy rate</small><strong class="fs-2"><?= e((string) ($roomStats['occupancyRate'] ?? 0)) ?>%</strong></div></div></div>
 
         <div class="row g-3">
             <div class="col-lg-8">

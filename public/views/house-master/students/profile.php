@@ -80,6 +80,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                             <p class="mb-1"><strong>Guardian:</strong> <span><?= e($student['guardianName'] ?? '—') ?></span></p>
                             <p class="mb-1"><strong>Guardian Phone:</strong> <span><?= e($student['guardianPhone'] ?? '—') ?></span></p>
                             <p class="mb-1"><strong>Status:</strong> <span><?= e($student['status'] ?? 'active') ?></span></p>
+                            <a class="btn btn-sm btn-outline-primary mt-2" href="<?= url('views/house-master/attendance/history.php?studentId=' . urlencode($studentId)) ?>">View attendance</a>
+                            <a class="btn btn-sm btn-outline-primary mt-2" href="<?= url('views/house-master/visitors/index.php?search=' . urlencode(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ) ?>">View visitors</a>
                         </div>
                     </div>
                 </div>

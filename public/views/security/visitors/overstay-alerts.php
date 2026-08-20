@@ -20,10 +20,10 @@ use App\Services\VisitorAlertService;
 use App\Services\FirebaseService;
 
 // Check for manual overstay check
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['action'] === 'check_overstays') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'check_overstays') {
     $alertService = new VisitorAlertService();
     $threshold = (int) sanitize($_POST['threshold'] ?? 2);
-    $alerts = $alertService->checkForOvrstays($threshold);
+    $alerts = $alertService->checkForOverstays($threshold);
     
     if (!empty($alerts)) {
         flash('info', 'Found ' . count($alerts) . ' visitor(s) with overstay');

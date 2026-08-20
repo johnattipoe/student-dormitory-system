@@ -15,6 +15,8 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
+use App\Services\FirebaseService;
+
 $pageTitle = 'Roles';
 // Custom roles managed via Firestore (roles collection)
 
@@ -28,7 +30,22 @@ $displayRoles = [
     ['key' => ROLE_STUDENT, 'name' => 'Student', 'dashboard' => 'Student Dashboard', 'house_access' => 'Own profile', 'description' => 'Accesses personal attendance, room, and notification data.'],
 ];
 
-// Firestore roles will be merged here when Firestore integration is complete
+try {
+    $customRoles = FirebaseService::getInstance()->getCollection(COL_ROLES, [], 200);
+    foreach ($customRoles as $customRole) {
+        if (!empty($customRole['key'])) {
+            $displayRoles[] = [
+                'key' => $customRole['key'],
+                'name' => $customRole['name'] ?? $customRole['key'],
+                'dashboard' => $customRole['dashboard'] ?? 'Custom Dashboard',
+                'house_access' => $customRole['house_access'] ?? 'Custom',
+                'description' => $customRole['description'] ?? '',
+            ];
+        }
+    }
+} catch (Throwable $e) {
+    // Built-in roles remain available when Firestore is unavailable.
+}
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
@@ -55,7 +72,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                     <h6 class="mb-1">System Roles</h6>
                     <p class="text-muted mb-0">Available user access levels across the dormitory system.</p>
                 </div>
-                <span class="badge bg-primary bg-opacity-10 text-primary">7 roles</span>
+                <span class="badge bg-primary bg-opacity-10 text-primary"><?= count($displayRoles) ?> roles</span>
             </div>
 
             <div class="table-responsive">

@@ -68,3 +68,6 @@ define('COL_MEDICAL_RECORDS', 'medical_records');
 define('COL_NOTIFICATIONS', 'notifications');
 define('COL_PARENT_MESSAGES', 'parent_messages');
 define('COL_REPORTS', 'reports');
+define('COL_ROLES', 'roles');
+define('COL_PERMISSIONS', 'permissions');
+define('COL_SETTINGS', 'settings');

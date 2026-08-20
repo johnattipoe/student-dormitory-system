@@ -25,6 +25,8 @@ $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = sanitize($_POST['action'] ?? '');
     $visitorIds = (array) ($_POST['visitorIds'] ?? []);
+    $knownVisitorIds = array_map(fn($visitor) => (string) ($visitor['id'] ?? ''), (new VisitorService())->all());
+    $visitorIds = array_values(array_intersect(array_map('strval', $visitorIds), $knownVisitorIds));
     
     if ($action === 'bulk_check_in' && !empty($visitorIds)) {
         try {

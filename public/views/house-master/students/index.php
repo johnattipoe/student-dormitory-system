@@ -51,6 +51,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['action'])) {
 
 $houseId = current_user()['houseId'] ?? null;
 $students = StudentService::all($houseId);
+$studentSearch = strtolower(sanitize($_GET['search'] ?? ''));
+$studentStatus = sanitize($_GET['status'] ?? '');
+if ($studentSearch !== '' || $studentStatus !== '') {
+    $students = array_values(array_filter($students, function ($student) use ($studentSearch, $studentStatus) {
+        $haystack = strtolower(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' ' . ($student['admissionNo'] ?? '') . ' ' . ($student['email'] ?? '') . ' ' . ($student['course'] ?? '')));
+        return ($studentSearch === '' || str_contains($haystack, $studentSearch))
+            && ($studentStatus === '' || ($student['status'] ?? '') === $studentStatus);
+    }));
+}
+$activeStudentCount = count(array_filter($students, fn($student) => ($student['status'] ?? '') === 'active'));
 
 $pageTitle = 'House Master Students';
 $navItems = [
@@ -72,8 +82,9 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
     <div class="content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">Assigned Students</h5>
+            <div><h5 class="mb-1">Assigned Students</h5><p class="text-muted mb-0"><?= e((string) $activeStudentCount) ?> active students in the current view.</p></div>
             <div class="btn-group" role="group">
+                <a class="btn btn-success btn-sm" href="<?= url('views/house-master/reports/export.php?type=students') ?>"><i class="bi bi-filetype-csv"></i> Export students</a>
                 <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#bulkEmailModal">
                     <i class="bi bi-envelope-bulk"></i> Send Bulk Email
                 </button>
@@ -82,6 +93,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 </a>
             </div>
         </div>
+        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-6"><input name="search" class="form-control form-control-sm" placeholder="Search name, admission number, email, or course" value="<?= e($studentSearch) ?>"></div><div class="col-md-3"><select name="status" class="form-select form-select-sm"><option value="">All statuses</option><option value="active" <?= $studentStatus === 'active' ? 'selected' : '' ?>>Active</option><option value="inactive" <?= $studentStatus === 'inactive' ? 'selected' : '' ?>>Inactive</option><option value="suspended" <?= $studentStatus === 'suspended' ? 'selected' : '' ?>>Suspended</option></select></div><div class="col-md-3"><button class="btn btn-primary btn-sm">Filter</button> <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/students/index.php') ?>">Reset</a></div></form></div>
         <div class="card stat-card p-3">
             <table class="table table-hover data-table w-100">
                 <thead>
@@ -95,6 +107,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <th>Course</th>
                         <th>Room</th>
                         <th>Status</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -110,11 +123,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td><?= e($student['course'] ?? '') ?></td>
                                 <td><?= e($student['roomId'] ?? '—') ?></td>
                                 <td><span class="badge bg-<?= ($student['status'] ?? '') === 'active' ? 'success' : 'secondary' ?>"><?= e($student['status'] ?? 'unknown') ?></span></td>
+                                <td class="text-nowrap"><a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/students/profile.php?studentId=' . urlencode((string) ($student['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/house-master/students/edit.php?studentId=' . urlencode((string) ($student['id'] ?? ''))) ?>">Edit</a></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="7" class="text-center text-muted">No students found for your house.</td>
+                            <td colspan="8" class="text-center text-muted">No students found for your house.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>

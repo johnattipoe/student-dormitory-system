@@ -15,6 +15,8 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
+use App\Services\FirebaseService;
+
 $roles = [
     ROLE_ADMIN => 'Admin',
     ROLE_HOUSE_MASTER => 'House Master',
@@ -44,9 +46,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(url('views/admin/permissions/create.php'));
     }
 
-    // Permissions managed via Firestore (permissions collection)
-    // TODO: Implement Firebase write for custom permissions
-    flash('info', 'Custom permissions management via Firestore coming soon.');
+    try {
+        FirebaseService::getInstance()->addDocument(COL_PERMISSIONS, [
+            'role' => $roleKey,
+            'levels' => $permissionMatrix,
+            'updatedBy' => current_user()['uid'] ?? current_user()['id'] ?? 'admin',
+        ], $roleKey);
+        flash('success', 'Permission matrix saved successfully.');
+    } catch (Throwable $e) {
+        flash('error', 'Unable to save permissions: ' . $e->getMessage());
+    }
     redirect(url('views/admin/permissions/index.php'));
 }
 
