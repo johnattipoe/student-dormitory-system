@@ -19,6 +19,11 @@ class AuthMiddleware
     public static function handle(): array
     {
         if (!AuthService::isLoggedIn()) {
+            $isAjax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest'
+                || str_contains(strtolower($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
+            if ($isAjax && function_exists('json_error')) {
+                json_error('Authentication required.', 401);
+            }
             header('Location: /login.php?redirect=' . urlencode($_SERVER['REQUEST_URI'] ?? '/'));
             exit;
         }

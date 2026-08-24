@@ -16,6 +16,7 @@ $allowedRoles = [ROLE_STUDENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\IncidentService;
+use App\Services\StudentService;
 
 $search = sanitize($_GET['search'] ?? '');
 $dateFrom = sanitize($_GET['dateFrom'] ?? '');
@@ -24,6 +25,10 @@ $severity = sanitize($_GET['severity'] ?? '');
 $status = sanitize($_GET['status'] ?? '');
 
 $studentId = current_user()['studentId'] ?? current_user()['uid'] ?? null;
+$studentProfile = $studentId ? StudentService::find($studentId) : null;
+$studentName = $studentProfile
+    ? trim(($studentProfile['firstName'] ?? '') . ' ' . ($studentProfile['lastName'] ?? ''))
+    : (current_user()['name'] ?? 'My account');
 $incidents = $studentId ? (IncidentService::byStudent($studentId) ?? []) : [];
 
 if (!empty($search)) {
@@ -73,7 +78,10 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
     <div class="content-wrapper">
-        <h5 class="mb-3">My Incidents</h5>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">My Incidents</h5>
+            <a class="btn btn-primary btn-sm" href="<?= url('views/student/incidents/create.php') ?>"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Create incident</a>
+        </div>
 
         <div class="row g-3 mb-3">
             <div class="col-md-3">
@@ -160,6 +168,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             <table class="table table-hover data-table w-100">
                 <thead>
                     <tr>
+                        <th>Name</th>
                         <th>Type</th>
                         <th>Description</th>
                         <th>Severity</th>
@@ -172,7 +181,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                     <?php if (!empty($incidents)): ?>
                         <?php foreach ($incidents as $incident): ?>
                             <tr>
-                                <td><?= e($incident['type'] ?? '') ?></td>
+                                <td><?= e($studentName) ?></td>
+                                <td><?= e(ucfirst((string) ($incident['type'] ?? 'other'))) ?></td>
                                 <td><?= e(substr((string) ($incident['description'] ?? ''), 0, 60)) ?></td>
                                 <td>
                                     <span class="badge bg-<?= match(($incident['severity'] ?? 'low')) {
@@ -195,12 +205,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                     </span>
                                 </td>
                                 <td><?= e(substr((string) ($incident['createdAt'] ?? ''), 0, 10)) ?></td>
-                                <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/student/incidents/view.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">View</a></td>
+                                <td class="text-nowrap"><a class="btn btn-sm btn-outline-secondary" href="<?= url('views/student/incidents/view.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-primary" href="<?= url('views/student/incidents/edit.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/student/incidents/delete.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">Delete</a></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="6" class="text-center text-muted">No incidents matching your filters.</td>
+                            <td colspan="7" class="text-center text-muted">No incidents matching your filters.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>

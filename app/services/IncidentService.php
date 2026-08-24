@@ -56,6 +56,7 @@ class IncidentService
                 [
                     'title' => $data['title'],
                     'description' => $data['description'] ?? '',
+                    'type' => $data['type'] ?? 'other',
                     'studentId' => $data['studentId'] ?? null,
                     'priority' => $data['priority'] ?? 'medium',
                     'status' => 'open',
@@ -82,11 +83,12 @@ class IncidentService
     {
         try {
 
-            $this->firebase->updateDocument(
-                $this->collection,
-                $id,
-                $data
-            );
+            $allowedFields = ['title', 'description', 'type', 'priority', 'status', 'resolvedAt'];
+            $updates = array_intersect_key($data, array_flip($allowedFields));
+            if (!$updates) {
+                return ['success' => false, 'message' => 'No incident changes supplied.'];
+            }
+            $this->firebase->updateDocument($this->collection, $id, $updates);
 
             return [
                 'success' => true,
@@ -99,6 +101,39 @@ class IncidentService
                 'message' => 'Unable to update incident.'
             ];
         }
+    }
+
+    public function deleteForStudent(string $id, ?string $studentId): array
+    {
+        if (!$studentId || !$this->findOwnedIncident($id, $studentId)) {
+            return [
+                'success' => false,
+                'message' => 'Incident not found.'
+            ];
+        }
+
+        try {
+            $this->firebase->deleteDocument($this->collection, $id);
+            return [
+                'success' => true,
+                'message' => 'Incident deleted successfully.'
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'message' => 'Unable to delete incident.'
+            ];
+        }
+    }
+
+    private function findOwnedIncident(string $id, string $studentId): ?array
+    {
+        foreach ($this->studentIncidents($studentId) as $incident) {
+            if ((string) ($incident['id'] ?? '') === $id) {
+                return $incident;
+            }
+        }
+        return null;
     }
 
     public function resolve(string $id): array

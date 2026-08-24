@@ -5,6 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= e($pageTitle ?? 'Dashboard') ?> — <?= e($appConfig['name'] ?? 'Student Dormitory System') ?></title>
+    <?php $advancedConfig = $appConfig['advanced'] ?? []; ?>
+    <style>
+        :root { --app-primary: <?= e($advancedConfig['primary_color'] ?? '#1f6feb') ?>; }
+        .portal-startup-loader[hidden] { display: none !important; }
+    </style>
 
     <!-- CSS libraries -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
@@ -55,11 +60,8 @@ if (str_contains($currentScript, '/views/admin/')) {
     $portalLoaderName = 'Nurse Portal';
 }
 ?>
-<div id="portalStartupLoader" class="portal-startup-loader" role="status" aria-live="polite" aria-label="Loading portal">
+<div id="portalStartupLoader" class="portal-startup-loader is-hidden" hidden role="status" aria-live="polite" aria-label="Loading portal">
     <div class="portal-startup-card">
-        <div class="portal-startup-logo">
-            <i class="bi bi-grid-1x2-fill"></i>
-        </div>
         <div class="portal-startup-title"><?= e($portalLoaderName) ?></div>
         <div class="portal-startup-text">Loading page resources...</div>
         <div class="portal-startup-progress" aria-hidden="true"><span></span></div>

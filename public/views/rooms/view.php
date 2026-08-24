@@ -15,10 +15,15 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
+use App\Services\HouseService;
 use App\Services\RoomService;
 
 $id = $_GET['id'] ?? '';
 $room = $id ? RoomService::find($id) : null;
+$houseMap = [];
+foreach (HouseService::all() as $house) {
+    $houseMap[(string) ($house['id'] ?? '')] = (string) ($house['name'] ?? $house['id'] ?? '');
+}
 $pageTitle = 'Room Details';
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
@@ -36,7 +41,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             <?php if ($room): ?>
                 <dl class="row mb-0">
                     <dt class="col-sm-3">Room Number</dt><dd class="col-sm-9"><?= e($room['roomNumber'] ?? '') ?></dd>
-                    <dt class="col-sm-3">House</dt><dd class="col-sm-9"><?= e($room['houseId'] ?? '-') ?></dd>
+                    <dt class="col-sm-3">House</dt><dd class="col-sm-9"><?= e($houseMap[(string) ($room['houseId'] ?? '')] ?? ($room['houseId'] ?? '-')) ?></dd>
                     <dt class="col-sm-3">Capacity</dt><dd class="col-sm-9"><?= e((string) ($room['capacity'] ?? 0)) ?></dd>
                     <dt class="col-sm-3">Occupied</dt><dd class="col-sm-9"><?= e((string) ($room['occupied'] ?? 0)) ?></dd>
                     <dt class="col-sm-3">Status</dt><dd class="col-sm-9"><?= e($room['status'] ?? '') ?></dd>

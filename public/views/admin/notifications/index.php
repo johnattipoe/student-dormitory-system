@@ -59,6 +59,17 @@ if ($search !== '' || $readFilter !== '') {
     }));
 }
 $users = (new UserService())->all();
+$userMap = [];
+foreach ($users as $user) {
+    $userName = $user['name'] ?? $user['email'] ?? null;
+    if ($userName) {
+        foreach ([$user['id'] ?? null, $user['uid'] ?? null] as $userId) {
+            if ($userId !== null && $userId !== '') {
+                $userMap[(string) $userId] = $userName;
+            }
+        }
+    }
+}
 $unreadCount = count(array_filter($notifications, fn($notification) => empty($notification['read'])));
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
@@ -144,13 +155,17 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 </thead>
                 <tbody>
                 <?php foreach ($notifications as $note): ?>
+                    <?php $notificationUserId = (string) ($note['userId'] ?? ''); ?>
                     <tr>
                         <td><a class="fw-semibold text-decoration-none" href="<?= url('views/admin/notifications/view.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>"><?= e($note['title'] ?? '') ?></a></td>
                         <td><?= e($note['type'] ?? 'info') ?></td>
                         <td><?= e($note['message'] ?? '') ?></td>
                         <td><?= !empty($note['read']) ? 'Yes' : 'No' ?></td>
-                        <td><?= e($note['userId'] ?? '-') ?></td>
+                        <td><?= e($userMap[$notificationUserId] ?? ($note['userId'] ?? '-')) ?></td>
                         <td>
+                            <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/notifications/view.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>">View</a>
+                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/notifications/edit.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>">Edit</a>
+                            <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/notifications/delete.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>">Delete</a>
                             <?php if (empty($note['read'])): ?>
                                 <form method="POST" action="<?= url('views/admin/notifications/index.php') ?>" class="d-inline">
                                     <input type="hidden" name="action" value="mark_read">

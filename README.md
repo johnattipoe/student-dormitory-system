@@ -32,6 +32,12 @@ PHP + Firebase Student Dormitory Management System.
 8. Configure .env.
 9. Run composer install.
 
+For the Render deployment, set the application URL in `.env`:
+
+```dotenv
+APP_URL=https://student-dormitory-system.onrender.com
+```
+
 ### Email delivery
 
 PHPMailer is installed through Composer and supports authenticated SMTP delivery.
@@ -48,7 +54,18 @@ that do not require encryption. The application never logs the SMTP password.
 Use the PHP development server:
 
 php -S localhost:8000 -t public
+php -S 127.0.0.1:8000 -t public
 
 Then open:
 
 http://localhost:8000
+
+## Deployment
+
+The deployed application is available at:
+
+https://student-dormitory-system.onrender.com
+
+Set the Firebase credentials and other `.env` values as environment variables
+in the hosting provider. Do not commit `.env` or the Firebase service-account
+JSON file.

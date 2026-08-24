@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="/assets/css/login.css">
 </head>
 <body class="login-body d-flex align-items-center justify-content-center">
-  <div id="startupLoader" class="startup-loader" role="status" aria-live="polite" aria-label="Starting application">
+  <div id="startupLoader" class="startup-loader is-hidden" hidden role="status" aria-live="polite" aria-label="Starting application">
     <div class="startup-loader-card">
       <div class="startup-logo">
         <i class="bi bi-building"></i>

@@ -76,7 +76,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <h5 class="mb-0">My Visitors</h5>
                 <small class="text-muted">Keep track of all visitor requests and approvals.</small>
             </div>
-            <a href="<?= url('views/student/visitors/requests.php') ?>" class="btn btn-primary btn-sm">
+            <a href="<?= url('views/visitors/request.php') ?>" class="btn btn-primary btn-sm">
                 <i class="bi bi-plus-lg"></i> Request Visitor
             </a>
         </div>
@@ -183,7 +183,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                         <?= e(ucfirst($visitor['status'] ?? 'pending')) ?>
                                     </span>
                                 </td>
-                                <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/student/visitors/view.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/student/visitors/edit.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>">Edit</a></td>
+                                <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/student/visitors/view.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/student/visitors/edit.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>">Edit</a><?php if (($visitor['status'] ?? 'pending') === 'pending'): ?> <form method="POST" action="<?= url('views/student/visitors/delete.php') ?>" class="d-inline"><input type="hidden" name="id" value="<?= e((string) ($visitor['id'] ?? '')) ?>"><button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Delete this pending visitor request?')"><i class="bi bi-trash me-1"></i>Delete</button></form><?php endif; ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>

@@ -15,7 +15,17 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_STUDENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
+use App\Services\BedService;
+
 $pageTitle = 'Student Attendance History';
+$studentId = current_user()['studentId'] ?? current_user()['uid'] ?? null;
+$assignedBed = null;
+foreach (BedService::all() as $bed) {
+    if ((string) ($bed['studentId'] ?? '') === (string) ($studentId ?? '')) {
+        $assignedBed = $bed;
+        break;
+    }
+}
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/student/dashboard/index.php')],
     ['icon' => 'bi-calendar-check', 'label' => 'Attendance', 'href' => url('views/student/attendance/index.php'), 'active' => true],
@@ -40,6 +50,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <thead>
                     <tr>
                         <th>Date</th>
+                        <th>Bed</th>
                         <th>Status</th>
                         <th>Marked By</th>
                     </tr>
@@ -49,13 +60,14 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <?php foreach ($attendance as $entry): ?>
                             <tr>
                                 <td><?= e($entry['date'] ?? '') ?></td>
+                                <td><?= e($assignedBed['bedNumber'] ?? '—') ?></td>
                                 <td><?= e($entry['status'] ?? 'unknown') ?></td>
                                 <td><?= e($entry['markedByName'] ?? ($entry['markedBy'] ?? '—')) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="3" class="text-center text-muted">No attendance history available.</td>
+                            <td colspan="4" class="text-center text-muted">No attendance history available.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>

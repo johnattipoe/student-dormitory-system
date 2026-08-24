@@ -4,8 +4,62 @@ namespace App\Services;
 
 class ParentMessageService
 {
-    public function send(array $student, string $subject, string $message, array $sender): array
+    public function all(): array
     {
+        try {
+            return FirebaseService::getInstance()->getCollection(\COL_PARENT_MESSAGES);
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    public function find(string $id): ?array
+    {
+        if ($id === '') {
+            return null;
+        }
+
+        try {
+            return FirebaseService::getInstance()->getDocument(\COL_PARENT_MESSAGES, $id);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function update(string $id, string $subject, string $message): array
+    {
+        if ($id === '' || trim($subject) === '' || trim($message) === '') {
+            return ['success' => false, 'message' => 'Subject and message are required.'];
+        }
+
+        try {
+            FirebaseService::getInstance()->updateDocument(\COL_PARENT_MESSAGES, $id, [
+                'subject' => trim($subject),
+                'message' => trim($message),
+            ]);
+            return ['success' => true, 'message' => 'Parent message updated successfully.'];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Unable to update parent message.'];
+        }
+    }
+
+    public function delete(string $id): array
+    {
+        if ($id === '') {
+            return ['success' => false, 'message' => 'Message ID is required.'];
+        }
+
+        try {
+            FirebaseService::getInstance()->deleteDocument(\COL_PARENT_MESSAGES, $id);
+            return ['success' => true, 'message' => 'Parent message deleted successfully.'];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Unable to delete parent message.'];
+        }
+    }
+
+    public function send(array $student, string $subject, string $message, array $sender, string $channel = 'mail'): array
+    {
+        $channel = $channel === 'sms' ? 'sms' : 'mail';
         $studentId = (string) ($student['id'] ?? '');
         $guardianName = trim((string) ($student['guardianName'] ?? ''));
         $guardianPhone = trim((string) ($student['guardianPhone'] ?? ''));
@@ -17,6 +71,18 @@ class ParentMessageService
 
         if (trim($subject) === '' || trim($message) === '') {
             return ['success' => false, 'message' => 'Subject and message are required.'];
+        }
+
+        if ($channel === 'mail' && $guardianEmail === '') {
+            return ['success' => false, 'message' => 'This parent does not have an email address.'];
+        }
+
+        if ($channel === 'sms' && $guardianPhone === '') {
+            return ['success' => false, 'message' => 'This parent does not have a phone number.'];
+        }
+
+        if ($channel === 'sms' && mb_strlen($message) > 160) {
+            return ['success' => false, 'message' => 'SMS messages must be 160 characters or fewer.'];
         }
 
         $data = [
@@ -32,28 +98,34 @@ class ParentMessageService
             'sentByName' => $sender['name'] ?? $sender['email'] ?? 'Staff',
             'sentByRole' => $sender['role'] ?? '',
             'createdAt' => (new \DateTime())->format(DATE_ATOM),
-            'emailStatus' => 'not_configured',
+            'channel' => $channel,
+            'deliveryStatus' => $channel === 'sms' ? 'not_configured' : 'pending',
+            'emailStatus' => $channel === 'mail' ? 'pending' : 'not_sent',
         ];
 
         $id = FirebaseService::getInstance()->addDocument(\COL_PARENT_MESSAGES, $data);
 
-        if ($guardianEmail !== '') {
+        if ($channel === 'mail') {
             $emailResult = (new EmailService())->sendHtml(
                 $guardianEmail,
                 $subject,
                 '<p>' . nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8')) . '</p>'
             );
             $data['emailStatus'] = $emailResult['success'] ? 'sent' : 'failed';
+            $data['deliveryStatus'] = $data['emailStatus'];
             FirebaseService::getInstance()->updateDocument(\COL_PARENT_MESSAGES, $id, [
                 'emailStatus' => $data['emailStatus'],
+                'deliveryStatus' => $data['deliveryStatus'],
             ]);
         }
 
         return [
             'success' => true,
-            'message' => $data['emailStatus'] === 'sent'
+            'message' => $channel === 'sms'
+                ? 'SMS recorded. Configure an SMS provider to deliver it.'
+                : ($data['emailStatus'] === 'sent'
                 ? 'Message recorded and emailed to the parent.'
-                : 'Message recorded for the parent.' . ($guardianEmail === '' ? ' Add a guardian email to enable email delivery.' : ''),
+                : 'Message recorded for the parent.'),
             'id' => $id,
         ];
     }

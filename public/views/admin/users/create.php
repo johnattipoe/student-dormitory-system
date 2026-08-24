@@ -36,6 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $errors = validate_required($data, ['name', 'email', 'role']);
 
+    if (in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true) && $houseId === '') {
+        $errors['houseId'] = 'A house is required for this role.';
+    }
+
     if (!empty($data['email']) && !validate_email($data['email'])) {
         $errors['email'] = 'Email is invalid.';
     }
@@ -145,14 +149,15 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         </select>
                     </div>
 
-                    <div class="col-md-12" id="house-assignment-field" style="display: none;">
+                    <div class="col-md-12" id="house-assignment-field" hidden>
                         <label class="form-label">Assign to House</label>
-                        <select name="houseId" class="form-select">
+                        <select name="houseId" class="form-select" id="house-assignment-select">
                             <option value="">Select house</option>
                             <?php foreach ($houses as $house): ?>
                                 <option value="<?= e((string) ($house['id'] ?? '')) ?>" <?= (($old['houseId'] ?? '') === ($house['id'] ?? '')) ? 'selected' : '' ?>><?= e($house['name'] ?? 'House') ?></option>
                             <?php endforeach; ?>
                         </select>
+                        <?php if (!empty($errors['houseId'])): ?><div class="text-danger small"><?= e($errors['houseId']) ?></div><?php endif; ?>
                         <div class="form-text">Only House Master and House Mistress roles can be assigned to a house. Senior Houseparent is excluded.</div>
                     </div>
                 </div>
@@ -166,21 +171,34 @@ require APP_ROOT . '/app/views/components/sidebar.php';
 </div>
 
 <script>
-(function () {
+document.addEventListener('DOMContentLoaded', function () {
     const roleSelect = document.getElementById('user-role-select');
     const houseField = document.getElementById('house-assignment-field');
+    const houseSelect = document.getElementById('house-assignment-select');
+    if (!roleSelect || !houseField || !houseSelect) return;
+
     function updateHouseField() {
-        const role = roleSelect.value;
+        const role = String(roleSelect.value || '').toLowerCase();
         const isHouseDuty = ['house_master', 'house_mistress'].includes(role);
+        houseField.hidden = !isHouseDuty;
         houseField.style.display = isHouseDuty ? 'block' : 'none';
+        houseSelect.required = isHouseDuty;
         if (!isHouseDuty) {
-            const select = houseField.querySelector('select');
-            if (select) select.value = '';
+            houseSelect.value = '';
+            if (window.jQuery && jQuery.fn.select2) {
+                jQuery(houseSelect).trigger('change');
+            }
         }
     }
+
     roleSelect.addEventListener('change', updateHouseField);
+    roleSelect.addEventListener('input', updateHouseField);
+    if (window.jQuery && jQuery.fn.select2) {
+        jQuery(roleSelect).on('select2:select change', updateHouseField);
+    }
     updateHouseField();
-})();
+    window.setTimeout(updateHouseField, 0);
+});
 </script>
 
 <?php require APP_ROOT . '/app/views/components/footer.php'; ?>

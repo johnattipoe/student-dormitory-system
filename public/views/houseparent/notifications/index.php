@@ -76,18 +76,21 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
     <div class="content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
+            <div class="d-flex align-items-center gap-2">
                 <h5 class="mb-0">Notifications</h5>
                 <span class="badge bg-secondary bg-opacity-10 text-secondary"><?= $notificationCount ?> items</span>
             </div>
-            <?php if ($unreadCount > 0): ?>
-                <form method="POST" class="d-inline">
-                    <input type="hidden" name="action" value="mark_all_read">
-                    <button type="submit" class="btn btn-outline-primary btn-sm">
-                        <i class="bi bi-check2-all me-1" aria-hidden="true"></i> Mark all read
-                    </button>
-                </form>
-            <?php endif; ?>
+            <div class="d-flex align-items-center gap-2">
+                <a href="<?= url('views/houseparent/notifications/send/send.php') ?>" class="btn btn-primary btn-sm"><i class="bi bi-send me-1" aria-hidden="true"></i> Send message</a>
+                <?php if ($unreadCount > 0): ?>
+                    <form method="POST" class="d-inline">
+                        <input type="hidden" name="action" value="mark_all_read">
+                        <button type="submit" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-check2-all me-1" aria-hidden="true"></i> Mark all read
+                        </button>
+                    </form>
+                <?php endif; ?>
+            </div>
         </div>
 
         <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-7"><input name="search" class="form-control form-control-sm" placeholder="Search title or message" value="<?= e($notificationSearch) ?>"></div><div class="col-md-3"><select name="read" class="form-select form-select-sm"><option value="">All notifications</option><option value="unread" <?= $notificationRead === 'unread' ? 'selected' : '' ?>>Unread</option><option value="read" <?= $notificationRead === 'read' ? 'selected' : '' ?>>Read</option></select></div><div class="col-md-2"><button class="btn btn-primary btn-sm">Filter</button></div></form></div>
@@ -161,6 +164,9 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td><?= e($note['message'] ?? '') ?></td>
                                 <td><?= !empty($note['read']) ? 'Yes' : 'No' ?></td>
                                 <td>
+                                    <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/houseparent/notifications/view.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>">View</a>
+                                    <a class="btn btn-sm btn-outline-primary" href="<?= url('views/houseparent/notifications/edit.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>">Edit</a>
+                                    <a class="btn btn-sm btn-outline-danger" href="<?= url('views/houseparent/notifications/delete.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>">Delete</a>
                                     <?php if (empty($note['read'])): ?>
                                         <form method="POST" action="<?= url('views/houseparent/notifications/index.php') ?>" class="d-inline">
                                             <input type="hidden" name="action" value="mark_read">

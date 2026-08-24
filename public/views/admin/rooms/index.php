@@ -14,13 +14,25 @@ if (!defined('APP_ROOT')) {
 }
 $allowedRoles = [ROLE_ADMIN];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
+use App\Services\HouseService;
 use App\Services\RoomService;
 
 $pageTitle = 'Rooms';
 $rooms = RoomService::all();
+$houses = HouseService::all();
+$houseMap = [];
+foreach ($houses as $house) {
+    $houseMap[(string) ($house['id'] ?? '')] = (string) ($house['name'] ?? $house['id'] ?? '');
+}
 $search = strtolower(sanitize($_GET['search'] ?? ''));
 if ($search !== '') {
-    $rooms = array_values(array_filter($rooms, fn($room) => str_contains(strtolower((string) ($room['roomNumber'] ?? '')), $search) || str_contains(strtolower((string) ($room['houseId'] ?? '')), $search)));
+    $rooms = array_values(array_filter($rooms, function ($room) use ($search, $houseMap) {
+        $houseId = (string) ($room['houseId'] ?? '');
+        $houseName = $houseMap[$houseId] ?? $houseId;
+        return str_contains(strtolower((string) ($room['roomNumber'] ?? '')), $search)
+            || str_contains(strtolower($houseName), $search)
+            || str_contains(strtolower($houseId), $search);
+    }));
 }
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
@@ -54,7 +66,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <?php foreach ($rooms as $room): ?>
                     <tr>
                         <td><?= e($room['roomNumber'] ?? '') ?></td>
-                        <td><?= e($room['houseId'] ?? '') ?></td>
+                        <td><?= e($houseMap[(string) ($room['houseId'] ?? '')] ?? ($room['houseId'] ?? '—')) ?></td>
                         <td><?= e($room['capacity'] ?? '') ?></td>
                         <td><?= e($room['occupied'] ?? 0) ?></td>
                         <td><span class="badge bg-<?= ($room['status'] ?? '') === 'available' ? 'success' : 'secondary' ?>"><?= e($room['status'] ?? '') ?></span></td>

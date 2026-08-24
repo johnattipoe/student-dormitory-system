@@ -16,12 +16,17 @@ $allowedRoles = [ROLE_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\AttendanceService;
+use App\Services\BedService;
 use App\Services\StudentService;
 
 $date = sanitize($_GET['date'] ?? date('Y-m-d'));
 $statusFilter = sanitize($_GET['status'] ?? '');
 $houseId = current_user()['houseId'] ?? null;
 $students = StudentService::all($houseId);
+$bedMap = [];
+foreach (BedService::all() as $bed) {
+    if (!empty($bed['studentId'])) $bedMap[(string) $bed['studentId']] = (string) ($bed['bedNumber'] ?? '—');
+}
 $attendance = AttendanceService::forDate($date, $houseId);
 $studentFilter = sanitize($_GET['studentId'] ?? '');
 if ($studentFilter !== '') {
@@ -96,6 +101,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <tr>
                             <th>Date</th>
                             <th>Student</th>
+                            <th>Bed</th>
                             <th>Status</th>
                             <th>Marked By</th>
                             <th>Actions</th>
@@ -104,7 +110,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                     <tbody>
                         <?php if (empty($attendance)): ?>
                             <tr>
-                                <td colspan="5" class="text-center text-muted">No attendance history found for this date.</td>
+                                <td colspan="6" class="text-center text-muted">No attendance history found for this date.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($attendance as $record): ?>
@@ -120,6 +126,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <tr>
                                     <td><?= e($record['date'] ?? '-') ?></td>
                                     <td><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?: e($record['studentId'] ?? '-') ?></td>
+                                    <td><?= e($bedMap[(string) ($record['studentId'] ?? '')] ?? '—') ?></td>
                                     <td><span class="badge bg-<?= ($record['status'] ?? 'present') === 'present' ? 'success' : (($record['status'] ?? '') === 'absent' ? 'danger' : 'warning') ?>"><?= e($record['status'] ?? 'present') ?></span></td>
                                     <td><?= e($record['markedBy'] ?? '—') ?></td>
                                     <td class="text-nowrap"><a class="btn btn-sm btn-outline-primary" href="<?= url('views/houseparent/attendance/view.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/houseparent/attendance/edit.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/houseparent/attendance/delete.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">Delete</a></td>

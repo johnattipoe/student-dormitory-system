@@ -8,12 +8,13 @@ require __DIR__ . '/../public/bootstrap.php';
 
 use App\Services\VisitorAlertService;
 
-$threshold = $argv[1] ?? 2;
+$threshold = isset($argv[1]) ? (int) $argv[1] : null;
 $service = new VisitorAlertService();
-$alerts = $service->checkForOvrstays((int) $threshold);
+$alerts = $service->checkForOvrstays($threshold);
 
 if (empty($alerts)) {
-    echo "No visitor overstays detected above {$threshold} hours.\n";
+    $label = $threshold === null ? 'the configured threshold' : $threshold . ' hours';
+    echo "No visitor overstays detected above {$label}.\n";
     exit(0);
 }
 

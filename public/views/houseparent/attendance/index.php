@@ -16,6 +16,7 @@ $allowedRoles = [ROLE_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\AttendanceService;
+use App\Services\BedService;
 use App\Services\HouseService;
 use App\Services\StudentService;
 
@@ -26,6 +27,11 @@ $houseFilter = sanitize($_GET['house'] ?? '');
 
 $attendance = AttendanceService::forDate($date);
 $students = StudentService::all();
+$beds = BedService::all();
+$bedMap = [];
+foreach ($beds as $bed) {
+    if (!empty($bed['studentId'])) $bedMap[(string) $bed['studentId']] = (string) ($bed['bedNumber'] ?? '—');
+}
 $houses = HouseService::all();
 
 // Apply filters
@@ -123,6 +129,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             </form>
         </div>
 
+        <br>
+
         <div class="row g-3 mb-4">
             <div class="col-md-4">
                 <div class="card stat-card p-3 text-center">
@@ -157,6 +165,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <th>Date</th>
                         <th>Student</th>
                         <th>House</th>
+                        <th>Bed</th>
                         <th>Status</th>
                         <th>Marked By</th>
                     </tr>
@@ -164,7 +173,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <tbody>
                     <?php if (empty($attendance)): ?>
                         <tr>
-                            <td colspan="5" class="text-center text-muted">No attendance records found matching your filters.</td>
+                            <td colspan="6" class="text-center text-muted">No attendance records found matching your filters.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($attendance as $record): ?>
@@ -181,6 +190,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td><?= e($record['date'] ?? '-') ?></td>
                                 <td><?= e(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' (' . ($student['admissionNo'] ?? '') . ')') ?: e($record['studentId'] ?? '-') ?></td>
                                 <td><?= e($houseMap[(string) ($record['houseId'] ?? '')] ?? ($student['houseId'] ?? ($record['houseId'] ?? '—'))) ?></td>
+                                <td><?= e($bedMap[(string) ($record['studentId'] ?? '')] ?? '—') ?></td>
                                 <td><span class="badge bg-<?= ($record['status'] ?? 'present') === 'present' ? 'success' : (($record['status'] ?? '') === 'absent' ? 'danger' : 'warning') ?>"><?= e($record['status'] ?? 'present') ?></span></td>
                                 <td><?= e($record['markedBy'] ?? '—') ?></td>
                             </tr>

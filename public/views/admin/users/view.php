@@ -17,9 +17,9 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 use App\Services\UserService;
 
 $pageTitle = 'View User';
-$id = $_GET['id'] ?? null;
+$id = sanitize($_GET['id'] ?? '');
 $userService = new UserService();
-$user = $id ? $userService->find($id) : null;
+$selectedUser = $id !== '' ? $userService->find($id) : null;
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-people', 'label' => 'Users', 'href' => url('views/admin/users/index.php')],
@@ -31,7 +31,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
 <div class="main-content">
     <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
     <div class="content-wrapper">
-        <?php if (!$user): ?>
+        <?php if (!$selectedUser): ?>
             <div class="alert alert-warning">User not found.</div>
         <?php else: ?>
             <div class="card stat-card p-4" style="max-width:720px;">
@@ -39,7 +39,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <dl class="row">
                     <?php foreach (['Name' => 'name', 'Email' => 'email', 'Role' => 'role', 'Status' => 'status', 'House' => 'houseId'] as $label => $key): ?>
                         <dt class="col-sm-4 text-muted"><?= e($label) ?></dt>
-                        <dd class="col-sm-8"><?= e($user[$key] ?? '-') ?></dd>
+                        <dd class="col-sm-8"><?= e($selectedUser[$key] ?? '-') ?></dd>
                     <?php endforeach; ?>
                 </dl>
                 <a href="<?= url('views/admin/users/index.php') ?>" class="btn btn-outline-secondary">Back to users</a>

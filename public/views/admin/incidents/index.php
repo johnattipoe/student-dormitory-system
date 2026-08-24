@@ -15,10 +15,22 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 use App\Services\IncidentService;
+use App\Services\UserService;
 
 $pageTitle = 'Incidents';
 $incidentService = new IncidentService();
 $incidents = $incidentService->all();
+$reporterMap = [];
+foreach ((new UserService())->all() as $user) {
+    $reporter = $user['name'] ?? $user['email'] ?? null;
+    if ($reporter) {
+        foreach ([$user['id'] ?? null, $user['uid'] ?? null] as $userId) {
+            if ($userId !== null && $userId !== '') {
+                $reporterMap[(string) $userId] = $reporter;
+            }
+        }
+    }
+}
 $search = strtolower(sanitize($_GET['search'] ?? ''));
 if ($search !== '') $incidents = array_values(array_filter($incidents, fn($incident) => str_contains(strtolower((string) ($incident['title'] ?? '')), $search) || str_contains(strtolower((string) ($incident['studentId'] ?? '')), $search)));
 $navItems = [
@@ -49,11 +61,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 </thead>
                 <tbody>
                 <?php foreach ($incidents as $incident): ?>
+                    <?php $reportedBy = (string) ($incident['reportedBy'] ?? ''); ?>
                     <tr>
                         <td><?= e($incident['title'] ?? '') ?></td>
                         <td><?= e($incident['priority'] ?? '') ?></td>
                         <td><span class="badge bg-<?= ($incident['status'] ?? '') === 'open' ? 'danger' : 'success' ?>"><?= e($incident['status'] ?? '') ?></span></td>
-                        <td><?= e($incident['reportedBy'] ?? '-') ?></td>
+                        <td><?= e($incident['reportedByName'] ?? ($reporterMap[$reportedBy] ?? ($incident['reportedBy'] ?? '-'))) ?></td>
                         <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/incidents/view.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/incidents/edit.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/incidents/delete.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">Delete</a></td>
                     </tr>
                 <?php endforeach; ?>

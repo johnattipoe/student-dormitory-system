@@ -14,12 +14,22 @@ class RoleMiddleware
     public static function allow(array $allowedRoles): void
     {
         if (!AuthService::isLoggedIn()) {
+            $isAjax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest'
+                || str_contains(strtolower($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
+            if ($isAjax && function_exists('json_error')) {
+                json_error('Authentication required.', 401);
+            }
             header('Location: /login.php?redirect=' . urlencode($_SERVER['REQUEST_URI'] ?? '/'));
             exit;
         }
 
         $role = AuthService::role();
         if (!in_array($role, $allowedRoles, true)) {
+            $isAjax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest'
+                || str_contains(strtolower($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
+            if ($isAjax && function_exists('json_error')) {
+                json_error('Access denied.', 403);
+            }
             http_response_code(403);
             include __DIR__ . '/../../public/views/errors/403.php';
             exit;

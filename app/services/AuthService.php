@@ -23,6 +23,25 @@ class AuthService
     /** @return array{success:bool, message:string, user?:array} */
     public static function login(string $email, string $password): array
     {
+        $config = require APP_ROOT . '/app/config/app.php';
+        $rateKey = 'login_attempts_' . hash('sha256', strtolower(trim($email)) . '|' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+        $attempts = $_SESSION[$rateKey] ?? ['count' => 0, 'first_at' => time()];
+        $lockoutSeconds = max(60, (int) ($config['advanced']['account_lockout_minutes'] ?? 15) * 60);
+        if (time() - ($attempts['first_at'] ?? 0) >= $lockoutSeconds) {
+            $attempts = ['count' => 0, 'first_at' => time()];
+        }
+        $maxAttempts = max(1, (int) ($config['advanced']['max_login_attempts'] ?? 5));
+        if (($attempts['count'] ?? 0) >= $maxAttempts) {
+            return ['success' => false, 'message' => 'Too many failed attempts. Please try again later.'];
+        }
+
+        $recordFailure = static function () use ($rateKey, &$attempts): void {
+            $attempts['count'] = ($attempts['count'] ?? 0) + 1;
+            $_SESSION[$rateKey] = $attempts;
+        };
+        $clearFailures = static function () use ($rateKey): void {
+            unset($_SESSION[$rateKey]);
+        };
         $defaultAdminEmail = $_ENV['DEFAULT_ADMIN_EMAIL'] ?? '';
         $defaultAdminPassword = $_ENV['DEFAULT_ADMIN_PASSWORD'] ?? '';
 
@@ -44,6 +63,7 @@ class AuthService
             session_put(AUTH_UID_SESSION, $user['uid']);
             session_put(AUTH_ROLE_SESSION, $user['role']);
             session_put('idToken', null);
+            $clearFailures();
 
             ActivityLogService::log($user['uid'], 'login', 'Default admin logged in');
 
@@ -54,8 +74,14 @@ class AuthService
             ];
         }
 
+        if ($defaultAdminEmail && $email === $defaultAdminEmail && $password !== $defaultAdminPassword) {
+            $recordFailure();
+            return ['success' => false, 'message' => 'Invalid email or password.'];
+        }
+
         $auth = FirebaseAuthService::signIn($email, $password);
         if (!$auth) {
+            $recordFailure();
             return ['success' => false, 'message' => 'Invalid email or password.'];
         }
 
@@ -64,6 +90,9 @@ class AuthService
             return ['success' => false, 'message' => 'No user profile found for this account. Contact an administrator.'];
         }
 
+        if (($profile['status'] ?? 'active') === 'pending') {
+            return ['success' => false, 'message' => 'Your account is awaiting administrator approval.'];
+        }
         if (($profile['status'] ?? 'active') !== 'active') {
             return ['success' => false, 'message' => 'This account has been disabled. Contact an administrator.'];
         }
@@ -89,6 +118,7 @@ class AuthService
         session_put(AUTH_UID_SESSION, $auth['uid']);
         session_put(AUTH_ROLE_SESSION, $user['role']);
         session_put('idToken', $auth['idToken']);
+        $clearFailures();
 
         ActivityLogService::log($auth['uid'], 'login', 'User logged in');
 

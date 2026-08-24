@@ -16,11 +16,14 @@ $allowedRoles = [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\StudentService;
+use App\Services\RoomService;
 
 $houseId = current_user()['houseId'] ?? null;
 $studentId = sanitize($_GET['studentId'] ?? '');
 $students = StudentService::all($houseId);
 $student = $studentId ? StudentService::find($studentId) : null;
+$room = ($student && !empty($student['roomId'])) ? RoomService::find((string) $student['roomId']) : null;
+$roomName = $room['roomNumber'] ?? ($student['roomId'] ?? '—');
 
 if ($student && ($student['houseId'] ?? null) !== $houseId) {
     $student = null;
@@ -69,7 +72,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                             <p class="mb-1"><strong>Admission No.:</strong> <span><?= e($student['admissionNo'] ?? '—') ?></span></p>
                             <p class="mb-1"><strong>Course:</strong> <span><?= e($student['course'] ?? '—') ?></span></p>
                             <p class="mb-1"><strong>Level:</strong> <span><?= e($student['level'] ?? '—') ?></span></p>
-                            <p class="mb-1"><strong>Room:</strong> <span><?= e($student['roomId'] ?? '—') ?></span></p>
+                            <p class="mb-1"><strong>Room:</strong> <span><?= e($roomName) ?></span></p>
                         </div>
                     </div>
                     <div class="col-md-6">

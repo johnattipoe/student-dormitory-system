@@ -23,9 +23,14 @@ class VisitorAlertService
      * Check for visitor overstays and create alerts
      * Typically called periodically (every 30 minutes)
      */
-    public function checkForOverstays(?int $thresholdHours = 2): array
+    public function checkForOverstays(?int $thresholdHours = null): array
     {
         $alerts = [];
+
+        if ($thresholdHours === null) {
+            $appConfig = require APP_ROOT . '/app/config/app.php';
+            $thresholdHours = max(1, (int) ($appConfig['advanced']['overstay_alert_hours'] ?? 2));
+        }
         
         try {
             $visitors = $this->firebase->where(COL_VISITORS, 'status', '=', 'inside');
@@ -48,7 +53,7 @@ class VisitorAlertService
         return $alerts;
     }
 
-    public function checkForOvrstays(?int $thresholdHours = 2): array
+    public function checkForOvrstays(?int $thresholdHours = null): array
     {
         return $this->checkForOverstays($thresholdHours);
     }
