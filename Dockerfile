@@ -33,7 +33,8 @@ RUN composer install \
     --no-interaction \
     --prefer-dist
 
-RUN sed -i 's#DocumentRoot /var/www/html#DocumentRoot /var/www/html/public#' /etc/apache2/sites-available/000-default.conf
+ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
+RUN sed -ri "s#DocumentRoot /var/www/html#DocumentRoot ${APACHE_DOCUMENT_ROOT}#g" /etc/apache2/sites-available/*.conf
 
 RUN printf '%s\n' \
     '<Directory /var/www/html/public>' \
