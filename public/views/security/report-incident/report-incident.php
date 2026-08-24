@@ -16,6 +16,9 @@ $allowedRoles = [ROLE_SECURITY];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\IncidentService;
+use App\Services\StudentService;
+
+$students = StudentService::all();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = (new IncidentService())->create([
@@ -46,14 +49,14 @@ require APP_ROOT . '/app/views/components/sidebar.php';
 <div class="main-content">
     <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
-    <div class="content-wrapper">
+    <div class="content-wrapper security-portal">
         <div class="card stat-card p-4">
             <h5 class="mb-3">Report Incident</h5>
             <form method="POST" action="<?= url('views/security/report-incident/report-incident.php') ?>">
                 <div class="row g-3">
                     <div class="col-md-6"><label class="form-label">Title</label><input type="text" name="title" class="form-control" required></div>
                     <div class="col-md-6"><label class="form-label">Priority</label><select name="priority" class="form-select"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></div>
-                    <div class="col-md-6"><label class="form-label">Student ID</label><input type="text" name="studentId" class="form-control"></div>
+                    <div class="col-md-6"><label class="form-label">Student involved</label><select name="studentId" class="form-select"><option value="">Not linked</option><?php foreach ($students as $student): ?><option value="<?= e((string) ($student['id'] ?? '')) ?>"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?> (<?= e($student['admissionNo'] ?? 'No ID') ?>)</option><?php endforeach; ?></select></div>
                     <div class="col-12"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="5" required></textarea></div>
                 </div>
                 <div class="mt-4 d-flex gap-2">

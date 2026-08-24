@@ -31,14 +31,52 @@ class NotificationService
         }
 
         try {
-            return $this->firebase->getCollection(
-                $this->collection,
-                [
-                    ['userId', '=', $uid]
-                ]
-            );
+            $identifiers = $this->userIdentifiers($uid);
+            $notifications = [];
+            foreach ($identifiers as $identifier) {
+                foreach ($this->firebase->getCollection($this->collection, [['userId', '=', $identifier]]) as $notification) {
+                    $notificationId = (string) ($notification['id'] ?? '');
+                    if ($notificationId !== '') {
+                        $notifications[$notificationId] = $notification;
+                    }
+                }
+            }
+            return array_values($notifications);
         } catch (\Throwable $e) {
             return [];
+        }
+    }
+
+    private function userIdentifiers(string $identifier): array
+    {
+        $identifiers = [trim($identifier)];
+        try {
+            foreach ((new UserService())->all() as $user) {
+                if ((string) ($user['id'] ?? '') === $identifier || (string) ($user['uid'] ?? '') === $identifier) {
+                    foreach ([$user['id'] ?? '', $user['uid'] ?? ''] as $userIdentifier) {
+                        if ($userIdentifier !== '' && !in_array((string) $userIdentifier, $identifiers, true)) {
+                            $identifiers[] = (string) $userIdentifier;
+                        }
+                    }
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Keep the session identifier as a fallback.
+        }
+        return array_values(array_filter($identifiers));
+    }
+
+    public function findForAdmin(string $id): ?array
+    {
+        if ($id === '') {
+            return null;
+        }
+
+        try {
+            return $this->firebase->getDocument($this->collection, $id);
+        } catch (\Throwable $e) {
+            return null;
         }
     }
 
@@ -50,7 +88,7 @@ class NotificationService
 
         try {
             $notification = $this->firebase->getDocument($this->collection, $id);
-            if (!$notification || ($notification['userId'] ?? '') !== $uid) {
+            if (!$notification || !in_array((string) ($notification['userId'] ?? ''), $this->userIdentifiers((string) $uid), true)) {
                 return null;
             }
 
@@ -58,6 +96,24 @@ class NotificationService
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    public function updateForUser(string $id, ?string $uid, array $data): array
+    {
+        if (!$this->findForUser($id, $uid)) {
+            return ['success' => false, 'message' => 'Notification not found.'];
+        }
+
+        return $this->update($id, $data);
+    }
+
+    public function deleteForUser(string $id, ?string $uid): array
+    {
+        if (!$this->findForUser($id, $uid)) {
+            return ['success' => false, 'message' => 'Notification not found.'];
+        }
+
+        return $this->delete($id);
     }
 
     public function create(array $data): array
@@ -133,6 +189,58 @@ class NotificationService
             return [
                 'success' => false,
                 'message' => 'Unable to create notification.'
+            ];
+        }
+    }
+
+    public function update(string $id, array $data): array
+    {
+        if ($id === '') {
+            return [
+                'success' => false,
+                'message' => 'Notification ID is required.'
+            ];
+        }
+
+        try {
+            $this->firebase->updateDocument($this->collection, $id, [
+                'title' => $data['title'] ?? '',
+                'message' => $data['message'] ?? '',
+                'type' => $data['type'] ?? 'info',
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Notification updated successfully.'
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'message' => 'Unable to update notification.'
+            ];
+        }
+    }
+
+    public function delete(string $id): array
+    {
+        if ($id === '') {
+            return [
+                'success' => false,
+                'message' => 'Notification ID is required.'
+            ];
+        }
+
+        try {
+            $this->firebase->deleteDocument($this->collection, $id);
+
+            return [
+                'success' => true,
+                'message' => 'Notification deleted successfully.'
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'message' => 'Unable to delete notification.'
             ];
         }
     }

@@ -112,7 +112,9 @@ document.addEventListener('DOMContentLoaded', function () {
   // Prevent double-submit on any form with a submit button (spinner + disable)
   document.querySelectorAll('form').forEach(form => {
     form.addEventListener('submit', function () {
-      SDS.showLoading();
+      if (!form.closest('[data-disable-loading]')) {
+        SDS.showLoading();
+      }
       const btn = form.querySelector('button[type="submit"], button:not([type])');
       if (btn && !btn.disabled) {
         btn.dataset.originalHtml = btn.innerHTML;

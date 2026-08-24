@@ -16,10 +16,13 @@ $allowedRoles = [ROLE_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\StudentService;
+use App\Services\RoomService;
 
 $studentId = sanitize($_GET['studentId'] ?? '');
 $student = $studentId ? StudentService::find($studentId) : null;
 $students = StudentService::all(current_user()['houseId'] ?? null);
+$room = ($student && !empty($student['roomId'])) ? RoomService::find((string) $student['roomId']) : null;
+$roomName = $room['roomNumber'] ?? ($student['roomId'] ?? '—');
 
 use App\Services\AttendanceService;
 use App\Services\IncidentService;
@@ -175,7 +178,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                             <p class="mb-1"><strong>Phone:</strong> <span><?= e($student['phone'] ?? '—') ?></span></p>
                             <p class="mb-1"><strong>Guardian:</strong> <span><?= e($student['guardianName'] ?? '—') ?></span></p>
                             <p class="mb-1"><strong>Guardian Phone:</strong> <span><?= e($student['guardianPhone'] ?? '—') ?></span></p>
-                            <p class="mb-1"><strong>Room:</strong> <span><?= e($student['roomId'] ?? '—') ?></span></p>
+                            <p class="mb-1"><strong>Room:</strong> <span><?= e($roomName) ?></span></p>
                             <p class="mb-1"><strong>Gender:</strong> <span><?= e($student['gender'] ?? '—') ?></span></p>
                         </div>
                     </div>

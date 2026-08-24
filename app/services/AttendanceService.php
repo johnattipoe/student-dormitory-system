@@ -52,21 +52,23 @@ class AttendanceService
                 $markedBy = $data['markedBy'] ?? null;
             }
 
-            $appConfig = require APP_ROOT . '/app/config/app.php';
-            $graceMinutes = max(0, (int) ($appConfig['attendance_grace_minutes'] ?? 10));
-
             $studentId = trim((string) $studentId);
             $status = trim((string) ($status ?? 'present'));
             $date = trim((string) ($date ?? (new \DateTime())->format('Y-m-d')));
 
-            if ($status === 'present' || $status === 'late') {
-                $currentTime = new \DateTimeImmutable('now');
-                $today = $currentTime->format('Y-m-d');
-                if ($date === $today) {
-                    $targetTime = $currentTime->setTime(9, 0, 0);
-                    if ($currentTime->getTimestamp() - $targetTime->getTimestamp() > ($graceMinutes * 60)) {
-                        $status = 'late';
-                    }
+            $appConfig = require APP_ROOT . '/app/config/app.php';
+            $advanced = $appConfig['advanced'] ?? [];
+            $dateObject = new \DateTimeImmutable($date);
+            if ($dateObject->format('N') >= 6 && empty($advanced['weekend_attendance'])) {
+                return ['success' => false, 'message' => 'Weekend attendance is disabled by the administrator.'];
+            }
+            if ($status === 'present' && $date === date('Y-m-d')) {
+                $checkInTime = (string) ($advanced['check_in_time'] ?? '14:00');
+                $lateMinutes = max(0, (int) ($advanced['late_arrival_minutes'] ?? 15));
+                $lateAfter = new \DateTimeImmutable($date . ' ' . $checkInTime);
+                $lateAfter = $lateAfter->modify('+' . $lateMinutes . ' minutes');
+                if (new \DateTimeImmutable() > $lateAfter) {
+                    $status = 'late';
                 }
             }
 

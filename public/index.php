@@ -9,6 +9,12 @@ require __DIR__ . '/bootstrap.php';
 use App\Middleware\AuthMiddleware;
 
 $route = $_GET['route'] ?? '/views/dashboard/dashboard.php';
+$routeParts = parse_url($route);
+$route = $routeParts['path'] ?? '/views/dashboard/dashboard.php';
+if (!empty($routeParts['query'])) {
+    parse_str($routeParts['query'], $routeQuery);
+    $_GET = array_merge($routeQuery, $_GET);
+}
 $route = str_replace(['..'], '', $route); // basic traversal guard
 $target = __DIR__ . $route;
 

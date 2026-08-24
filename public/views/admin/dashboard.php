@@ -41,6 +41,8 @@ $attendanceCount     = count(FirebaseService::getInstance()->getCollection(COL_A
 $allocationCount     = count(FirebaseService::getInstance()->getCollection(COL_ROOM_ALLOCATIONS, [], 500));
 $activityLogCount    = count(FirebaseService::getInstance()->getCollection(COL_ACTIVITY_LOGS, [], 500));
 $notificationCount   = count((new NotificationService())->all());
+$openIncidentCount   = count(array_filter(FirebaseService::getInstance()->getCollection(COL_INCIDENTS, [], 500), static fn(array $incident): bool => ($incident['status'] ?? 'open') === 'open'));
+$unreadNotificationCount = count(array_filter((new NotificationService())->all(), static fn(array $notification): bool => empty($notification['read'])));
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php'), 'active' => true],
@@ -66,7 +68,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
 
-    <div class="content-wrapper">
+    <div class="content-wrapper admin-dashboard-page">
+        <section class="admin-dashboard-hero mb-4">
+            <div class="admin-dashboard-icon"><i class="bi bi-grid-1x2"></i></div>
+            <div><span class="admin-kicker">Administration center</span><h1>System overview</h1><p>Monitor residents, spaces, attendance, visitors, incidents, and system activity from one place.</p></div>
+            <div class="admin-dashboard-actions"><a class="btn btn-light" href="<?= url('views/admin/profile.php') ?>"><i class="bi bi-person-circle me-1"></i>My profile</a><a class="btn btn-primary" href="<?= url('views/admin/settings/index.php') ?>"><i class="bi bi-gear me-1"></i>Settings</a></div>
+        </section>
         <div class="row g-3 mb-4">
             <div class="col-md-3">
                 <div class="card stat-card p-3 d-flex flex-row align-items-center gap-3">
@@ -89,7 +96,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             <div class="col-md-3">
                 <div class="card stat-card p-3 d-flex flex-row align-items-center gap-3">
                     <div class="stat-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-exclamation-triangle"></i></div>
-                    <div><div class="text-muted small">Open Incidents</div><div class="fs-4 fw-bold"><span id="incidentCount"><?= $incidentCount ?></span></div></div>
+                    <div><div class="text-muted small">Incidents</div><div class="fs-4 fw-bold"><span id="incidentCount"><?= $incidentCount ?></span></div></div>
                 </div>
             </div>
         </div>
@@ -123,7 +130,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
 
         <div class="row g-3 mb-4">
             <div class="col-xl-8">
-                <div class="card stat-card p-3 h-100">
+                        <div class="card stat-card admin-dashboard-panel p-3 h-100">
                     <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-3">
                         <div>
                             <h6 class="mb-1">Usage Overview</h6>
@@ -139,7 +146,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             </div>
 
             <div class="col-xl-4">
-                <div class="card stat-card p-3 mb-3">
+                        <div class="card stat-card admin-dashboard-panel p-3 mb-3">
                     <h6 class="mb-3">Operational Snapshot</h6>
                     <ul class="list-group list-group-flush">
                         <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center border-0">
@@ -155,17 +162,17 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                             <span class="badge bg-warning bg-opacity-15 text-warning rounded-pill"><?= $attendanceCount ?></span>
                         </li>
                         <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center border-0">
-                            <span>Pending notifications</span>
-                            <span class="badge bg-info bg-opacity-15 text-info rounded-pill"><?= $notificationCount ?></span>
+                            <span>Unread notifications</span>
+                            <span class="badge bg-info bg-opacity-15 text-info rounded-pill"><?= $unreadNotificationCount ?></span>
                         </li>
                     </ul>
                 </div>
 
-                <div class="card stat-card p-3">
+                <div class="card stat-card admin-dashboard-panel p-3">
                     <h6 class="mb-3">Quick Insights</h6>
                     <div class="d-flex flex-column gap-2">
                         <div class="alert alert-secondary py-2 mb-0" role="alert">
-                            <strong><?= $incidentCount ?></strong> open incidents need review.
+                            <strong><?= $openIncidentCount ?></strong> open incidents need review.
                         </div>
                         <div class="alert alert-secondary py-2 mb-0" role="alert">
                             <?= $houseCount ?> houses and <?= $roomCount ?> rooms are currently managed.
@@ -178,7 +185,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             </div>
         </div>
 
-        <div class="card stat-card p-3 mb-4">
+        <div class="card stat-card admin-dashboard-panel p-3 mb-4">
             <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-3">
                 <div>
                     <h6 class="mb-1">House Staff Assignment</h6>
@@ -203,9 +210,9 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             </div>
         </div>
 
-        <div class="card stat-card p-3 mb-4"><div class="d-flex justify-content-between align-items-center mb-3"><div><h6 class="mb-1">Reporting Center</h6><p class="text-muted mb-0">Open detailed operational reports and exports.</p></div><i class="bi bi-bar-chart-line fs-3 text-primary"></i></div><div class="d-flex flex-wrap gap-2"><a class="btn btn-outline-primary btn-sm" href="<?= url('views/admin/attendance/reports.php') ?>">Attendance report</a><a class="btn btn-outline-primary btn-sm" href="<?= url('views/admin/visitors/reports.php') ?>">Visitor report</a><a class="btn btn-outline-primary btn-sm" href="<?= url('views/admin/incidents/reports.php') ?>">Incident report</a><a class="btn btn-outline-primary btn-sm" href="<?= url('views/reports/dashboard.php') ?>">All reports</a></div></div>
+        <div class="card stat-card admin-dashboard-panel p-3 mb-4"><div class="d-flex justify-content-between align-items-center mb-3"><div><h6 class="mb-1">Reporting Center</h6><p class="text-muted mb-0">Open detailed operational reports and exports.</p></div><i class="bi bi-bar-chart-line fs-3 text-primary"></i></div><div class="d-flex flex-wrap gap-2"><a class="btn btn-outline-primary btn-sm" href="<?= url('views/admin/attendance/reports.php') ?>">Attendance report</a><a class="btn btn-outline-primary btn-sm" href="<?= url('views/admin/visitors/reports.php') ?>">Visitor report</a><a class="btn btn-outline-primary btn-sm" href="<?= url('views/admin/incidents/reports.php') ?>">Incident report</a><a class="btn btn-outline-primary btn-sm" href="<?= url('views/reports/dashboard.php') ?>">All reports</a></div></div>
 
-        <div class="card stat-card p-3">
+        <div class="card stat-card admin-dashboard-panel p-3">
             <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-3">
                 <div>
                     <h6 class="mb-1">Quick Links</h6>

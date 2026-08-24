@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$postId) {
         flash('error', 'Room ID is required.');
-        redirect(base_url('index.php?route=/views/admin/rooms/index.php'));
+        redirect(base_url('index.php?route=/views/admin/rooms/allocation.php'));
     }
 
     if (!empty($errors)) {

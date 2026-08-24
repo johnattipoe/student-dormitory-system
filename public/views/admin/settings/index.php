@@ -84,21 +84,24 @@ require APP_ROOT . '/app/views/components/sidebar.php';
 <div class="main-content">
     <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
-    <div class="content-wrapper">
+    <div class="content-wrapper admin-settings-page">
+        <section class="admin-settings-hero mb-4">
+            <div class="admin-settings-icon"><i class="bi bi-sliders"></i></div>
+            <div><span class="admin-kicker">System configuration</span><h1>Settings</h1><p>Shape the way your dormitory system communicates, authenticates, and operates.</p></div>
+            <div class="admin-settings-hero-actions"><a href="<?= url('views/admin/profile.php') ?>" class="btn btn-light"><i class="bi bi-person-circle me-1"></i>My profile</a><button type="submit" form="settings-form" class="btn btn-primary"><i class="bi bi-check2 me-1"></i>Save settings</button></div>
+        </section>
+
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-            <div>
-                <h5 class="mb-0">Settings</h5>
-                <p class="text-muted mb-0">Configure system-wide admin settings and preferences.</p>
-            </div>
-            <button type="submit" form="settings-form" class="btn btn-primary btn-sm">Save Settings</button>
+            <div><span class="admin-kicker">Control center</span><h2 class="admin-settings-title">Application preferences</h2></div>
+            <a href="<?= url('views/admin/settings/advanced.php') ?>" class="btn btn-outline-secondary"><i class="bi bi-sliders2 me-1"></i>Advanced settings</a>
         </div>
 
         <form id="settings-form" method="POST" action="<?= url('views/admin/settings/index.php') ?>">
-            <div class="alert alert-info small d-flex justify-content-between align-items-center"><span><i class="bi bi-cloud-check me-1"></i> Settings persistence: <strong><?= e($settingsSource) ?></strong>.</span><span class="badge bg-<?= $settingsConnected ? 'success' : 'secondary' ?>"><?= $settingsConnected ? 'Firebase connected' : 'Using defaults' ?></span></div>
+            <div class="admin-settings-source alert d-flex justify-content-between align-items-center"><span><i class="bi bi-cloud-check me-1"></i> Settings persistence: <strong><?= e($settingsSource) ?></strong>.</span><span class="badge bg-<?= $settingsConnected ? 'success' : 'secondary' ?>"><?= $settingsConnected ? 'Firebase connected' : 'Using defaults' ?></span></div>
             <div class="row g-4">
                 <div class="col-lg-6">
-                    <div class="card stat-card p-3 h-100">
-                        <h6 class="mb-3">General Settings</h6>
+                    <section class="admin-settings-card h-100">
+                        <div class="admin-settings-card-heading"><span class="admin-settings-card-icon blue"><i class="bi bi-building"></i></span><div><span class="admin-kicker">Foundation</span><h2>General settings</h2><p>Basic identity and regional behavior.</p></div></div>
                         <div class="row g-3">
                             <div class="col-12">
                                 <label class="form-label">Application Name</label>
@@ -125,12 +128,12 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <input type="email" name="support_email" class="form-control" value="<?= e($settings['support_email']) ?>">
                             </div>
                         </div>
-                    </div>
+                    </section>
                 </div>
 
                 <div class="col-lg-6">
-                    <div class="card stat-card p-3 h-100">
-                        <h6 class="mb-3">Security & Access</h6>
+                    <section class="admin-settings-card h-100">
+                        <div class="admin-settings-card-heading"><span class="admin-settings-card-icon red"><i class="bi bi-shield-lock"></i></span><div><span class="admin-kicker">Protection</span><h2>Security & access</h2><p>Control registration, authentication, and data sync.</p></div></div>
                         <div class="row g-3">
                             <div class="col-12">
                                 <label class="form-label">Default Temporary Password</label>
@@ -161,7 +164,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </section>
                 </div>
             </div>
         </form>

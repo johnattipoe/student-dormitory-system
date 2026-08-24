@@ -58,6 +58,7 @@ define('COL_USERS', 'users');
 define('COL_STUDENTS', 'students');
 define('COL_HOUSES', 'houses');
 define('COL_ROOMS', 'rooms');
+define('COL_BEDS', 'beds');
 define('COL_ROOM_ALLOCATIONS', 'room_allocations');
 define('COL_ATTENDANCE', 'attendance');
 define('COL_ACTIVITY_LOGS', 'activity_logs');

@@ -15,10 +15,17 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
+use App\Services\HouseService;
 use App\Services\StudentService;
 
 $pageTitle = 'Students';
 $students = StudentService::all(current_role() === ROLE_ADMIN ? null : current_user()['houseId']);
+$houses = [];
+foreach (HouseService::all() as $house) {
+    if (!empty($house['id'])) {
+        $houses[(string) $house['id']] = $house['name'] ?? $house['id'];
+    }
+}
 $search = strtolower(sanitize($_GET['search'] ?? ''));
 if ($search !== '') {
     $students = array_values(array_filter($students, function ($student) use ($search) {
@@ -74,7 +81,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                         <td><?= e(trim(($s['firstName'] ?? '') . ' ' . ($s['lastName'] ?? ''))) ?></td>
                         <td><?= e($s['email'] ?? '') ?></td>
                         <td><?= e($s['course'] ?? '') ?></td>
-                        <td><?= e($s['houseId'] ?? '—') ?></td>
+                        <td><?= e($houses[(string) ($s['houseId'] ?? '')] ?? ($s['houseId'] ?? '—')) ?></td>
                         <td><span class="badge bg-<?= ($s['status'] ?? '') === 'active' ? 'success' : 'secondary' ?>"><?= e($s['status'] ?? '') ?></span></td>
                         <td>
                             <a href="<?= url('views/admin/students/view.php?id=' . urlencode($s['id'])) ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i></a>

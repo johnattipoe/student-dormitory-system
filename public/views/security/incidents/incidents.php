@@ -37,7 +37,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
 <div class="main-content">
     <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
-    <div class="content-wrapper">
+    <div class="content-wrapper security-portal">
         <div class="card stat-card p-3">
             <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">Incident Log</h5><form method="GET" class="d-flex gap-2"><input name="search" class="form-control form-control-sm" placeholder="Search incidents" value="<?= e($search) ?>"><button class="btn btn-primary btn-sm">Filter</button></form></div>
             <table class="table table-hover data-table w-100">

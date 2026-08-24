@@ -17,11 +17,14 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\AttendanceService;
 use App\Services\IncidentService;
+use App\Services\HouseService;
 use App\Services\RoomService;
 use App\Services\StudentService;
 use App\Services\VisitorService;
 
 $houseId = current_user()['houseId'] ?? null;
+$assignedHouse = $houseId ? HouseService::find((string) $houseId) : null;
+$assignedHouseName = $assignedHouse['name'] ?? 'Not assigned';
 $students = StudentService::all($houseId);
 $studentMap = [];
 foreach ($students as $student) {
@@ -61,7 +64,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <div class="content-wrapper">
         <div class="mb-4">
             <h5 class="mb-1">Welcome, <?= e(current_user()['name'] ?? '') ?></h5>
-            <p class="text-muted mb-0">Live overview for your assigned house.</p>
+            <p class="text-muted mb-0">Assigned house: <strong><?= e($assignedHouseName) ?></strong></p>
         </div>
 
         <div class="row g-3">
@@ -203,8 +206,10 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 </div>
             </div>
         </div>
-        
 
+        <br>
+
+        
     </div>
 </div>
 <?php require APP_ROOT . '/app/views/components/footer.php'; ?>

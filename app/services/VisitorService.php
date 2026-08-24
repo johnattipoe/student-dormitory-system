@@ -57,6 +57,8 @@ class VisitorService
                 ];
             }
 
+            $appConfig = require APP_ROOT . '/app/config/app.php';
+            $status = !empty($appConfig['advanced']['visitor_approval_required']) ? 'pending' : 'registered';
             $id = $this->firebase->addDocument(
                 $this->collection,
                 [
@@ -67,7 +69,7 @@ class VisitorService
                     'idType' => $data['idType'] ?? '',
                     'idNumber' => $data['idNumber'] ?? '',
                     'registeredBy' => $data['registeredBy'] ?? null,
-                    'status' => 'registered',
+                    'status' => $status,
                     'checkInTime' => null,
                     'checkOutTime' => null
                 ]
@@ -92,7 +94,7 @@ class VisitorService
         try {
 
             $id = $this->firebase->addDocument(
-                $this->collection,
+                \COL_VISITOR_REQUESTS,
                 [
                     'studentId' => $data['studentId'] ?? null,
                     'visitorName' => $data['visitorName'] ?? '',
@@ -123,6 +125,22 @@ class VisitorService
         ?string $securityUser = null
     ): array {
         try {
+
+            $visitor = $this->find($id);
+            if (!$visitor) {
+                return ['success' => false, 'message' => 'Visitor not found.'];
+            }
+            if (($visitor['status'] ?? '') === 'pending') {
+                return ['success' => false, 'message' => 'Visitor approval is required before check-in.'];
+            }
+            $appConfig = require APP_ROOT . '/app/config/app.php';
+            $advanced = $appConfig['advanced'] ?? [];
+            $now = new \DateTimeImmutable();
+            $checkInTime = new \DateTimeImmutable($now->format('Y-m-d') . ' ' . ($advanced['check_in_time'] ?? '14:00'));
+            $curfewTime = new \DateTimeImmutable($now->format('Y-m-d') . ' ' . ($advanced['curfew_time'] ?? '22:00'));
+            if ($now < $checkInTime || $now >= $curfewTime) {
+                return ['success' => false, 'message' => 'Visitor check-in is outside the permitted hours.'];
+            }
 
             $this->firebase->updateDocument(
                 $this->collection,

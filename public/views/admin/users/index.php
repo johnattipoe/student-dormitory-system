@@ -33,6 +33,15 @@ $authUsers = [];
 if (FirebaseAdminAuthService::credentialsAvailable()) {
     $authUsers = FirebaseAdminAuthService::listAuthUsers(500);
 }
+$totalUsers = count($users);
+$activeUsers = count(array_filter($users, static fn(array $user): bool => ($user['status'] ?? 'active') === 'active'));
+$staffUsers = count(array_filter($users, static fn(array $user): bool => ($user['role'] ?? '') !== 'student'));
+$roleCount = count(array_unique(array_filter(array_map(static fn(array $user): string => (string) ($user['role'] ?? ''), $users))));
+$roleCounts = [];
+foreach ($users as $userRecord) {
+    $roleKey = strtolower(trim((string) ($userRecord['role'] ?? '')));
+    $roleCounts[$roleKey] = ($roleCounts[$roleKey] ?? 0) + 1;
+}
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
@@ -68,8 +77,46 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 </div>
             </div>
         </div>
-        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-9"><input name="search" class="form-control form-control-sm" placeholder="Search name, email, or role" value="<?= e($search) ?>"></div><div class="col-md-3"><button class="btn btn-primary btn-sm">Filter</button> <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/users/index.php') ?>">Reset</a></div></form></div>
+        <div class="card stat-card p-3 mb-3">
+            <form method="GET" class="row g-2">
+                <div class="col-md-9">
+                    <input name="search" class="form-control form-control-sm" placeholder="Search name, email, or role" value="<?= e($search) ?>">
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary btn-sm">Filter</button> 
+                    <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/users/index.php') ?>">Reset</a>
+                </div>
+            </form>
+        </div>
 
+        <br>
+
+        <div class="row g-3 mb-4 admin-user-metrics">
+            <div class="col-md-3"><div class="card stat-card p-3 d-flex flex-row align-items-center gap-3"><div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-people"></i></div><div><div class="text-muted small">Total users</div><div class="fs-4 fw-bold"><?= e((string) $totalUsers) ?></div></div></div></div>
+            <div class="col-md-3"><div class="card stat-card p-3 d-flex flex-row align-items-center gap-3"><div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-person-check"></i></div><div><div class="text-muted small">Active users</div><div class="fs-4 fw-bold"><?= e((string) $activeUsers) ?></div></div></div></div>
+            <div class="col-md-3"><div class="card stat-card p-3 d-flex flex-row align-items-center gap-3"><div class="stat-icon bg-info bg-opacity-10 text-info"><i class="bi bi-person-badge"></i></div><div><div class="text-muted small">Staff accounts</div><div class="fs-4 fw-bold"><?= e((string) $staffUsers) ?></div></div></div></div>
+            <div class="col-md-3"><div class="card stat-card p-3 d-flex flex-row align-items-center gap-3"><div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-shield-check"></i></div><div><div class="text-muted small">Role groups</div><div class="fs-4 fw-bold"><?= e((string) $roleCount) ?></div></div></div></div>
+        </div>
+
+        <section class="admin-role-block mb-4">
+            <div class="admin-section-heading"><div><span class="admin-kicker">Access overview</span><h2>Users by role</h2><p>Quick distribution of accounts currently in view.</p></div><i class="bi bi-diagram-3"></i></div>
+            <div class="row g-3">
+                <?php $roleCards = [
+                    ['key' => 'student', 'label' => 'Students', 'icon' => 'bi-mortarboard', 'tone' => 'blue'],
+                    ['key' => 'admin', 'label' => 'Admins', 'icon' => 'bi-shield-lock', 'tone' => 'red'],
+                    ['key' => 'houseparent', 'label' => 'Houseparents', 'icon' => 'bi-house-heart', 'tone' => 'green'],
+                    ['key' => 'house_master', 'label' => 'House Masters', 'icon' => 'bi-building-check', 'tone' => 'purple'],
+                    ['key' => 'security', 'label' => 'Security', 'icon' => 'bi-shield-check', 'tone' => 'orange'],
+                    ['key' => 'nurse', 'label' => 'Nurses', 'icon' => 'bi-heart-pulse', 'tone' => 'pink'],
+                ]; ?>
+                <?php foreach ($roleCards as $roleCard): ?>
+                    <div class="col-6 col-lg-4 col-xl-2"><div class="admin-role-card"><span class="admin-role-icon <?= e($roleCard['tone']) ?>"><i class="bi <?= e($roleCard['icon']) ?>"></i></span><div><small><?= e($roleCard['label']) ?></small><strong><?= e((string) ($roleCounts[$roleCard['key']] ?? 0)) ?></strong></div></div></div>
+                <?php endforeach; ?>
+            </div>
+        </section>
+        
+    
+        
         <div class="card stat-card p-3">
             <?php if (!empty($authUsers)): ?>
                 <div class="mb-3">
@@ -77,7 +124,11 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                     <div class="table-responsive mb-3">
                         <table class="table table-sm table-striped">
                             <thead>
-                            <tr><th>Email</th><th>UID</th><th>Provider</th></tr>
+                            <tr>
+                                <th>Email</th>
+                                <th>UID</th>
+                                <th>Provider</th>
+                            </tr>
                             </thead>
                             <tbody>
                             <?php foreach ($authUsers as $au): ?>

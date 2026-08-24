@@ -16,15 +16,122 @@ $allowedRoles = [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\AttendanceService;
+use App\Services\BedService;
+use App\Services\FirebaseService;
+use App\Services\HouseService;
+use App\Services\RoomService;
 use App\Services\StudentService;
+use App\Services\UserService;
+
+$user = current_user() ?? [];
+$userId = (string) ($user['uid'] ?? $user['id'] ?? '');
+$assignedHouseId = (string) ($user['houseId'] ?? $user['house_id'] ?? '');
+$assignedHouses = [];
+foreach (HouseService::all() as $house) {
+    $houseId = (string) ($house['id'] ?? $house['houseId'] ?? '');
+    if ($houseId !== '' && ($houseId === $assignedHouseId
+        || (string) ($house['houseMasterId'] ?? '') === $userId
+        || (string) ($house['houseMistressId'] ?? '') === $userId)) {
+        $assignedHouses[$houseId] = $house;
+    }
+}
+
+$studentHouseId = static fn(array $student): string => (string) (
+    $student['houseId']
+    ?? $student['house_id']
+    ?? $student['assignedHouseId']
+    ?? $student['assigned_house_id']
+    ?? ''
+);
+
+$studentRecordId = static fn(array $student): string => (string) (
+    $student['id']
+    ?? $student['uid']
+    ?? $student['studentId']
+    ?? ''
+);
+
+$studentsForHouse = static function (string $houseId) use ($assignedHouses, $studentHouseId, $studentRecordId): array {
+    if ($houseId === '' || !array_key_exists($houseId, $assignedHouses)) {
+        return [];
+    }
+
+    $allStudents = StudentService::all();
+    $rooms = RoomService::all($houseId);
+    $roomIds = array_values(array_filter(array_map(
+        static fn(array $room): string => (string) ($room['id'] ?? $room['roomId'] ?? ''),
+        $rooms
+    )));
+    $roomIdSet = array_fill_keys($roomIds, true);
+
+    $assignedStudentIds = [];
+    foreach (BedService::all() as $bed) {
+        $bedRoomId = (string) ($bed['roomId'] ?? '');
+        $bedStudentId = (string) ($bed['studentId'] ?? '');
+        if ($bedStudentId !== '' && isset($roomIdSet[$bedRoomId])) {
+            $assignedStudentIds[$bedStudentId] = true;
+        }
+    }
+
+    foreach (FirebaseService::getInstance()->getCollection(COL_ROOM_ALLOCATIONS, [], 1000) as $allocation) {
+        $allocationStudentId = (string) ($allocation['studentId'] ?? '');
+        $allocationHouseId = (string) ($allocation['houseId'] ?? $allocation['house_id'] ?? '');
+        $allocationRoomId = (string) ($allocation['roomId'] ?? '');
+        $allocationStatus = strtolower((string) ($allocation['status'] ?? 'active'));
+
+        if ($allocationStudentId !== ''
+            && $allocationStatus === 'active'
+            && ($allocationHouseId === $houseId || isset($roomIdSet[$allocationRoomId]))) {
+            $assignedStudentIds[$allocationStudentId] = true;
+        }
+    }
+
+    $studentsWithRoomAssignment = array_values(array_filter($allStudents, static function (array $student) use ($studentRecordId, $roomIdSet, $assignedStudentIds): bool {
+        $studentId = $studentRecordId($student);
+        $studentRoomId = (string) ($student['roomId'] ?? '');
+
+        return ($studentId !== '' && isset($assignedStudentIds[$studentId]))
+            || ($studentRoomId !== '' && isset($roomIdSet[$studentRoomId]));
+    }));
+
+    $students = !empty($studentsWithRoomAssignment)
+        ? $studentsWithRoomAssignment
+        : array_values(array_filter(
+            $allStudents,
+            static fn(array $student): bool => $studentHouseId($student) === $houseId
+        ));
+
+    usort($students, static fn(array $first, array $second): int => strcasecmp(
+        trim(($first['firstName'] ?? '') . ' ' . ($first['lastName'] ?? '')),
+        trim(($second['firstName'] ?? '') . ' ' . ($second['lastName'] ?? ''))
+    ));
+
+    return $students;
+};
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $selectedHouseId = sanitize($_POST['houseId'] ?? '');
+    $studentId = sanitize($_POST['studentId'] ?? '');
+    $allowedHouseIds = array_keys($assignedHouses);
+    $selectedStudents = in_array($selectedHouseId, $allowedHouseIds, true) ? $studentsForHouse($selectedHouseId) : [];
+    $studentIds = array_map($studentRecordId, $selectedStudents);
+
+    if (!in_array($selectedHouseId, $allowedHouseIds, true)) {
+        flash('error', 'Please select one of your assigned houses.');
+        redirect(base_url('index.php?route=/views/house-master/attendance/index.php'));
+    }
+
+    if (!in_array($studentId, $studentIds, true)) {
+        flash('error', 'The selected student is not assigned to that house.');
+        redirect(base_url('index.php?route=/views/house-master/attendance/index.php&houseId=' . urlencode($selectedHouseId)));
+    }
+
     $data = [
-        'studentId' => sanitize($_POST['studentId'] ?? ''),
+        'studentId' => $studentId,
         'status' => sanitize($_POST['status'] ?? 'present'),
         'date' => sanitize($_POST['date'] ?? date('Y-m-d')),
-        'houseId' => current_user()['houseId'] ?? null,
-        'markedBy' => current_user()['uid'] ?? current_user()['id'] ?? 'house-master',
+        'houseId' => $selectedHouseId,
+        'markedBy' => $user['uid'] ?? $user['id'] ?? 'house-master',
     ];
 
     $result = AttendanceService::mark($data);
@@ -36,14 +143,37 @@ $pageTitle = 'House Master Attendance';
 $date = sanitize($_GET['date'] ?? date('Y-m-d'));
 $searchQuery = sanitize($_GET['search'] ?? '');
 $statusFilter = sanitize($_GET['status'] ?? '');
+$selectedHouseId = sanitize($_GET['houseId'] ?? $assignedHouseId);
+if (!array_key_exists($selectedHouseId, $assignedHouses)) {
+    $selectedHouseId = array_key_first($assignedHouses) ?? '';
+}
 
-$students = StudentService::all(current_user()['houseId'] ?? null);
-$attendance = AttendanceService::forDate($date, current_user()['houseId'] ?? null);
+$students = $studentsForHouse($selectedHouseId);
+$beds = BedService::all();
+$bedMap = [];
+foreach ($beds as $bed) {
+    $bedMap[(string) ($bed['studentId'] ?? '')] = (string) ($bed['bedNumber'] ?? '—');
+}
+$attendance = AttendanceService::forDate($date, $selectedHouseId !== '' ? $selectedHouseId : null);
+$markedByNames = [];
+foreach ((new UserService())->all() as $user) {
+    $userName = trim((string) ($user['name'] ?? ''));
+    if ($userName === '') {
+        $userName = trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''));
+    }
+    if ($userName !== '') {
+        foreach ([$user['id'] ?? null, $user['uid'] ?? null] as $userId) {
+            if ($userId !== null && (string) $userId !== '') {
+                $markedByNames[(string) $userId] = $userName;
+            }
+        }
+    }
+}
 
 // Apply filters
 if (!empty($searchQuery)) {
-    $attendance = array_filter($attendance, function($record) use ($searchQuery, $students) {
-        $student = current(array_filter($students, fn($s) => ((string) ($s['id'] ?? '')) === ((string) ($record['studentId'] ?? ''))));
+    $attendance = array_filter($attendance, function($record) use ($searchQuery, $students, $studentRecordId) {
+        $student = current(array_filter($students, fn($s) => $studentRecordId($s) === ((string) ($record['studentId'] ?? ''))));
         $name = ($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '');
         $admNo = $student['admissionNo'] ?? '';
         return stripos($name, $searchQuery) !== false || stripos($admNo, $searchQuery) !== false;
@@ -54,7 +184,7 @@ if (!empty($statusFilter)) {
     $attendance = array_filter($attendance, fn($record) => ($record['status'] ?? 'present') === $statusFilter);
 }
 
-$summary = AttendanceService::summary($date, current_user()['houseId'] ?? null);
+$summary = AttendanceService::summary($date, $selectedHouseId !== '' ? $selectedHouseId : null);
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/house-master/dashboard/index.php')],
     ['icon' => 'bi-mortarboard', 'label' => 'Students', 'href' => url('views/house-master/students/index.php')],
@@ -122,6 +252,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             </form>
         </div>
 
+        <br>
+
         <div class="row g-3 mb-4">
             <div class="col-md-4">
                 <div class="card stat-card p-3 text-center">
@@ -146,12 +278,28 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         <div class="card stat-card p-4 mb-4">
             <h6 class="mb-3">Quick Mark Attendance</h6>
             <form method="POST" action="<?= url('views/house-master/attendance/index.php') ?>" class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <label class="form-label">House</label>
+                    <select name="houseId" class="form-select" required onchange="window.location.href='<?= url('views/house-master/attendance/index.php') ?>?houseId=' + encodeURIComponent(this.value)">
+                        <option value="">Select house</option>
+                        <?php foreach ($assignedHouses as $houseId => $house): ?>
+                            <option value="<?= e($houseId) ?>" <?= $selectedHouseId === $houseId ? 'selected' : '' ?>><?= e($house['name'] ?? $houseId) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-3">
                     <label class="form-label">Student</label>
-                    <select name="studentId" class="form-select" required>
-                        <option value="">Select student</option>
+                    <select name="studentId" class="form-select" required <?= empty($students) ? 'disabled' : '' ?>>
+                        <option value=""><?= empty($students) ? 'No students assigned to this house' : 'Select student in this house' ?></option>
                         <?php foreach ($students as $student): ?>
-                            <option value="<?= e((string) ($student['id'] ?? '')) ?>"><?= e(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' (' . ($student['admissionNo'] ?? '') . ')') ?></option>
+                            <?php
+                            $optionStudentId = $studentRecordId($student);
+                            $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
+                            $studentLabel = trim($studentName . ' (' . ($student['admissionNo'] ?? $student['studentId'] ?? $optionStudentId) . ')');
+                            ?>
+                            <?php if ($optionStudentId !== ''): ?>
+                                <option value="<?= e($optionStudentId) ?>"><?= e($studentLabel) ?></option>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -186,6 +334,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                     <tr>
                         <th>Date</th>
                         <th>Student</th>
+                        <th>Bed</th>
                         <th>Status</th>
                         <th>Marked By</th>
                         <th>Actions</th>
@@ -194,14 +343,14 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <tbody>
                     <?php if (empty($attendance)): ?>
                         <tr>
-                            <td colspan="5" class="text-center text-muted">No attendance records matching your filters.</td>
+                            <td colspan="6" class="text-center text-muted">No attendance records matching your filters.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($attendance as $record): ?>
                             <?php
                             $student = null;
                             foreach ($students as $s) {
-                                if (($s['id'] ?? '') === ($record['studentId'] ?? '')) {
+                                if ($studentRecordId($s) === (string) ($record['studentId'] ?? '')) {
                                     $student = $s;
                                     break;
                                 }
@@ -210,8 +359,9 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                             <tr>
                                 <td><?= e($record['date'] ?? '-') ?></td>
                                 <td><?= e(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' (' . ($student['admissionNo'] ?? '') . ')') ?: e($record['studentId'] ?? '-') ?></td>
+                                <td><?= e($bedMap[(string) ($record['studentId'] ?? '')] ?? '—') ?></td>
                                 <td><span class="badge bg-<?= ($record['status'] ?? 'present') === 'present' ? 'success' : (($record['status'] ?? '') === 'absent' ? 'danger' : 'warning') ?>"><?= e($record['status'] ?? 'present') ?></span></td>
-                                <td><?= e($record['markedBy'] ?? '—') ?></td>
+                                <td><?= e($markedByNames[(string) ($record['markedBy'] ?? '')] ?? ($record['markedBy'] ?? '—')) ?></td>
                                 <td class="text-nowrap"><a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/attendance/view.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/house-master/attendance/edit.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/house-master/attendance/delete.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">Delete</a></td>
                             </tr>
                         <?php endforeach; ?>

@@ -15,11 +15,17 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSEPARENT, ROLE_NURSE, ROLE_SECURITY];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
+use App\Services\HouseService;
+use App\Services\RoomService;
 use App\Services\StudentService;
 
 $id = $_GET['id'] ?? '';
 $student = $id ? StudentService::find($id) : null;
 if (!$student) { http_response_code(404); echo 'Student not found.'; exit; }
+$house = !empty($student['houseId']) ? HouseService::find((string) $student['houseId']) : null;
+$houseName = $house['name'] ?? ($student['houseId'] ?? '—');
+$room = !empty($student['roomId']) ? RoomService::find((string) $student['roomId']) : null;
+$roomName = $room['roomNumber'] ?? ($student['roomId'] ?? '—');
 $pageTitle = 'Student Profile';
 
 $navItems = [
@@ -40,8 +46,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <tr><th>Email</th><td><?= e($student['email'] ?? '—') ?></td></tr>
                 <tr><th>Phone</th><td><?= e($student['phone'] ?? '—') ?></td></tr>
                 <tr><th>Course</th><td><?= e($student['course'] ?? '—') ?></td></tr>
-                <tr><th>House</th><td><?= e($student['houseId'] ?? '—') ?></td></tr>
-                <tr><th>Room</th><td><?= e($student['roomId'] ?? '—') ?></td></tr>
+                <tr><th>House</th><td><?= e($houseName) ?></td></tr>
+                <tr><th>Room</th><td><?= e($roomName) ?></td></tr>
                 <tr><th>Status</th><td><?= e($student['status'] ?? '—') ?></td></tr>
                 <tr><th>Guardian</th><td><?= e($student['guardianName'] ?? '—') ?> (<?= e($student['guardianPhone'] ?? '—') ?>)</td></tr>
             </table>

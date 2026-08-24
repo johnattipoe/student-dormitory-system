@@ -30,14 +30,31 @@ class UserService
             return null;
         }
 
+        $target = trim((string) $id);
+        if ($target === '') {
+            return null;
+        }
+
         try {
-            return $this->firebase->getDocument(
-                $this->collection,
-                $id
-            );
+            $doc = $this->firebase->getDocument($this->collection, $target);
+            if ($doc) {
+                return $doc;
+            }
+        } catch (\Throwable $e) {
+            // fall through below to UID lookup
+        }
+
+        try {
+            foreach ($this->all() as $user) {
+                if ((string) ($user['id'] ?? '') === $target || (string) ($user['uid'] ?? '') === $target) {
+                    return $user;
+                }
+            }
         } catch (\Throwable $e) {
             return null;
         }
+
+        return null;
     }
 
     /**

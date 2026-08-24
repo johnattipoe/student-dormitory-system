@@ -15,9 +15,39 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_STUDENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
+use App\Services\VisitorService;
+
 $pageTitle = 'Visitor Request';
 $errors = $_SESSION['_errors'] ?? []; unset($_SESSION['_errors']);
 $old = $_SESSION['_old'] ?? []; unset($_SESSION['_old']);
+$studentId = current_user()['studentId'] ?? current_user()['uid'] ?? current_user()['id'] ?? null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $data = [
+        'studentId' => $studentId,
+        'visitorName' => sanitize($_POST['visitorName'] ?? ''),
+        'phone' => sanitize($_POST['phone'] ?? ''),
+        'relationship' => sanitize($_POST['relationship'] ?? ''),
+        'visitDate' => sanitize($_POST['visitDate'] ?? ''),
+        'purpose' => sanitize($_POST['purpose'] ?? ''),
+    ];
+    $errors = validate_required($data, ['visitorName', 'visitDate']);
+
+    if (empty($errors) && $studentId) {
+        $result = (new VisitorService())->request($data);
+        flash($result['success'] ? 'success' : 'error', $result['message']);
+        if ($result['success']) {
+            redirect(url('views/student/visitors/index.php'));
+        }
+    } elseif (!$studentId) {
+        flash('error', 'Student profile not found.');
+        redirect(url('views/student/visitors/index.php'));
+    }
+
+    $_SESSION['_errors'] = $errors;
+    $_SESSION['_old'] = $data;
+    redirect(url('views/visitors/request.php'));
+}
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/student/dashboard/index.php')],
@@ -49,7 +79,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Visit Date</label>
-                        <input type="date" name="visitDate" class="form-control" value="<?= e($old['visitDate'] ?? '') ?>">
+                        <input type="date" name="visitDate" class="form-control" value="<?= e($old['visitDate'] ?? '') ?>" required>
                     </div>
                     <div class="col-md-12">
                         <label class="form-label">Purpose</label>

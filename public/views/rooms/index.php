@@ -15,10 +15,16 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
+use App\Services\HouseService;
 use App\Services\RoomService;
 
 $pageTitle = 'Rooms';
 $rooms = RoomService::all();
+$houses = HouseService::all();
+$houseMap = [];
+foreach ($houses as $house) {
+    $houseMap[(string) ($house['id'] ?? '')] = (string) ($house['name'] ?? $house['id'] ?? '');
+}
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-door-closed', 'label' => 'Rooms', 'href' => url('views/rooms/index.php'), 'active' => true],
@@ -55,7 +61,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 <?php foreach ($rooms as $room): ?>
                     <tr>
                         <td><?= e($room['roomNumber'] ?? '') ?></td>
-                        <td><?= e($room['houseId'] ?? '-') ?></td>
+                        <td><?= e($houseMap[(string) ($room['houseId'] ?? '')] ?? ($room['houseId'] ?? '-')) ?></td>
                         <td><?= e((string) ($room['capacity'] ?? 0)) ?></td>
                         <td><?= e((string) ($room['occupied'] ?? 0)) ?></td>
                         <td><span class="badge bg-<?= ($room['status'] ?? 'available') === 'available' ? 'success' : 'secondary' ?>"><?= e($room['status'] ?? 'available') ?></span></td>

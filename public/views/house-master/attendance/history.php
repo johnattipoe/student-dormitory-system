@@ -17,6 +17,7 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 
 use App\Services\AttendanceService;
 use App\Services\StudentService;
+use App\Services\UserService;
 
 $houseId = current_user()['houseId'] ?? null;
 $students = StudentService::all($houseId);
@@ -25,6 +26,20 @@ foreach ($students as $student) {
     $studentMap[(string) ($student['id'] ?? '')] = $student;
 }
 $attendanceHistory = AttendanceService::byHouse($houseId);
+$markedByNames = [];
+foreach ((new UserService())->all() as $user) {
+    $userName = trim((string) ($user['name'] ?? ''));
+    if ($userName === '') {
+        $userName = trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''));
+    }
+    if ($userName !== '') {
+        foreach ([$user['id'] ?? null, $user['uid'] ?? null] as $userId) {
+            if ($userId !== null && (string) $userId !== '') {
+                $markedByNames[(string) $userId] = $userName;
+            }
+        }
+    }
+}
 $attendanceStudent = sanitize($_GET['studentId'] ?? '');
 $attendanceStatus = sanitize($_GET['status'] ?? '');
 $attendanceDate = sanitize($_GET['date'] ?? '');
@@ -74,7 +89,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <td><?= e($entry['date'] ?? '') ?></td>
                                 <td><?= e(trim((($entryStudent['firstName'] ?? '') . ' ' . ($entryStudent['lastName'] ?? '')))) ?: e($entry['studentId'] ?? '—') ?></td>
                                 <td><?= e($entry['status'] ?? 'unknown') ?></td>
-                                <td><?= e($entry['markedByName'] ?? ($entry['markedBy'] ?? '—')) ?></td>
+                                <td><?= e($entry['markedByName'] ?? ($markedByNames[(string) ($entry['markedBy'] ?? '')] ?? ($entry['markedBy'] ?? '—'))) ?></td>
                                 <td class="text-nowrap"><a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/attendance/view.php?id=' . urlencode((string) ($entry['id'] ?? ''))) ?>">View</a> <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/house-master/attendance/edit.php?id=' . urlencode((string) ($entry['id'] ?? ''))) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/house-master/attendance/delete.php?id=' . urlencode((string) ($entry['id'] ?? ''))) ?>">Delete</a></td>
                             </tr>
                         <?php endforeach; ?>

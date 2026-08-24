@@ -84,7 +84,9 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
     <div class="content-wrapper">
         <h5 class="mb-3">Incident Log</h5>
-        <div class="d-flex justify-content-end mb-3"><a class="btn btn-success btn-sm me-2" href="<?= url('views/house-master/reports/export.php?type=incidents') ?>"><i class="bi bi-filetype-csv"></i> CSV</a><a class="btn btn-primary btn-sm" href="<?= url('views/house-master/incidents/create.php') ?>"><i class="bi bi-plus-lg"></i> Report incident</a></div>
+        <p class="text-muted mb-3">View and manage incidents reported in your assigned house.</p>
+        <div class="d-flex justify-content-end mb-3">
+            <a class="btn btn-success btn-sm me-2" href="<?= url('views/house-master/reports/export.php?type=incidents') ?>"><i class="bi bi-filetype-csv"></i> CSV</a><a class="btn btn-primary btn-sm" href="<?= url('views/house-master/incidents/create.php') ?>"><i class="bi bi-plus-lg"></i> Report incident</a></div>
 
         <div class="row g-3 mb-3">
             <div class="col-md-3">

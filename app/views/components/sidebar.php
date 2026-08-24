@@ -15,7 +15,7 @@ $navItems = $navItems ?? [];
         <?php
         $groups = [
             'Overview' => ['Dashboard'],
-            'Management' => ['Users', 'Students', 'Houses', 'Rooms', 'Attendance', 'Visitors', 'Incidents'],
+            'Management' => ['Users', 'Students', 'Houses', 'Rooms', 'Beds', 'Attendance', 'Visitors', 'Incidents'],
             'Administration' => ['Reports', 'Notifications', 'Activity Logs', 'Settings'],
         ];
 
@@ -35,6 +35,22 @@ $navItems = $navItems ?? [];
                 }
             }
             $groupedNavItems[$section][] = $item;
+        }
+
+        $role = current_role();
+        $bedRoutes = [
+            ROLE_ADMIN => 'views/admin/beds/index.php',
+            ROLE_HOUSE_MASTER => 'views/house-master/beds/index.php',
+            ROLE_HOUSE_MISTRESS => 'views/house-master/beds/index.php',
+            ROLE_HOUSEPARENT => 'views/houseparent/beds/index.php',
+            ROLE_STUDENT => 'views/student/beds/index.php',
+        ];
+        if (isset($bedRoutes[$role]) && !array_filter($navItems, static fn ($item) => ($item['label'] ?? '') === 'Beds')) {
+            $groupedNavItems['Management'][] = [
+                'icon' => 'bi-grid-3x3-gap',
+                'label' => 'Beds',
+                'href' => url($bedRoutes[$role]),
+            ];
         }
         ?>
 

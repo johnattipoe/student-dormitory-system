@@ -18,6 +18,8 @@ require APP_ROOT . '/app/middleware/RoleMiddleware.php';
 use App\Services\VisitorService;
 use App\Services\FirebaseService;
 
+$eligibleVisitors = array_values(array_filter((new VisitorService())->all(), static fn(array $visitor): bool => in_array(($visitor['status'] ?? ''), ['registered', 'approved'], true)));
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $visitorId = sanitize($_POST['visitorId'] ?? '');
     if ($visitorId === '') {
@@ -51,15 +53,16 @@ require APP_ROOT . '/app/views/components/sidebar.php';
 <div class="main-content">
     <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
     <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
-    <div class="content-wrapper">
-        <div class="card stat-card p-4">
+    <div class="content-wrapper security-portal">
+        <section class="security-hero mb-4"><div class="security-hero-icon"><i class="bi bi-box-arrow-in-right"></i></div><div><span class="security-kicker">Gate movement</span><h1>Check in visitor</h1><p>Confirm an approved visitor’s arrival and start their on-premises visit.</p></div><span class="badge bg-success"><?= e((string) count($eligibleVisitors)) ?> eligible</span></section>
+        <div class="security-card">
             <h5 class="mb-3">Check In Visitor</h5>
             <form method="POST" action="<?= url('views/security/visitor-check-in/visitor-check-in.php') ?>">
                 <div class="mb-3">
                     <label class="form-label">Visitor ID</label>
-                    <input type="text" name="visitorId" class="form-control" required>
+                    <select name="visitorId" class="form-select" required><option value="">Select approved visitor</option><?php foreach ($eligibleVisitors as $visitor): ?><option value="<?= e((string) ($visitor['id'] ?? '')) ?>"><?= e($visitor['visitorName'] ?? 'Visitor') ?>, host <?= e($visitor['studentId'] ?? '—') ?></option><?php endforeach; ?></select>
                 </div>
-                <button type="submit" class="btn btn-primary">Check In</button>
+                <button type="submit" class="btn btn-success"><i class="bi bi-box-arrow-in-right me-1"></i>Confirm check-in</button>
             </form>
         </div>
     </div>

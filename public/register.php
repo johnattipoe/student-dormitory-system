@@ -34,12 +34,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $userService = new UserService();
+    $requiresApproval = !empty($appConfig['advanced']['registration_requires_approval']);
     $result = $userService->create([
         'name' => $name,
         'email' => $email,
         'password' => $password,
         'role' => $role,
         'emailVerified' => empty($appConfig['require_email_verification']) ? true : false,
+        'status' => $requiresApproval ? 'pending' : 'active',
     ]);
 
     if (!$result['success']) {
@@ -47,7 +49,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(base_url('register.php'));
     }
 
-    if (!empty($appConfig['require_email_verification'])) {
+    if ($requiresApproval) {
+        flash('success', 'Registration submitted. An administrator must approve your account before you can sign in.');
+    } elseif (!empty($appConfig['require_email_verification'])) {
         flash('success', 'Registration successful. Please check your email to verify your account.');
     } else {
         flash('success', 'Registration successful. Please sign in to continue.');

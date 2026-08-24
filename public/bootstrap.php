@@ -14,10 +14,28 @@ if (!empty($appConfig['timezone'])) {
 }
 require_once __DIR__ . '/../app/helpers/functions.php';
 
+// Keep the login and admin portal available while the rest of the system is offline.
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+$isLoginRequest = str_ends_with($requestPath, '/login.php') || str_ends_with($requestPath, '/logout.php');
+$isEntryRequest = $requestPath === '/' || str_ends_with($requestPath, '/index.php');
+$isIncidentRequest = str_contains($requestPath, '/incidents/');
+$isVisitorRequest = str_contains($requestPath, '/views/visitors/')
+    || str_contains($requestPath, '/views/student/visitors/');
+$isAdminUser = strtolower((string) ($_SESSION[AUTH_ROLE_SESSION] ?? '')) === ROLE_ADMIN;
+if (!empty($appConfig['advanced']['maintenance_mode']) && !$isLoginRequest && !$isEntryRequest && !$isIncidentRequest && !$isVisitorRequest && !$isAdminUser) {
+    http_response_code(503);
+    header('Retry-After: 3600');
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Maintenance</title></head><body><h1>System maintenance</h1><p>Please try again later.</p></body></html>';
+    exit;
+}
+
 // Page routes need the global loading spinner; JSON endpoints must stay JSON-only.
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 $acceptsJson = str_contains(strtolower($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
-if (!str_contains($requestUri, '/ajax/') && !str_contains($requestUri, '/reports/') && !$acceptsJson) {
+$isXmlHttpRequest = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
+$isSettingsExport = $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'export';
+$isStudentTemplateDownload = $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download_template']);
+if (!str_contains($requestUri, '/ajax/') && !str_contains($requestUri, '/reports/') && !$acceptsJson && !$isXmlHttpRequest && !$isSettingsExport && !$isStudentTemplateDownload) {
     if (ob_get_level() === 0) {
         ob_start();
     }

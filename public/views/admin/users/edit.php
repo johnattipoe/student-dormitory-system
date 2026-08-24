@@ -18,7 +18,7 @@ use App\Services\HouseService;
 use App\Services\UserService;
 
 $pageTitle = 'Edit User';
-$id = $_GET['id'] ?? null;
+$id = sanitize($_GET['id'] ?? '');
 $userService = new UserService();
 $houses = HouseService::all();
 $roleOptions = ['admin','house_master','house_mistress','houseparent','security','nurse','student'];
@@ -76,7 +76,7 @@ unset($_SESSION['_errors']);
 $old = $_SESSION['_old'] ?? [];
 unset($_SESSION['_old']);
 
-$user = $id ? $userService->find($id) : null;
+$selectedUser = $id !== '' ? $userService->find($id) : null;
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-people', 'label' => 'Users', 'href' => url('views/admin/users/index.php')],
@@ -90,26 +90,26 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     <div class="content-wrapper">
         <div class="card stat-card p-4" style="max-width:720px;">
             <h5 class="mb-3">Edit User</h5>
-            <?php if (!$user): ?>
+            <?php if (!$selectedUser): ?>
                 <div class="alert alert-warning">User not found.</div>
             <?php else: ?>
                 <form method="POST" action="<?= url('views/admin/users/edit.php?id=' . urlencode($id)) ?>">
-                    <input type="hidden" name="id" value="<?= e($user['id'] ?? $user['uid'] ?? '') ?>">
+                    <input type="hidden" name="id" value="<?= e($selectedUser['id'] ?? $selectedUser['uid'] ?? '') ?>">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Name</label>
-                            <input name="name" class="form-control" value="<?= e($old['name'] ?? $user['name'] ?? '') ?>" required>
+                            <input name="name" class="form-control" value="<?= e($old['name'] ?? $selectedUser['name'] ?? '') ?>" required>
                             <?php if (!empty($errors['name'])): ?><div class="text-danger small"><?= e($errors['name']) ?></div><?php endif; ?>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Email</label>
-                            <input type="email" class="form-control" value="<?= e($user['email'] ?? '') ?>" disabled>
+                            <input type="email" class="form-control" value="<?= e($selectedUser['email'] ?? '') ?>" disabled>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Role</label>
                             <select name="role" class="form-select" id="user-role-select">
                                 <?php foreach ($roleOptions as $role): ?>
-                                    <option value="<?= e($role) ?>" <?= (($old['role'] ?? $user['role'] ?? '') === $role) ? 'selected' : '' ?>><?= ucfirst(str_replace('_', ' ', $role)) ?></option>
+                                    <option value="<?= e($role) ?>" <?= (($old['role'] ?? $selectedUser['role'] ?? '') === $role) ? 'selected' : '' ?>><?= ucfirst(str_replace('_', ' ', $role)) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <?php if (!empty($errors['role'])): ?><div class="text-danger small"><?= e($errors['role']) ?></div><?php endif; ?>
@@ -118,7 +118,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                             <label class="form-label">Status</label>
                             <select name="status" class="form-select">
                                 <?php foreach (['active','inactive'] as $status): ?>
-                                    <option value="<?= e($status) ?>" <?= (($old['status'] ?? $user['status'] ?? 'active') === $status) ? 'selected' : '' ?>><?= ucfirst($status) ?></option>
+                                    <option value="<?= e($status) ?>" <?= (($old['status'] ?? $selectedUser['status'] ?? 'active') === $status) ? 'selected' : '' ?>><?= ucfirst($status) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -128,7 +128,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                             <select name="houseId" class="form-select">
                                 <option value="">Select house</option>
                                 <?php foreach ($houses as $house): ?>
-                                    <option value="<?= e((string) ($house['id'] ?? '')) ?>" <?= (($old['houseId'] ?? $user['houseId'] ?? '') === ($house['id'] ?? '')) ? 'selected' : '' ?>><?= e($house['name'] ?? 'House') ?></option>
+                                    <option value="<?= e((string) ($house['id'] ?? '')) ?>" <?= (($old['houseId'] ?? $selectedUser['houseId'] ?? '') === ($house['id'] ?? '')) ? 'selected' : '' ?>><?= e($house['name'] ?? 'House') ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <div class="form-text">Only House Master and House Mistress roles can be assigned to a house. Senior Houseparent is excluded.</div>
