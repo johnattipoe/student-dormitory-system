@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     make \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j1 gd zip \
-    && CFLAGS="-Os -g0 -fno-inline" CXXFLAGS="-Os -g0 -fno-inline" MAKEFLAGS="-j1" pecl install grpc-1.51.1 \
+    && CFLAGS="-O0 -g0" CXXFLAGS="-O0 -g0" MAKEFLAGS="-j1" pecl install grpc-1.57.0 \
     && docker-php-ext-enable grpc \
     && rm -rf /var/lib/apt/lists/*
 
