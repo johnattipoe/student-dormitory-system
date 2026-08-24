@@ -10,8 +10,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libjpeg62-turbo-dev \
     libpng-dev \
     zlib1g-dev \
+    libssl-dev \
+    pkg-config \
+    autoconf \
+    g++ \
+    make \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j1 gd zip \
+    && CFLAGS="-O0 -g0" CXXFLAGS="-O0 -g0" MAKEFLAGS="-j1" pecl install grpc-1.62.2 \
+    && docker-php-ext-enable grpc \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
