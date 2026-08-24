@@ -3,6 +3,9 @@ RewriteEngine On
 # Block direct access to sensitive folders if they ever end up under public/
 RewriteRule ^(credentials|storage|vendor)/ - [F,L]
 
+# Keep the short dashboard URL compatible with the generic dashboard router.
+RewriteRule ^dashboard\.php$ index.php?route=/views/dashboard/dashboard.php [QSA,L]
+
 # Pretty-route everything that isn't a real file/dir through index.php
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
