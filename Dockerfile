@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     make \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" gd zip \
-    && MAKEFLAGS="-j$(nproc)" pecl install grpc \
+    && docker-php-ext-install -j1 gd zip \
+    && MAKEFLAGS="-j1" pecl install grpc \
     && docker-php-ext-enable grpc \
     && rm -rf /var/lib/apt/lists/*
 
