@@ -53,6 +53,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <div><h5 class="mb-1">Room Allocation</h5><p class="text-muted mb-0">Manage room capacity and student occupancy.</p></div>
             <a href="<?= url('views/house-master/reports/export.php?type=rooms') ?>" class="btn btn-success btn-sm"><i class="bi bi-filetype-csv"></i> CSV</a>
+            <a href="<?= url('views/house-master/beds/index.php') ?>" class="btn btn-info btn-sm"><i class="bi bi-grid-3x3-gap"></i> Allocation</a>
             <a href="<?= url('views/house-master/rooms/create.php') ?>" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add room</a>
         </div>
         <div class="row g-3 mb-3">
