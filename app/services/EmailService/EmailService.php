@@ -56,75 +56,93 @@ class EmailService
             ];
         }
 
-        try {
-            $mailer = new PHPMailer(true);
-            $mailer->isSMTP();
-            $mailer->Host = $config['host'];
-            $mailer->Port = (int) ($config['port'] ?? 587);
-            $mailer->SMTPAuth = !empty($config['username']);
-            $mailer->Username = trim((string) ($config['username'] ?? ''));
-            $password = (string) ($config['password'] ?? '');
-            if ($config['host'] === 'smtp.gmail.com') {
-                $trimmedPassword = str_replace(' ', '', $password);
-                if (strlen($trimmedPassword) === 16) {
-                    $password = $trimmedPassword;
-                }
+        $attempts = [
+            [
+                'host' => $config['host'],
+                'port' => (int) ($config['port'] ?? 587),
+                'encryption' => strtolower((string) ($config['encryption'] ?? 'tls')),
+            ],
+        ];
+
+        // If configured on 587, add 465 as auto-fallback (and vice-versa) for Gmail / standard SMTP
+        if (($config['host'] ?? '') === 'smtp.gmail.com') {
+            if ((int)($config['port'] ?? 587) === 587) {
+                $attempts[] = ['host' => 'smtp.gmail.com', 'port' => 465, 'encryption' => 'ssl'];
+            } elseif ((int)($config['port'] ?? 465) === 465) {
+                $attempts[] = ['host' => 'smtp.gmail.com', 'port' => 587, 'encryption' => 'tls'];
             }
-            $mailer->Password = $password;
-
-            $encryption = strtolower((string) ($config['encryption'] ?? 'tls'));
-            if ($encryption === 'ssl' || $mailer->Port === 465) {
-                $mailer->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-            } elseif ($encryption === 'tls' || $mailer->Port === 587) {
-                $mailer->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            }
-
-            // SMTP Options for local / self-signed certificate resilience
-            $mailer->SMTPOptions = [
-                'ssl' => [
-                    'verify_peer' => false,
-                    'verify_peer_name' => false,
-                    'allow_self_signed' => true,
-                ],
-            ];
-
-            $mailer->CharSet = 'UTF-8';
-            $mailer->setFrom($config['from_address'], $config['from_name'] ?? 'Student Dormitory System');
-            $mailer->addAddress(trim($recipient));
-            $mailer->isHTML(true);
-            $mailer->Subject = $subject;
-
-            // Wrap in styled HTML email template if not already wrapped
-            if (!str_contains($htmlBody, '<html') && !str_contains($htmlBody, '<body')) {
-                $styledHtml = $this->buildEmailTemplate($subject, $htmlBody, $config['from_name'] ?? 'Student Dormitory System');
-            } else {
-                $styledHtml = $htmlBody;
-            }
-
-            $mailer->Body = $styledHtml;
-            $mailer->AltBody = $textBody ?? trim(strip_tags($htmlBody));
-            $mailer->send();
-
-            return [
-                'success' => true,
-                'message' => 'Email sent successfully via PHPMailer.',
-            ];
-        } catch (Exception $e) {
-            $errorMessage = $mailer->ErrorInfo ?: $e->getMessage();
-            error_log('PHPMailer delivery failed: ' . $errorMessage);
-
-            return [
-                'success' => false,
-                'message' => 'Email delivery failed: ' . $errorMessage,
-            ];
-        } catch (\Throwable $e) {
-            error_log('Email general error: ' . $e->getMessage());
-
-            return [
-                'success' => false,
-                'message' => 'Unable to send email: ' . $e->getMessage(),
-            ];
         }
+
+        $lastError = '';
+
+        foreach ($attempts as $attempt) {
+            try {
+                $mailer = new PHPMailer(true);
+                $mailer->isSMTP();
+                $mailer->Host = $attempt['host'];
+                $mailer->Port = $attempt['port'];
+                $mailer->Timeout = 8;
+                $mailer->SMTPAuth = !empty($config['username']);
+                $mailer->Username = trim((string) ($config['username'] ?? ''));
+                $password = (string) ($config['password'] ?? '');
+                if ($attempt['host'] === 'smtp.gmail.com') {
+                    $trimmedPassword = str_replace(' ', '', $password);
+                    if (strlen($trimmedPassword) === 16) {
+                        $password = $trimmedPassword;
+                    }
+                }
+                $mailer->Password = $password;
+
+                $encryption = $attempt['encryption'];
+                if ($encryption === 'ssl' || $attempt['port'] === 465) {
+                    $mailer->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                } elseif ($encryption === 'tls' || $attempt['port'] === 587) {
+                    $mailer->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                }
+
+                // SMTP Options for local / self-signed certificate resilience
+                $mailer->SMTPOptions = [
+                    'ssl' => [
+                        'verify_peer' => false,
+                        'verify_peer_name' => false,
+                        'allow_self_signed' => true,
+                    ],
+                ];
+
+                $mailer->CharSet = 'UTF-8';
+                $mailer->setFrom($config['from_address'], $config['from_name'] ?? 'Student Dormitory System');
+                $mailer->addAddress(trim($recipient));
+                $mailer->isHTML(true);
+                $mailer->Subject = $subject;
+
+                // Wrap in styled HTML email template if not already wrapped
+                if (!str_contains($htmlBody, '<html') && !str_contains($htmlBody, '<body')) {
+                    $styledHtml = $this->buildEmailTemplate($subject, $htmlBody, $config['from_name'] ?? 'Student Dormitory System');
+                } else {
+                    $styledHtml = $htmlBody;
+                }
+
+                $mailer->Body = $styledHtml;
+                $mailer->AltBody = $textBody ?? trim(strip_tags($htmlBody));
+                $mailer->send();
+
+                return [
+                    'success' => true,
+                    'message' => 'Email sent successfully via PHPMailer.',
+                ];
+            } catch (Exception $e) {
+                $lastError = $mailer->ErrorInfo ?: $e->getMessage();
+                error_log('PHPMailer attempt on port ' . $attempt['port'] . ' failed: ' . $lastError);
+            } catch (\Throwable $e) {
+                $lastError = $e->getMessage();
+                error_log('Email attempt error: ' . $lastError);
+            }
+        }
+
+        return [
+            'success' => false,
+            'message' => 'Email delivery failed: ' . $lastError . '. (Check internet connection, or try port 465 SSL in .env)',
+        ];
     }
 
     private function buildEmailTemplate(string $title, string $content, string $appName): string
