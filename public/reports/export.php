@@ -7,15 +7,15 @@ $type = strtolower(trim((string) ($_GET['type'] ?? 'dashboard')));
 $format = strtolower(trim((string) ($_GET['format'] ?? 'pdf')));
 
 $allowedReports = [
-    'dashboard' => [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSEPARENT],
-    'attendance' => [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSEPARENT],
-    'occupancy' => [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSEPARENT],
+    'dashboard' => [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_SENIOR_HOUSEPARENT],
+    'attendance' => [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_SENIOR_HOUSEPARENT],
+    'occupancy' => [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_SENIOR_HOUSEPARENT],
     'students' => [ROLE_ADMIN, ROLE_HOUSE_MASTER],
-    'visitors' => [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSEPARENT, ROLE_SECURITY],
-    'incidents' => [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSEPARENT, ROLE_SECURITY, ROLE_NURSE],
+    'visitors' => [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_SENIOR_HOUSEPARENT, ROLE_SECURITY],
+    'incidents' => [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_SENIOR_HOUSEPARENT, ROLE_SECURITY, ROLE_NURSE],
     'medical' => [ROLE_ADMIN, ROLE_NURSE],
     'house_master' => [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS],
-    'houseparent' => [ROLE_HOUSEPARENT],
+    'senior-houseparent' => [ROLE_SENIOR_HOUSEPARENT],
     'student_attendance' => [ROLE_STUDENT],
 ];
 
@@ -25,7 +25,7 @@ if (!isset($allowedReports[$type])) {
 }
 
 $allowedRoles = $allowedReports[$type];
-require APP_ROOT . '/app/middleware/RoleMiddleware.php';
+require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 if (!in_array($format, ['pdf', 'csv', 'xls'], true)) {
     http_response_code(400);
@@ -35,7 +35,7 @@ if (!in_array($format, ['pdf', 'csv', 'xls'], true)) {
 $service = new ReportService();
 $data = match ($type) {
     'house_master' => house_master_report_data(),
-    'houseparent' => houseparent_report_data(),
+    'senior-houseparent' => senior_houseparent_report_data(),
     'student_attendance' => student_attendance_report_data(),
     default => $service->{$type === 'dashboard' ? 'dashboard' : $type}(),
 };
@@ -156,7 +156,7 @@ function house_master_report_data(): array
     ];
 }
 
-function houseparent_report_data(): array
+function senior_houseparent_report_data(): array
 {
     $date = sanitize($_GET['date'] ?? date('Y-m-d'));
     $summary = App\Services\AttendanceService::summary($date);

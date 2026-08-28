@@ -1,18 +1,24 @@
 <?php
 require_once __DIR__ . '/../vendor/autoload.php';
-$dotenv = \Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-$dotenv->safeLoad();
+$rootPath = dirname(__DIR__);
+if (file_exists($rootPath . '/.env')) {
+    $dotenv = \Dotenv\Dotenv::createImmutable($rootPath);
+    $dotenv->safeLoad();
+} elseif (file_exists($rootPath . '/.env.example')) {
+    $dotenv = \Dotenv\Dotenv::createImmutable($rootPath, '.env.example');
+    $dotenv->safeLoad();
+}
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_once __DIR__ . '/../app/config/constants.php';
-$appConfig = require __DIR__ . '/../app/config/app.php';
+require_once __DIR__ . '/../app/config/constants/constants.php';
+$appConfig = require __DIR__ . '/../app/config/app/app.php';
 if (!empty($appConfig['timezone'])) {
     date_default_timezone_set((string) $appConfig['timezone']);
 }
-require_once __DIR__ . '/../app/helpers/functions.php';
+require_once __DIR__ . '/../app/helpers/functions/functions.php';
 
 // Keep the login and admin portal available while the rest of the system is offline.
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
@@ -39,7 +45,7 @@ if (!str_contains($requestUri, '/ajax/') && !str_contains($requestUri, '/reports
     if (ob_get_level() === 0) {
         ob_start();
     }
-    include __DIR__ . '/../app/views/components/loading.php';
+    include __DIR__ . '/../app/views/components/loading/loading.php';
 }
 
 // Define public root for use in views and nested includes
@@ -54,20 +60,20 @@ spl_autoload_register(function ($class) {
         return false;
     }
     
-    // Map App\Services\ClassName -> app/services/ClassName.php
+    // Map App\Services\ClassName -> app/services/ClassName/ClassName.php
     if (str_starts_with($class, 'App\\Services\\')) {
         $className = str_replace('App\\Services\\', '', $class);
-        $path = __DIR__ . '/../app/services/' . $className . '.php';
+        $path = __DIR__ . '/../app/services/' . $className . '/' . $className . '.php';
         if (file_exists($path)) {
             require_once $path;
             return true;
         }
     }
     
-    // Map App\Models\ClassName -> app/models/ClassName.php
+    // Map App\Models\ClassName -> app/models/ClassName/ClassName.php
     if (str_starts_with($class, 'App\\Models\\')) {
         $className = str_replace('App\\Models\\', '', $class);
-        $path = __DIR__ . '/../app/models/' . $className . '.php';
+        $path = __DIR__ . '/../app/models/' . $className . '/' . $className . '.php';
         if (file_exists($path)) {
             require_once $path;
             return true;
@@ -77,7 +83,7 @@ spl_autoload_register(function ($class) {
     // Map App\Controllers\ClassName -> app/controllers/ClassName.php
     if (str_starts_with($class, 'App\\Controllers\\')) {
         $className = str_replace('App\\Controllers\\', '', $class);
-        $path = __DIR__ . '/../app/controllers/' . $className . '.php';
+        $path = __DIR__ . '/../app/controllers/' . $className . '/' . $className . '.php';
         if (file_exists($path)) {
             require_once $path;
             return true;
@@ -87,7 +93,17 @@ spl_autoload_register(function ($class) {
     // Map App\Middleware\ClassName -> app/middleware/ClassName.php
     if (str_starts_with($class, 'App\\Middleware\\')) {
         $className = str_replace('App\\Middleware\\', '', $class);
-        $path = __DIR__ . '/../app/middleware/' . $className . '.php';
+        $path = __DIR__ . '/../app/middleware/' . $className . '/' . $className . '.php';
+        if (file_exists($path)) {
+            require_once $path;
+            return true;
+        }
+    }
+
+    // Map App\Migrations\ClassName -> app/migrations/ClassName/ClassName.php
+    if (str_starts_with($class, 'App\\Migrations\\')) {
+        $className = str_replace('App\\Migrations\\', '', $class);
+        $path = __DIR__ . '/../app/migrations/' . $className . '/' . $className . '.php';
         if (file_exists($path)) {
             require_once $path;
             return true;

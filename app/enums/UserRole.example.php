@@ -14,7 +14,7 @@ enum UserRole: string
     case STUDENT = 'student';
     case SECURITY = 'security';
     case NURSE = 'nurse';
-    case HOUSEPARENT = 'houseparent';
+    case SENIOR_HOUSEPARENT = 'senior-houseparent';
     case HOUSEMASTER = 'housemaster';
     
     /**
@@ -27,7 +27,7 @@ enum UserRole: string
             self::STUDENT => 'Student',
             self::SECURITY => 'Security Officer',
             self::NURSE => 'Nurse',
-            self::HOUSEPARENT => 'House Parent',
+            self::SENIOR_HOUSEPARENT => 'Senior Houseparent',
             self::HOUSEMASTER => 'House Master',
         };
     }

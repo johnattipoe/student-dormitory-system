@@ -5,5 +5,5 @@ if (!defined('APP_ROOT')) {
 
 // Generic dashboard router: bounces the user to their role-specific dashboard.
 $role = \App\Services\AuthService::role();
-$target = ROLE_DASHBOARD[$role] ?? '/views/auth/login.php';
+$target = ROLE_DASHBOARD[$role] ?? '/views/auth/login/login.php';
 redirect(base_url('index.php?route=' . urlencode($target)));

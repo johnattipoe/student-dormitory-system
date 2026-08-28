@@ -8,7 +8,7 @@ This document outlines the expanded, production-ready folder structure following
 ## Core Application Structure (`/app`)
 
 ### Controllers (`/app/controllers`)
-- Role-based controllers: AdminController, SecurityController, StudentController, etc.
+- One subfolder per controller: `AdminController/AdminController.php`, `SecurityController/SecurityController.php`, `StudentController/StudentController.php`, etc.
 - Handle HTTP requests and coordinate with services/models
 - Keep logic thin; delegate to services
 
@@ -16,12 +16,14 @@ This document outlines the expanded, production-ready folder structure following
 - Firestore document models: Student, User, Room, Attendance, etc.
 - Contain document structure and relationships
 - Provide basic query methods
+- One subfolder per model: `Student/Student.php`, `Room/Room.php`, etc.
 
 ### Services (`/app/services`)
 - Business logic: NotificationService, AttendanceService, AuthService, etc.
 - Orchestrate models and external integrations (Firebase, email)
 - Handle complex operations
 - Examples: PreferenceService, ReportService, AuditService
+- One subfolder per service: `AuthService/AuthService.php`, `StudentService/StudentService.php`, etc.
 
 ### Repositories (`/app/repositories`) - **NEW**
 - Data access abstraction layer
@@ -30,7 +32,7 @@ This document outlines the expanded, production-ready folder structure following
 - Usage: `$students = $studentRepo->findActive()`
 
 ### Middleware (`/app/middleware`)
-- Route-level authorization and request processing
+- One subfolder per middleware: `AuthMiddleware/AuthMiddleware.php`, `RoleMiddleware/RoleMiddleware.php`, etc.
 - Examples: AuthMiddleware, RoleMiddleware, AdminMiddleware
 - Verify permissions before controller execution
 
@@ -38,6 +40,7 @@ This document outlines the expanded, production-ready folder structure following
 - Utility functions: auth, session, validation, response, functions
 - No classes; pure procedural helpers
 - Keep reusable logic here
+- One subfolder per helper: `auth/auth.php`, `functions/functions.php`, etc.
 
 ### Traits (`/app/traits`) - **NEW**
 - Shared behavior across classes
@@ -81,13 +84,14 @@ This document outlines the expanded, production-ready folder structure following
 - Enable notifications, logging, audits
 
 ### Config (`/app/config`)
-- Application configuration: app.php, constants.php
-- Firebase settings: firebase.php, firebase-auth.php
-- Permissions and feature flags
+- Application configuration: `app/app.php`, `constants/constants.php`
+- Firebase settings: `firebase/firebase.php`, `firebase-auth/firebase-auth.php`
+- Email settings: `mail/mail.php`
+- Permissions and feature flags: `permissions/permissions.php`
 
-### Migrations (`/app/database/migrations`) - **NEW**
+### Migrations (`/app/migrations`)
 - Firestore collection initialization and setup
-- Examples: CreateNotificationPreferencesCollection, CreateMedicalRecordAuditsCollection
+- One subfolder per migration: `CreateNotificationPreferencesCollection/CreateNotificationPreferencesCollection.php`, etc.
 - Executable via `php Runner.php up`
 
 ### Seeders (`/app/database/seeders`) - **NEW**
@@ -110,11 +114,12 @@ This document outlines the expanded, production-ready folder structure following
 ### Views (`/public/views`)
 - Role-based subdirectories: admin/, student/, nurse/, security/
 - Blade-like or plain PHP templates
-- Include global components: loading.php, alerts.php, pagination.php, modal.php
+- Global components are organized as one subfolder per file: `components/header/header.php`, `components/footer/footer.php`, etc.
+- Admin views use one subfolder per PHP file, for example `admin/attendance/index/index.php` and `admin/rooms/allocation/allocation.php`.
 
 ### Assets (`/public/assets`)
-- **css/** - Bootstrap + custom styles
-- **js/** - app.js (global), role-specific scripts (admin.js, student.js, etc.)
+- **css/** - Bootstrap + custom styles, with one subfolder per stylesheet (`css/style/style.css`, etc.)
+- **js/** - Global and role-specific scripts, with one subfolder per script (`js/app/app.js`, etc.)
 - **images/** - Icons, logos, etc.
 - **uploads/** - User-uploaded files
 
@@ -126,6 +131,7 @@ This document outlines the expanded, production-ready folder structure following
 
 ### AJAX (`/public/ajax`)
 - Endpoint scripts for dynamic updates
+- One subfolder per endpoint (`attendance/mark_attendance/mark_attendance.php`, etc.)
 - Leverage existing architecture
 
 ---
