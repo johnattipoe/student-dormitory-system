@@ -14,7 +14,7 @@ if (!defined('APP_ROOT')) {
 }
 
 $allowedRoles = [ROLE_STUDENT];
-require APP_ROOT . '/app/middleware/RoleMiddleware.php';
+require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\BedService;
 use App\Services\HouseService;
@@ -104,22 +104,22 @@ $pageTitle = 'My Bed';
 $pageStyles = ['student.css'];
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/student/dashboard/index.php')],
-    ['icon' => 'bi-calendar-check', 'label' => 'Attendance', 'href' => url('views/student/attendance/index.php')],
-    ['icon' => 'bi-people', 'label' => 'Visitors', 'href' => url('views/student/visitors/index.php')],
-    ['icon' => 'bi-flag', 'label' => 'Incidents', 'href' => url('views/student/incidents/index.php')],
-    ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/student/notifications/index.php')],
-    ['icon' => 'bi-person-circle', 'label' => 'Profile', 'href' => url('views/student/profile/index.php')],
+    ['icon' => 'bi-calendar-check', 'label' => 'Attendance', 'href' => url('views/student/attendance/index/index.php')],
+    ['icon' => 'bi-people', 'label' => 'Visitors', 'href' => url('views/student/visitors/index/index.php')],
+    ['icon' => 'bi-flag', 'label' => 'Incidents', 'href' => url('views/student/incidents/index/index.php')],
+    ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/student/notifications/index/index.php')],
+    ['icon' => 'bi-person-circle', 'label' => 'Profile', 'href' => url('views/student/profile/index/index.php')],
     ['icon' => 'bi-house-door', 'label' => 'Room', 'href' => url('views/student/room/index.php')],
     ['icon' => 'bi-grid-3x3-gap', 'label' => 'Beds', 'href' => url('views/student/beds/index.php'), 'active' => true],
-    ['icon' => 'bi-gear', 'label' => 'Settings', 'href' => url('views/student/settings/index.php')],
+    ['icon' => 'bi-gear', 'label' => 'Settings', 'href' => url('views/student/settings/index/index.php')],
 ];
 
-require APP_ROOT . '/app/views/components/header.php';
-require APP_ROOT . '/app/views/components/sidebar.php';
+require APP_ROOT . '/app/views/components/header/header.php';
+require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 ?>
 <div class="main-content">
-    <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
-    <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
     <div class="content-wrapper">
         <section class="student-bed-hero mb-4">
             <div class="student-bed-hero-icon"><i class="bi bi-grid-3x3-gap"></i></div>
@@ -130,7 +130,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             </div>
             <div class="student-bed-hero-actions">
                 <a href="<?= url('views/student/room/index.php') ?>" class="btn btn-light"><i class="bi bi-house-door me-1"></i>Room details</a>
-                <a href="<?= url('views/student/profile/index.php') ?>" class="btn btn-primary"><i class="bi bi-person-circle me-1"></i>Profile</a>
+                <a href="<?= url('views/student/profile/index/index.php') ?>" class="btn btn-primary"><i class="bi bi-person-circle me-1"></i>Profile</a>
             </div>
         </section>
 
@@ -142,10 +142,10 @@ require APP_ROOT . '/app/views/components/sidebar.php';
             <div class="student-bed-empty">
                 <div class="student-bed-empty-icon"><i class="bi bi-bed"></i></div>
                 <h2>No bed assigned yet</h2>
-                <p>Your house parent or administrator has not assigned a bed to your account yet. You can still review your room page or contact support.</p>
+                <p>Your Senior Houseparent or administrator has not assigned a bed to your account yet. You can still review your room page or contact support.</p>
                 <div class="d-flex flex-wrap gap-2 justify-content-center">
                     <a href="<?= url('views/student/room/index.php') ?>" class="btn btn-outline-primary"><i class="bi bi-house-door me-1"></i>Check room information</a>
-                    <a href="<?= url('views/student/settings/index.php') ?>" class="btn btn-outline-secondary"><i class="bi bi-gear me-1"></i>Open settings</a>
+                    <a href="<?= url('views/student/settings/index/index.php') ?>" class="btn btn-outline-secondary"><i class="bi bi-gear me-1"></i>Open settings</a>
                 </div>
             </div>
         <?php else: ?>
@@ -227,14 +227,14 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                             <div><i class="bi bi-check-circle-fill text-success"></i><span>Student profile linked</span></div>
                             <div><i class="bi bi-check-circle-fill text-success"></i><span>Room assignment found</span></div>
                             <div><i class="bi bi-check-circle-fill text-success"></i><span>Bed assignment active</span></div>
-                            <div><i class="bi bi-info-circle-fill text-info"></i><span>Report any room issue to your house parent</span></div>
+                            <div><i class="bi bi-info-circle-fill text-info"></i><span>Report any room issue to your Senior Houseparent</span></div>
                         </div>
                         <hr>
                         <h3>Quick actions</h3>
                         <div class="d-grid gap-2">
                             <a href="<?= url('views/student/room/index.php') ?>" class="btn btn-outline-primary"><i class="bi bi-house-door me-1"></i>View room page</a>
-                            <a href="<?= url('views/student/incidents/create.php') ?>" class="btn btn-outline-danger"><i class="bi bi-flag me-1"></i>Report issue</a>
-                            <a href="<?= url('views/student/visitors/index.php') ?>" class="btn btn-outline-info"><i class="bi bi-people me-1"></i>Visitor requests</a>
+                            <a href="<?= url('views/student/incidents/create/create.php') ?>" class="btn btn-outline-danger"><i class="bi bi-flag me-1"></i>Report issue</a>
+                            <a href="<?= url('views/student/visitors/index/index.php') ?>" class="btn btn-outline-info"><i class="bi bi-people me-1"></i>Visitor requests</a>
                         </div>
                     </aside>
                 </div>
@@ -242,4 +242,4 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         <?php endif; ?>
     </div>
 </div>
-<?php require APP_ROOT . '/app/views/components/footer.php'; ?>
+<?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

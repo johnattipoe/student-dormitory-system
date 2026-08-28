@@ -13,7 +13,7 @@ if (!defined('APP_ROOT')) {
 }
 
 $allowedRoles = [ROLE_NURSE];
-require APP_ROOT . '/app/middleware/RoleMiddleware.php';
+require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\MedicalService;
 
@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'treatment' => sanitize($_POST['treatment'] ?? ''),
         'notes' => sanitize($_POST['notes'] ?? ''),
         'severity' => sanitize($_POST['severity'] ?? 'normal'),
+        'updatedBy' => current_user_id(),
     ]);
 
     flash($result['success'] ? 'success' : 'error', $result['message']);
@@ -47,12 +48,12 @@ $navItems = [
     ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/nurse/notifications/notifications.php')],
 ];
 
-require APP_ROOT . '/app/views/components/header.php';
-require APP_ROOT . '/app/views/components/sidebar.php';
+require APP_ROOT . '/app/views/components/header/header.php';
+require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 ?>
 <div class="main-content nurse-portal">
-    <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
-    <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
 
     <div class="content-wrapper">
         <section class="nurse-hero mb-4">
@@ -135,4 +136,4 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         <?php endif; ?>
     </div>
 </div>
-<?php require APP_ROOT . '/app/views/components/footer.php'; ?>
+<?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

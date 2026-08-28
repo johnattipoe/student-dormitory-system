@@ -7,7 +7,7 @@ use App\Services\ActivityLogService;
 header('Content-Type: application/json');
 
 // Require house-master, houseparent, or admin role
-if (!in_array(current_role(), [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS, ROLE_HOUSEPARENT, ROLE_ADMIN])) {
+if (!in_array(current_role(), [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS, ROLE_SENIOR_HOUSEPARENT, ROLE_ADMIN])) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'error' => 'Forbidden']);
     exit;

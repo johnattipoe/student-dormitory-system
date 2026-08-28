@@ -14,12 +14,10 @@ if (!defined('APP_ROOT')) {
 }
 
 $allowedRoles = [ROLE_NURSE];
-require APP_ROOT . '/app/middleware/RoleMiddleware.php';
+require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\MedicalService;
 use App\Services\StudentService;
-use App\Services\FirebaseService;
-use App\Services\AuditService;
 
 // Handle bulk operations
 $errors = [];
@@ -34,33 +32,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if (!empty($diagnosis)) {
             try {
-                $firebaseService = FirebaseService::getInstance();
-                $auditService = new AuditService();
-                $currentUserId = current_user()['uid'];
+                $medicalService = new MedicalService();
+                $currentUserId = current_user_id();
                 
                 foreach ($studentIds as $sId) {
-                    $recordId = $firebaseService->addDocument(COL_MEDICAL_RECORDS, [
+                    $medicalService->create([
                         'studentId' => $sId,
                         'diagnosis' => $diagnosis,
+                        'treatment' => sanitize($_POST['treatment'] ?? ''),
                         'severity' => $severity,
                         'notes' => $notes,
                         'recordedBy' => $currentUserId,
                         'createdAt' => date('Y-m-d H:i:s'),
                     ]);
-                    
-                    // Log audit trail
-                    $auditService->logMedicalRecordChange(
-                        $recordId,
-                        $sId,
-                        'created',
-                        $currentUserId,
-                        ['severity' => ['from' => '', 'to' => $severity]],
-                        'Bulk record creation: ' . $diagnosis
-                    );
                 }
                 flash('success', 'Created medical records for ' . count($studentIds) . ' student(s)');
                 redirect(url('views/nurse/medical-records/bulk-management.php'));
-            } catch (Exception $e) {
+            } catch (Throwable $e) {
                 $errors[] = 'Failed: ' . $e->getMessage();
             }
         } else {
@@ -70,46 +58,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     elseif ($action === 'bulk_mark_critical' && !empty($studentIds)) {
         try {
-            $firebaseService = FirebaseService::getInstance();
-            $auditService = new AuditService();
-            $currentUserId = current_user()['uid'];
-            $records = $firebaseService->getCollection(COL_MEDICAL_RECORDS, [], 500);
+            $medicalService = new MedicalService();
+            $currentUserId = current_user_id();
+            $records = $medicalService->all();
             $updatedCount = 0;
             
             foreach ($records as $record) {
                 if (in_array($record['studentId'] ?? '', $studentIds)) {
                     $recordId = (string) ($record['id'] ?? '');
-                    $previousSeverity = $record['severity'] ?? 'normal';
-                    
-                    $firebaseService->updateDocument(COL_MEDICAL_RECORDS, $recordId, [
+                    if ($recordId === '') {
+                        continue;
+                    }
+                    $medicalService->update($recordId, [
                         'severity' => 'critical',
                         'flaggedAt' => date('Y-m-d H:i:s'),
                         'flaggedBy' => $currentUserId,
+                        'updatedBy' => $currentUserId,
                     ]);
-                    
-                    // Log audit trail
-                    $auditService->logMedicalRecordChange(
-                        $recordId,
-                        $record['studentId'] ?? '',
-                        'severity_changed',
-                        $currentUserId,
-                        ['severity' => ['from' => $previousSeverity, 'to' => 'critical']],
-                        'Bulk severity update to critical'
-                    );
-                    
                     $updatedCount++;
                 }
             }
             
             flash('success', 'Marked ' . $updatedCount . ' record(s) as critical');
             redirect(url('views/nurse/medical-records/bulk-management.php'));
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $errors[] = $e->getMessage();
         }
     }
 }
 
 $students = StudentService::all();
+$studentMap = [];
+foreach ($students as $student) {
+    $studentId = (string) ($student['id'] ?? '');
+    if ($studentId !== '') {
+        $studentMap[$studentId] = $student;
+    }
+}
 $medicalService = new MedicalService();
 $allRecords = $medicalService->all();
 
@@ -120,13 +105,17 @@ $navItems = [
     ['icon' => 'bi-plus-circle', 'label' => 'Bulk Management', 'href' => url('views/nurse/medical-records/bulk-management.php'), 'active' => true],
 ];
 
-require APP_ROOT . '/app/views/components/header.php';
-require APP_ROOT . '/app/views/components/sidebar.php';
+require APP_ROOT . '/app/views/components/header/header.php';
+require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 ?>
 <div class="main-content">
-    <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
-    <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
-    <div class="content-wrapper">
+    <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
+    <div class="content-wrapper nurse-portal">
+        <?php foreach ($errors as $error): ?>
+            <div class="alert alert-danger"><?= e($error) ?></div>
+        <?php endforeach; ?>
+
         <ul class="nav nav-tabs mb-4" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="create-tab" data-bs-toggle="tab" data-bs-target="#create-mode" type="button">
@@ -195,6 +184,10 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <textarea name="diagnosis" class="form-control" rows="2" placeholder="E.g., Mild fever, Headache..." required></textarea>
                             </div>
                             <div class="col-md-3">
+                                <label class="form-label">Treatment</label>
+                                <input type="text" name="treatment" class="form-control" placeholder="Treatment given">
+                            </div>
+                            <div class="col-md-3">
                                 <label class="form-label">Severity</label>
                                 <select name="severity" class="form-select">
                                     <option value="normal">Normal</option>
@@ -202,7 +195,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                     <option value="critical">Critical</option>
                                 </select>
                             </div>
-                            <div class="col-md-3 d-flex align-items-end">
+                            <div class="col-md-12 d-flex align-items-end">
                                 <button type="submit" class="btn btn-primary w-100" id="createBtn" disabled>
                                     <i class="bi bi-plus-circle"></i> Create Records
                                 </button>
@@ -253,7 +246,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                             <?php if (!isset($recordsByStudent[$sId])) $recordsByStudent[$sId] = $record; ?>
                                         <?php endforeach; ?>
                                         <?php foreach ($recordsByStudent as $sId => $record): ?>
-                                            <?php $student = StudentService::find($sId); ?>
+                                            <?php $student = $studentMap[(string) $sId] ?? null; ?>
                                             <tr>
                                                 <td>
                                                     <input type="checkbox" class="form-check-input student-checkbox-critical" 
@@ -390,4 +383,4 @@ require APP_ROOT . '/app/views/components/sidebar.php';
     updateCreateSelection();
     updateCriticalSelection();
 </script>
-<?php require APP_ROOT . '/app/views/components/footer.php'; ?>
+<?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

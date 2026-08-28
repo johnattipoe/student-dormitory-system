@@ -13,7 +13,7 @@ if (!defined('APP_ROOT')) {
     }
 }
 $allowedRoles = [ROLE_ADMIN];
-require APP_ROOT . '/app/middleware/RoleMiddleware.php';
+require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Middleware\RoleMiddleware;
 use App\Services\FirebaseService;

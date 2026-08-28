@@ -3,7 +3,7 @@ require __DIR__ . '/bootstrap.php';
 
 use App\Services\UserService;
 
-$appConfig = require __DIR__ . '/../app/config/app.php';
+$appConfig = require __DIR__ . '/../app/config/app/app.php';
 if (empty($appConfig['allow_self_registration'])) {
     flash('error', 'Self-registration is disabled by the administrator.');
     redirect(base_url('login.php'));
@@ -70,7 +70,7 @@ $successMessage = flash('success');
     <title>Create Account | <?= e($appConfig['name'] ?? 'Student Dormitory System') ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/login.css">
+    <link rel="stylesheet" href="/assets/css/login/login.css">
 </head>
 <body class="login-body d-flex align-items-center justify-content-center">
     <div class="login-card card shadow-lg border-0">
@@ -110,7 +110,7 @@ $successMessage = flash('success');
                     <label class="form-label">Role</label>
                     <select name="role" class="form-select" required>
                         <option value="student">Student</option>
-                        <option value="houseparent">House Parent</option>
+                        <option value="senior-houseparent">Senior Houseparent</option>
                         <option value="house_master">House Master</option>
                         <option value="house_mistress">House Mistress</option>
                         <option value="security">Security</option>
@@ -148,6 +148,6 @@ $successMessage = flash('success');
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/auth/auth.js"></script>
 </body>
 </html>

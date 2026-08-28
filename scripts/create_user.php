@@ -20,7 +20,7 @@ if (count($argv) < 2) {
 
 $name = $argv[0];
 $email = $argv[1];
-$role = $argv[2] ?? 'houseparent';
+$role = $argv[2] ?? 'senior-houseparent';
 $houseId = $argv[3] ?? null;
 $password = $argv[4] ?? 'Password@123';
 

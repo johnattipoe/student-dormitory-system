@@ -1,8 +1,20 @@
 <?php
-require_once dirname(__DIR__, 3) . '/bootstrap.php';
+// Ensure bootstrap is loaded (safe at any view nesting depth)
+if (!defined('APP_ROOT')) {
+    $dir = __DIR__;
+    for ($i = 0; $i < 10; $i++) {
+        if (file_exists($dir . '/bootstrap.php')) {
+            require $dir . '/bootstrap.php';
+            break;
+        }
+        $parent = dirname($dir);
+        if ($parent === $dir) break;
+        $dir = $parent;
+    }
+}
 
 $allowedRoles = [ROLE_NURSE];
-require APP_ROOT . '/app/middleware/RoleMiddleware.php';
+require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\MedicalService;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -70,12 +82,12 @@ $navItems = [
     ['icon' => 'bi-upload', 'label' => 'Import Records', 'href' => url('views/nurse/medical-records/bulk-import.php')],
 ];
 
-require APP_ROOT . '/app/views/components/header.php';
-require APP_ROOT . '/app/views/components/sidebar.php';
+require APP_ROOT . '/app/views/components/header/header.php';
+require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 ?>
 <div class="main-content nurse-portal">
-    <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
-    <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
 
     <div class="content-wrapper">
         <section class="nurse-hero mb-4">
@@ -134,4 +146,4 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         </div>
     </div>
 </div>
-<?php require APP_ROOT . '/app/views/components/footer.php'; ?>
+<?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

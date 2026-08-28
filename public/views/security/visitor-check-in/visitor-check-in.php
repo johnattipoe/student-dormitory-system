@@ -13,7 +13,7 @@ if (!defined('APP_ROOT')) {
     }
 }
 $allowedRoles = [ROLE_SECURITY];
-require APP_ROOT . '/app/middleware/RoleMiddleware.php';
+require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\VisitorService;
 use App\Services\FirebaseService;
@@ -35,24 +35,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $result = (new VisitorService())->checkIn($visitorId, current_user()['uid'] ?? current_user()['id'] ?? null);
     flash($result['success'] ? 'success' : 'error', $result['message']);
-    redirect(base_url('index.php?route=/views/security/visitors/visitors.php'));
+    redirect(base_url('index.php?route=/views/security/visitors/visitors/visitors.php'));
 }
 
 $pageTitle = 'Visitor Check-In';
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/security/dashboard/dashboard.php')],
-    ['icon' => 'bi-people', 'label' => 'Visitors', 'href' => url('views/security/visitors/visitors.php')],
+    ['icon' => 'bi-people', 'label' => 'Visitors', 'href' => url('views/security/visitors/visitors/visitors.php')],
     ['icon' => 'bi-journal-text', 'label' => 'Visitor History', 'href' => url('views/security/visitor-history/visitor-history.php')],
-    ['icon' => 'bi-exclamation-triangle', 'label' => 'Incidents', 'href' => url('views/security/incidents/incidents.php')],
+    ['icon' => 'bi-exclamation-triangle', 'label' => 'Incidents', 'href' => url('views/security/incidents/incidents/incidents.php')],
     ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/security/notifications/notifications.php')],
 ];
 
-require APP_ROOT . '/app/views/components/header.php';
-require APP_ROOT . '/app/views/components/sidebar.php';
+require APP_ROOT . '/app/views/components/header/header.php';
+require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 ?>
 <div class="main-content">
-    <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
-    <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
     <div class="content-wrapper security-portal">
         <section class="security-hero mb-4"><div class="security-hero-icon"><i class="bi bi-box-arrow-in-right"></i></div><div><span class="security-kicker">Gate movement</span><h1>Check in visitor</h1><p>Confirm an approved visitor’s arrival and start their on-premises visit.</p></div><span class="badge bg-success"><?= e((string) count($eligibleVisitors)) ?> eligible</span></section>
         <div class="security-card">
@@ -67,4 +67,4 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         </div>
     </div>
 </div>
-<?php require APP_ROOT . '/app/views/components/footer.php'; ?>
+<?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

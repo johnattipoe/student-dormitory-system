@@ -13,7 +13,7 @@ if (!defined('APP_ROOT')) {
 }
 
 $allowedRoles = [ROLE_NURSE];
-require APP_ROOT . '/app/middleware/RoleMiddleware.php';
+require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\MedicalService;
 
@@ -31,12 +31,12 @@ $navItems = [
     ['icon' => 'bi-bar-chart', 'label' => 'Health Reports', 'href' => url('views/nurse/health-reports/health-reports.php'), 'active' => true],
 ];
 
-require APP_ROOT . '/app/views/components/header.php';
-require APP_ROOT . '/app/views/components/sidebar.php';
+require APP_ROOT . '/app/views/components/header/header.php';
+require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 ?>
 <div class="main-content nurse-portal">
-    <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
-    <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
 
     <div class="content-wrapper">
         <section class="nurse-hero mb-4">
@@ -54,7 +54,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         <div class="row g-3 mb-4">
             <div class="col-md-3"><div class="nurse-stat"><span class="nurse-stat-icon green"><i class="bi bi-folder2-open"></i></span><div><small>Total records</small><strong><?= e((string) ($report['total'] ?? 0)) ?></strong></div></div></div>
             <div class="col-md-3"><div class="nurse-stat"><span class="nurse-stat-icon green"><i class="bi bi-check2-circle"></i></span><div><small>Normal</small><strong><?= e((string) ($report['normal'] ?? 0)) ?></strong></div></div></div>
-            <div class="col-md-3"><div class="nurse-stat"><span class="nurse-stat-icon orange"><i class="bi bi-exclamation-triangle"></i></span><div><small>Emergency</small><strong><?= e((string) ($report['emergency'] ?? 0)) ?></strong></div></div></div>
+            <div class="col-md-3"><div class="nurse-stat"><span class="nurse-stat-icon orange"><i class="bi bi-exclamation-triangle"></i></span><div><small>Moderate / Severe</small><strong><?= e((string) (($report['moderate'] ?? 0) + ($report['severe'] ?? 0))) ?></strong></div></div></div>
             <div class="col-md-3"><div class="nurse-stat"><span class="nurse-stat-icon red"><i class="bi bi-activity"></i></span><div><small>Critical</small><strong><?= e((string) ($report['critical'] ?? 0)) ?></strong></div></div></div>
         </div>
 
@@ -70,8 +70,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                     </div>
                     <div class="nurse-severity-grid">
                         <div><span class="normal"></span><small>Normal</small><strong><?= e((string) ($report['normal'] ?? 0)) ?></strong></div>
-                        <div><span class="moderate"></span><small>Emergency</small><strong><?= e((string) ($report['emergency'] ?? 0)) ?></strong></div>
-                        <div><span class="critical"></span><small>Critical</small><strong><?= e((string) ($report['critical'] ?? 0)) ?></strong></div>
+                        <div><span class="moderate"></span><small>Moderate / Severe</small><strong><?= e((string) (($report['moderate'] ?? 0) + ($report['severe'] ?? 0))) ?></strong></div>
+                        <div><span class="critical"></span><small>Emergency / Critical</small><strong><?= e((string) (($report['emergency'] ?? 0) + ($report['critical'] ?? 0))) ?></strong></div>
                     </div>
                 </section>
             </div>
@@ -110,4 +110,4 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         </div>
     </div>
 </div>
-<?php require APP_ROOT . '/app/views/components/footer.php'; ?>
+<?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

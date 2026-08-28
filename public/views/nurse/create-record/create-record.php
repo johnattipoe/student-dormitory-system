@@ -13,12 +13,13 @@ if (!defined('APP_ROOT')) {
 }
 
 $allowedRoles = [ROLE_NURSE];
-require APP_ROOT . '/app/middleware/RoleMiddleware.php';
+require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\MedicalService;
 use App\Services\StudentService;
 
 $students = StudentService::all();
+$selectedStudentId = sanitize($_GET['studentId'] ?? '');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = (new MedicalService())->create([
@@ -43,12 +44,12 @@ $navItems = [
     ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/nurse/notifications/notifications.php')],
 ];
 
-require APP_ROOT . '/app/views/components/header.php';
-require APP_ROOT . '/app/views/components/sidebar.php';
+require APP_ROOT . '/app/views/components/header/header.php';
+require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 ?>
 <div class="main-content nurse-portal">
-    <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
-    <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
 
     <div class="content-wrapper">
         <section class="nurse-hero mb-4">
@@ -81,7 +82,8 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                 <option value="">Select student</option>
                                 <?php foreach ($students as $student): ?>
                                     <?php $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')); ?>
-                                    <option value="<?= e((string) ($student['id'] ?? '')) ?>">
+                                    <?php $optionStudentId = (string) ($student['id'] ?? ''); ?>
+                                    <option value="<?= e($optionStudentId) ?>" <?= $selectedStudentId === $optionStudentId ? 'selected' : '' ?>>
                                         <?= e($studentName !== '' ? $studentName : 'Unnamed student') ?>
                                         (<?= e($student['admissionNo'] ?? $student['studentId'] ?? $student['id'] ?? 'No ID') ?>)
                                     </option>
@@ -131,4 +133,4 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         </div>
     </div>
 </div>
-<?php require APP_ROOT . '/app/views/components/footer.php'; ?>
+<?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

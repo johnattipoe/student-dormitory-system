@@ -2,140 +2,310 @@
 if (!defined('APP_ROOT')) {
     $dir = __DIR__;
     for ($i = 0; $i < 10; $i++) {
-        if (file_exists($dir . '/bootstrap.php')) {
-            require $dir . '/bootstrap.php';
-            break;
-        }
+        if (file_exists($dir . '/bootstrap.php')) { require $dir . '/bootstrap.php'; break; }
         $parent = dirname($dir);
         if ($parent === $dir) break;
         $dir = $parent;
     }
 }
 $allowedRoles = [ROLE_NURSE];
-require APP_ROOT . '/app/middleware/RoleMiddleware.php';
+require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\MedicalService;
 use App\Services\StudentService;
+use App\Services\FirebaseService;
+
+$user = current_user() ?? [];
+$nurseName = trim(($user['name'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))) ?: 'Nurse';
 
 $medicalService = new MedicalService();
 $students = StudentService::all();
-$records = $medicalService->all();
-$todayCases = $medicalService->todayCases();
-$emergencyCases = $medicalService->emergencyCases();
-$criticalRecords = array_values(array_filter($records, static fn($r) => in_array(strtolower((string) ($r['severity'] ?? 'normal')), ['critical', 'emergency'], true)));
-$moderateRecords = array_values(array_filter($records, static fn($r) => strtolower((string) ($r['severity'] ?? 'normal')) === 'moderate'));
-$normalRecords = array_values(array_filter($records, static fn($r) => strtolower((string) ($r['severity'] ?? 'normal')) === 'normal'));
+$records  = $medicalService->all();
+$todayCases    = (int) $medicalService->todayCases();
+$emergencyCases = (int) $medicalService->emergencyCases();
 
-usort($records, static fn($a, $b) => strcmp((string) ($b['createdAt'] ?? ''), (string) ($a['createdAt'] ?? '')));
+$criticalRecords = array_values(array_filter($records, static fn($r) => in_array(strtolower((string)($r['severity'] ?? 'normal')), ['severe', 'critical', 'emergency'], true)));
+$moderateRecords = array_values(array_filter($records, static fn($r) => strtolower((string)($r['severity'] ?? 'normal')) === 'moderate'));
 
-$pageTitle = 'Nurse Dashboard';
+// Fetch announcements for nurses
+$firebase = FirebaseService::getInstance();
+$allAnn = $firebase->getCollection('announcements', [], 50);
+$nurseAnn = array_values(array_filter($allAnn, fn($a) => ($a['status'] ?? 'published') === 'published' && in_array($a['audience'] ?? 'all', ['all', 'role'])));
+usort($nurseAnn, fn($a, $b) => strcmp((string)($b['createdAt'] ?? ''), (string)($a['createdAt'] ?? '')));
+$topAnn = array_slice($nurseAnn, 0, 3);
+
+usort($records, static fn($a, $b) => strcmp((string)($b['createdAt'] ?? ''), (string)($a['createdAt'] ?? '')));
+$recentRecords = array_slice($records, 0, 7);
+
+$totalStudents  = count($students);
+$totalRecords   = count($records);
+$criticalCount  = count($criticalRecords);
+$moderateCount  = count($moderateRecords);
+
+$pageTitle  = 'Nurse Dashboard';
 $pageStyles = ['nurse.css'];
 $navItems = [
-    ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/nurse/dashboard/dashboard.php'), 'active' => true],
-    ['icon' => 'bi-people', 'label' => 'Students', 'href' => url('views/nurse/students/students.php')],
-    ['icon' => 'bi-journal-medical', 'label' => 'Medical Records', 'href' => url('views/nurse/medical-records/medical-records.php')],
-    ['icon' => 'bi-plus-circle', 'label' => 'Create Record', 'href' => url('views/nurse/create-record/create-record.php')],
-    ['icon' => 'bi-exclamation-triangle', 'label' => 'Emergency Cases', 'href' => url('views/nurse/emergency-cases/emergency-cases.php')],
-    ['icon' => 'bi-file-earmark-medical', 'label' => 'Health Reports', 'href' => url('views/nurse/health-reports/health-reports.php')],
-    ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/nurse/notifications/notifications.php')],
+    ['icon' => 'bi-speedometer2',          'label' => 'Dashboard',       'href' => url('views/nurse/dashboard/dashboard.php'), 'active' => true],
+    ['icon' => 'bi-people',                'label' => 'Students',         'href' => url('views/nurse/students/students.php')],
+    ['icon' => 'bi-journal-medical',       'label' => 'Medical Records',  'href' => url('views/nurse/medical-records/medical-records.php')],
+    ['icon' => 'bi-plus-circle',           'label' => 'Create Record',    'href' => url('views/nurse/create-record/create-record.php')],
+    ['icon' => 'bi-exclamation-triangle',  'label' => 'Emergency Cases',  'href' => url('views/nurse/emergency-cases/emergency-cases.php')],
+    ['icon' => 'bi-file-earmark-medical',  'label' => 'Health Reports',   'href' => url('views/nurse/health-reports/health-reports.php')],
+    ['icon' => 'bi-bell',                  'label' => 'Notifications',    'href' => url('views/nurse/notifications/notifications.php')],
 ];
 
-require APP_ROOT . '/app/views/components/header.php';
-require APP_ROOT . '/app/views/components/sidebar.php';
+require APP_ROOT . '/app/views/components/header/header.php';
+require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 ?>
 <div class="main-content">
-    <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
-    <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
-    <div class="content-wrapper nurse-portal">
-        <section class="nurse-hero mb-4">
-            <div class="nurse-hero-icon"><i class="bi bi-heart-pulse"></i></div>
+    <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
+    <div class="content-wrapper">
+
+        <!-- Welcome Hero -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
             <div>
-                <span class="nurse-kicker">Health desk</span>
-                <h1>Welcome, <?= e(current_user()['name'] ?? 'Nurse') ?></h1>
-                <p>Track student medical records, emergency cases, follow-ups, and daily clinic activity from one workspace.</p>
-                <div class="nurse-badges">
-                    <span class="badge bg-success"><i class="bi bi-people me-1"></i><?= e((string) count($students)) ?> students</span>
-                    <span class="badge bg-info"><i class="bi bi-calendar-day me-1"></i><?= e((string) $todayCases) ?> today</span>
-                    <span class="badge bg-danger"><i class="bi bi-exclamation-octagon me-1"></i><?= e((string) $emergencyCases) ?> emergency</span>
-                </div>
+                <h4 class="mb-1 fw-bold text-dark">
+                    <i class="bi bi-heart-pulse-fill text-danger me-2"></i>Welcome, <?= e($nurseName) ?>
+                </h4>
+                <p class="text-muted mb-0">
+                    Campus Health &amp; Infirmary Desk &bull; <?= e(date('l, F j, Y')) ?>
+                </p>
             </div>
-            <div class="nurse-hero-actions">
-                <a class="btn btn-light" href="<?= url('views/nurse/create-record/create-record.php') ?>"><i class="bi bi-plus-circle me-1"></i>New record</a>
-                <a class="btn btn-primary" href="<?= url('views/nurse/emergency-cases/emergency-cases.php') ?>"><i class="bi bi-exclamation-triangle me-1"></i>Emergencies</a>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="<?= url('views/nurse/create-record/create-record.php') ?>" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-circle me-1"></i> New Medical Record
+                </a>
+                <a href="<?= url('views/nurse/emergency-cases/emergency-cases.php') ?>" class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-exclamation-octagon me-1"></i> Emergencies
+                </a>
+                <a href="<?= url('views/nurse/emergency-alerts/index.php') ?>" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-telephone-inbound me-1"></i> Alert Desk
+                </a>
             </div>
-        </section>
+        </div>
 
+        <!-- Primary KPI Cards -->
         <div class="row g-3 mb-4">
-            <div class="col-md-3"><div class="nurse-stat"><span class="nurse-stat-icon green"><i class="bi bi-people"></i></span><div><small>Students</small><strong><?= e((string) count($students)) ?></strong></div></div></div>
-            <div class="col-md-3"><div class="nurse-stat"><span class="nurse-stat-icon blue"><i class="bi bi-journal-medical"></i></span><div><small>Records</small><strong><?= e((string) count($records)) ?></strong></div></div></div>
-            <div class="col-md-3"><div class="nurse-stat"><span class="nurse-stat-icon orange"><i class="bi bi-calendar-day"></i></span><div><small>Today cases</small><strong><?= e((string) $todayCases) ?></strong></div></div></div>
-            <div class="col-md-3"><div class="nurse-stat"><span class="nurse-stat-icon red"><i class="bi bi-exclamation-octagon"></i></span><div><small>Emergency</small><strong><?= e((string) $emergencyCases) ?></strong></div></div></div>
-        </div>
-
-        <div class="row g-4">
-            <div class="col-xl-8">
-                <div class="nurse-card-panel mb-4">
-                    <div class="nurse-card-header">
-                        <div><span class="nurse-kicker">Clinical records</span><h2>Recent medical records</h2><p>Latest diagnoses, treatment notes, and severity flags.</p></div>
-                        <a class="btn btn-outline-primary btn-sm" href="<?= url('views/nurse/medical-records/medical-records.php') ?>">Open records</a>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-hover data-table w-100">
-                            <thead><tr><th>Student</th><th>Diagnosis</th><th>Severity</th><th>Recorded</th><th></th></tr></thead>
-                            <tbody>
-                            <?php if (!$records): ?>
-                                <tr><td colspan="5" class="text-center text-muted">No medical records yet.</td></tr>
-                            <?php else: foreach (array_slice($records, 0, 10) as $record): ?>
-                                <?php $severity = strtolower((string) ($record['severity'] ?? 'normal')); ?>
-                                <tr>
-                                    <td><?= e($record['studentId'] ?? '-') ?></td>
-                                    <td><?= e($record['diagnosis'] ?? '-') ?></td>
-                                    <td><span class="badge bg-<?= in_array($severity, ['critical', 'emergency'], true) ? 'danger' : ($severity === 'moderate' ? 'warning' : 'success') ?>"><?= e(ucfirst($severity)) ?></span></td>
-                                    <td><?= e($record['createdAt'] ?? '-') ?></td>
-                                    <td><a class="btn btn-sm btn-outline-primary" href="<?= url('views/nurse/edit-record/edit-record.php?id=' . urlencode((string) ($record['id'] ?? ''))) ?>">Edit</a></td>
-                                </tr>
-                            <?php endforeach; endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="nurse-card-panel">
-                    <div class="nurse-card-header">
-                        <div><span class="nurse-kicker">Case balance</span><h2>Health status distribution</h2><p>Quick view of normal, moderate, and emergency cases.</p></div>
-                    </div>
-                    <div class="nurse-severity-grid">
-                        <div><span class="normal"></span><small>Normal</small><strong><?= e((string) count($normalRecords)) ?></strong></div>
-                        <div><span class="moderate"></span><small>Moderate</small><strong><?= e((string) count($moderateRecords)) ?></strong></div>
-                        <div><span class="critical"></span><small>Critical/Emergency</small><strong><?= e((string) count($criticalRecords)) ?></strong></div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="card stat-card h-100 p-3 border-start border-4 border-primary shadow-sm">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="text-muted small text-uppercase fw-semibold">Total Students</span>
+                            <h3 class="fw-bold my-1 text-primary"><?= e((string) $totalStudents) ?></h3>
+                            <span class="small text-muted">Enrolled campus residents</span>
+                        </div>
+                        <div class="rounded-3 bg-primary bg-opacity-10 p-2 text-primary"><i class="bi bi-people fs-4"></i></div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-xl-4">
-                <aside class="nurse-side-card mb-4">
-                    <span class="nurse-kicker">Quick actions</span>
-                    <h2>Clinic actions</h2>
-                    <div class="d-grid gap-2">
-                        <a class="btn btn-outline-success" href="<?= url('views/nurse/create-record/create-record.php') ?>"><i class="bi bi-plus-circle me-1"></i>Create medical record</a>
-                        <a class="btn btn-outline-danger" href="<?= url('views/nurse/emergency-cases/emergency-cases.php') ?>"><i class="bi bi-exclamation-octagon me-1"></i>Emergency cases</a>
-                        <a class="btn btn-outline-primary" href="<?= url('views/nurse/students/students.php') ?>"><i class="bi bi-people me-1"></i>Student directory</a>
-                        <a class="btn btn-secondary" href="<?= url('views/nurse/health-reports/health-reports.php') ?>"><i class="bi bi-file-earmark-medical me-1"></i>Health reports</a>
+            <div class="col-sm-6 col-lg-3">
+                <div class="card stat-card h-100 p-3 border-start border-4 border-info shadow-sm">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="text-muted small text-uppercase fw-semibold">Today's Cases</span>
+                            <h3 class="fw-bold my-1 text-info"><?= e((string) $todayCases) ?></h3>
+                            <span class="small text-muted">Clinic visits today</span>
+                        </div>
+                        <div class="rounded-3 bg-info bg-opacity-10 p-2 text-info"><i class="bi bi-calendar-day fs-4"></i></div>
                     </div>
-                </aside>
+                </div>
+            </div>
 
-                <aside class="nurse-side-card">
-                    <span class="nurse-kicker">Care pulse</span>
-                    <h2>Clinic summary</h2>
-                    <div class="nurse-info-list">
-                        <div><i class="bi bi-people text-success"></i><span>Total students</span><strong><?= e((string) count($students)) ?></strong></div>
-                        <div><i class="bi bi-journal-medical text-primary"></i><span>Total records</span><strong><?= e((string) count($records)) ?></strong></div>
-                        <div><i class="bi bi-calendar-day text-info"></i><span>Today cases</span><strong><?= e((string) $todayCases) ?></strong></div>
-                        <div><i class="bi bi-exclamation-triangle text-danger"></i><span>Emergency cases</span><strong><?= e((string) $emergencyCases) ?></strong></div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="card stat-card h-100 p-3 border-start border-4 border-<?= $emergencyCases > 0 ? 'danger' : 'secondary' ?> shadow-sm">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="text-muted small text-uppercase fw-semibold">Emergency Cases</span>
+                            <h3 class="fw-bold my-1 text-<?= $emergencyCases > 0 ? 'danger' : 'dark' ?>"><?= e((string) $emergencyCases) ?></h3>
+                            <span class="small text-muted"><?= $criticalCount ?> critical records</span>
+                        </div>
+                        <div class="rounded-3 bg-danger bg-opacity-10 p-2 text-danger"><i class="bi bi-exclamation-octagon fs-4"></i></div>
                     </div>
-                </aside>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-lg-3">
+                <div class="card stat-card h-100 p-3 border-start border-4 border-success shadow-sm">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="text-muted small text-uppercase fw-semibold">All Medical Records</span>
+                            <h3 class="fw-bold my-1 text-success"><?= e((string) $totalRecords) ?></h3>
+                            <span class="small text-muted"><?= $moderateCount ?> moderate severity</span>
+                        </div>
+                        <div class="rounded-3 bg-success bg-opacity-10 p-2 text-success"><i class="bi bi-journal-medical fs-4"></i></div>
+                    </div>
+                </div>
             </div>
         </div>
+
+        <!-- Secondary Analytics Strip -->
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-md-3">
+                <div class="card stat-card p-3 h-100 shadow-sm">
+                    <small class="text-muted fw-bold">CRITICAL SEVERITY</small>
+                    <div class="fs-4 fw-bold text-danger mt-1"><?= $criticalCount ?> Cases</div>
+                    <small class="text-muted">Require immediate attention</small>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="card stat-card p-3 h-100 shadow-sm">
+                    <small class="text-muted fw-bold">MODERATE SEVERITY</small>
+                    <div class="fs-4 fw-bold text-warning mt-1"><?= $moderateCount ?> Cases</div>
+                    <small class="text-muted">Under monitoring</small>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="card stat-card p-3 h-100 shadow-sm">
+                    <small class="text-muted fw-bold">TODAY'S LOAD</small>
+                    <div class="fs-4 fw-bold text-info mt-1"><?= $todayCases ?> Visits</div>
+                    <small class="text-muted">Clinic consultations today</small>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="card stat-card p-3 h-100 shadow-sm">
+                    <small class="text-muted fw-bold">INFIRMARY STATUS</small>
+                    <div class="fs-4 fw-bold text-success mt-1">Open</div>
+                    <small class="text-muted">Health desk operational</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Workspace -->
+        <div class="row g-4 mb-4">
+
+            <!-- Left: Recent Medical Records -->
+            <div class="col-lg-8">
+                <div class="card stat-card shadow-sm">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-journal-medical me-2 text-primary"></i>Recent Medical Records</h6>
+                            <small class="text-muted">Latest diagnoses, treatment notes, and severity flags</small>
+                        </div>
+                        <a href="<?= url('views/nurse/medical-records/medical-records.php') ?>" class="btn btn-outline-secondary btn-sm">
+                            All Records <i class="bi bi-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Student</th>
+                                        <th>Diagnosis</th>
+                                        <th>Severity</th>
+                                        <th>Recorded</th>
+                                        <th class="text-end">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($recentRecords)): ?>
+                                        <tr><td colspan="5" class="text-center text-muted py-4">
+                                            <i class="bi bi-clipboard2-x fs-3 d-block text-secondary mb-1"></i>
+                                            No medical records yet.
+                                        </td></tr>
+                                    <?php else: ?>
+                                        <?php foreach ($recentRecords as $rec): ?>
+                                            <?php
+                                            $sev = strtolower((string)($rec['severity'] ?? 'normal'));
+                                            $sevBadge = in_array($sev, ['severe', 'critical', 'emergency'], true) ? 'bg-danger' : ($sev === 'moderate' ? 'bg-warning text-dark' : 'bg-success');
+                                            $recId = (string)($rec['id'] ?? '');
+                                            ?>
+                                            <tr>
+                                                <td><strong><?= e($rec['studentName'] ?? $rec['studentId'] ?? '—') ?></strong></td>
+                                                <td><?= e(mb_strimwidth((string)($rec['diagnosis'] ?? '—'), 0, 35, '…')) ?></td>
+                                                <td><span class="badge <?= $sevBadge ?>"><?= ucfirst(e($sev)) ?></span></td>
+                                                <td><small class="text-muted"><?= e(substr((string)($rec['createdAt'] ?? '—'), 0, 10)) ?></small></td>
+                                                <td class="text-end">
+                                                    <?php if ($recId !== ''): ?>
+                                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/nurse/edit-record/edit-record.php?id=' . urlencode($recId)) ?>">Edit</a>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Quick Actions + Bulletins -->
+            <div class="col-lg-4">
+
+                <!-- Quick Actions -->
+                <div class="card stat-card shadow-sm mb-4">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-grid me-2 text-primary"></i>Health Desk Actions</h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <a href="<?= url('views/nurse/create-record/create-record.php') ?>" class="btn btn-outline-primary w-100 p-3 d-flex flex-column align-items-center">
+                                    <i class="bi bi-plus-circle fs-3 mb-1"></i>
+                                    <span class="small fw-bold">New Record</span>
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a href="<?= url('views/nurse/emergency-cases/emergency-cases.php') ?>" class="btn btn-outline-danger w-100 p-3 d-flex flex-column align-items-center">
+                                    <i class="bi bi-exclamation-octagon fs-3 mb-1"></i>
+                                    <span class="small fw-bold">Emergencies</span>
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a href="<?= url('views/nurse/students/students.php') ?>" class="btn btn-outline-info w-100 p-3 d-flex flex-column align-items-center">
+                                    <i class="bi bi-people fs-3 mb-1"></i>
+                                    <span class="small fw-bold">Students</span>
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a href="<?= url('views/nurse/medical-records/medical-records.php') ?>" class="btn btn-outline-success w-100 p-3 d-flex flex-column align-items-center">
+                                    <i class="bi bi-journal-medical fs-3 mb-1"></i>
+                                    <span class="small fw-bold">All Records</span>
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a href="<?= url('views/nurse/health-reports/health-reports.php') ?>" class="btn btn-outline-secondary w-100 p-3 d-flex flex-column align-items-center">
+                                    <i class="bi bi-file-earmark-medical fs-3 mb-1"></i>
+                                    <span class="small fw-bold">Health Reports</span>
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a href="<?= url('views/nurse/activity-logs/index.php') ?>" class="btn btn-outline-dark w-100 p-3 d-flex flex-column align-items-center">
+                                    <i class="bi bi-clock-history fs-3 mb-1"></i>
+                                    <span class="small fw-bold">Activity Logs</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bulletins -->
+                <div class="card stat-card shadow-sm">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-megaphone me-2 text-warning"></i>Health Bulletins</h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <?php if (empty($topAnn)): ?>
+                            <p class="text-muted small text-center my-2">No bulletins posted.</p>
+                        <?php else: ?>
+                            <div class="d-flex flex-column gap-2">
+                                <?php foreach ($topAnn as $ann): ?>
+                                    <div class="p-2 rounded-3 bg-light border">
+                                        <div class="fw-bold small text-dark"><?= e($ann['title'] ?? 'Notice') ?></div>
+                                        <p class="text-muted small mb-0"><?= e(mb_strimwidth((string)($ann['message'] ?? ''), 0, 70, '…')) ?></p>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
     </div>
 </div>
-<?php require APP_ROOT . '/app/views/components/footer.php'; ?>
+<?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

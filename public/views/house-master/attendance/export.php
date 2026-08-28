@@ -1,3 +1,0 @@
-<?php
-require_once dirname(__DIR__, 3) . '/bootstrap.php'; $allowedRoles=[ROLE_HOUSE_MASTER,ROLE_HOUSE_MISTRESS]; require APP_ROOT.'/app/middleware/RoleMiddleware.php'; use App\Services\AttendanceService;
-$records=AttendanceService::byHouse(current_user()['houseId']??null);header('Content-Type: text/csv');header('Content-Disposition: attachment; filename="house-attendance.csv"');$out=fopen('php://output','w');fputcsv($out,['Date','Student ID','Status','Marked By']);foreach($records as $record){fputcsv($out,[$record['date']??'',$record['studentId']??'',$record['status']??'',$record['markedBy']??'']);}fclose($out);exit;

@@ -59,7 +59,7 @@ $successMessage = flash('success');
     <title>Forgot Password | Student Dormitory System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/login.css">
+    <link rel="stylesheet" href="/assets/css/login/login.css">
 </head>
 <body class="login-body d-flex align-items-center justify-content-center">
     <div class="login-card card shadow-lg border-0">
@@ -99,6 +99,6 @@ $successMessage = flash('success');
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/auth/auth.js"></script>
 </body>
 </html>

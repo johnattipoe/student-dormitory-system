@@ -13,7 +13,7 @@ if (!defined('APP_ROOT')) {
 }
 
 $allowedRoles = [ROLE_NURSE];
-require APP_ROOT . '/app/middleware/RoleMiddleware.php';
+require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\MedicalService;
 use App\Services\StudentService;
@@ -36,12 +36,12 @@ $navItems = [
     ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => url('views/nurse/notifications/notifications.php')],
 ];
 
-require APP_ROOT . '/app/views/components/header.php';
-require APP_ROOT . '/app/views/components/sidebar.php';
+require APP_ROOT . '/app/views/components/header/header.php';
+require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 ?>
 <div class="main-content nurse-portal">
-    <?php require APP_ROOT . '/app/views/components/navbar.php'; ?>
-    <?php require APP_ROOT . '/app/views/components/alerts.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
+    <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
 
     <div class="content-wrapper">
         <?php if (!$student): ?>
@@ -67,7 +67,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                 </div>
                 <div class="nurse-hero-actions">
                     <a class="btn btn-light" href="<?= url('views/nurse/students/students.php') ?>"><i class="bi bi-arrow-left"></i> Students</a>
-                    <a class="btn btn-warning" href="<?= url('views/nurse/create-record/create-record.php') ?>"><i class="bi bi-plus-circle"></i> New record</a>
+                    <a class="btn btn-warning" href="<?= url('views/nurse/create-record/create-record.php?studentId=' . urlencode($studentId)) ?>"><i class="bi bi-plus-circle"></i> New record</a>
                 </div>
             </section>
 
@@ -88,7 +88,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                             <dd class="col-sm-8"><?= e($student['studentId'] ?? $student['admissionNo'] ?? $student['id'] ?? 'Not assigned') ?></dd>
                             <dt class="col-sm-4">Phone</dt>
                             <dd class="col-sm-8"><?= e($student['phone'] ?? 'Not provided') ?></dd>
-                            <dt class="col-sm-4">Course</dt>
+                            <dt class="col-sm-4">Class Code</dt>
                             <dd class="col-sm-8"><?= e($student['course'] ?? 'Not specified') ?></dd>
                             <dt class="col-sm-4">Level</dt>
                             <dd class="col-sm-8"><?= e($student['level'] ?? 'Not specified') ?></dd>
@@ -128,7 +128,7 @@ require APP_ROOT . '/app/views/components/sidebar.php';
                                     <tr>
                                         <td><?= e($record['diagnosis'] ?? 'Not recorded') ?></td>
                                         <td><?= e($record['treatment'] ?? 'Not recorded') ?></td>
-                                        <td><span class="badge <?= $severity === 'critical' ? 'bg-danger' : ($severity === 'moderate' ? 'bg-warning text-dark' : 'bg-success') ?>"><?= e(ucfirst($severity ?: 'normal')) ?></span></td>
+                                        <td><span class="badge <?= in_array($severity, ['severe', 'critical', 'emergency'], true) ? 'bg-danger' : ($severity === 'moderate' ? 'bg-warning text-dark' : 'bg-success') ?>"><?= e(ucfirst($severity ?: 'normal')) ?></span></td>
                                         <td><?= e($record['createdAt'] ?? 'Not recorded') ?></td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -142,4 +142,4 @@ require APP_ROOT . '/app/views/components/sidebar.php';
         <?php endif; ?>
     </div>
 </div>
-<?php require APP_ROOT . '/app/views/components/footer.php'; ?>
+<?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>
