@@ -106,7 +106,15 @@ class ParentMessageService
         $id = FirebaseService::getInstance()->addDocument(\COL_PARENT_MESSAGES, $data);
 
         if ($channel === 'mail') {
-            $emailResult = (new EmailService())->sendHtml(
+            // Use SendGrid Web API if configured, otherwise fall back to SMTP
+            $emailService = class_exists(SendGridEmailService::class) ? new SendGridEmailService() : new EmailService();
+            
+            // Only try SendGrid if it's properly configured
+            if ($emailService instanceof SendGridEmailService && !$emailService->isConfigured()) {
+                $emailService = new EmailService();
+            }
+
+            $emailResult = $emailService->sendHtml(
                 $guardianEmail,
                 $subject,
                 '<p>Dear ' . htmlspecialchars($guardianName, ENT_QUOTES, 'UTF-8') . ',</p><p>' . nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8')) . '</p>'
