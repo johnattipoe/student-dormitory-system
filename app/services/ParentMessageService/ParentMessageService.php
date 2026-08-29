@@ -106,11 +106,23 @@ class ParentMessageService
         $id = FirebaseService::getInstance()->addDocument(\COL_PARENT_MESSAGES, $data);
 
         if ($channel === 'mail') {
-            // Use SendGrid Web API if configured, otherwise fall back to SMTP
-            $emailService = class_exists(SendGridEmailService::class) ? new SendGridEmailService() : new EmailService();
-            
-            // Only try SendGrid if it's properly configured
-            if ($emailService instanceof SendGridEmailService && !$emailService->isConfigured()) {
+            // Try SendGrid Web API first if it's configured, otherwise fall back to SMTP
+            $emailService = null;
+            $sendGridAvailable = false;
+
+            try {
+                if (class_exists(SendGridEmailService::class)) {
+                    $sendGridService = new SendGridEmailService();
+                    $emailService = $sendGridService;
+                    $sendGridAvailable = true;
+                }
+            } catch (\Throwable $e) {
+                // SendGrid not properly configured, will use SMTP fallback
+                error_log('SendGrid not available: ' . $e->getMessage());
+            }
+
+            // Fall back to SMTP if SendGrid isn't available
+            if (!$sendGridAvailable) {
                 $emailService = new EmailService();
             }
 
