@@ -15,11 +15,13 @@ class SendGridEmailService
         $this->fromEmail = (string) ($config['from_address'] ?? '');
         $this->fromName = (string) ($config['from_name'] ?? 'Student Dormitory System');
 
-        // Extract API key if it's in SMTP password format
-        if (str_starts_with($this->apiKey, 'SG.')) {
-            // Already extracted
-        } else {
-            throw new \Exception('SendGrid API key not found in mail configuration.');
+        // Trim spaces from API key (sometimes environment variables have extra spaces)
+        $this->apiKey = trim($this->apiKey);
+        $this->fromEmail = trim($this->fromEmail);
+
+        // Check if API key looks valid
+        if (empty($this->apiKey) || !str_starts_with($this->apiKey, 'SG.')) {
+            throw new \Exception('SendGrid API key not found or invalid in mail configuration. Key should start with "SG."');
         }
     }
 
