@@ -19,6 +19,7 @@ if (!defined('APP_ROOT')) {
 }
 
 use App\Services\EmailService;
+use App\Services\SendGridEmailService;
 
 echo "=== Email Configuration Test ===\n\n";
 
@@ -43,37 +44,57 @@ if (empty($config['host']) || empty($config['from_address'])) {
     exit(1);
 }
 
-// Test connectivity
-echo "🔌 Testing SMTP Connectivity...\n";
+// Detect which service to use
+$isUsingSendGrid = strpos($config['host'] ?? '', 'sendgrid') !== false;
 
-$ports = [$config['port']];
-if ($config['host'] === 'smtp.gmail.com' && $config['port'] == 587) {
-    $ports[] = 465;
-}
-
-foreach ($ports as $testPort) {
-    $encryption = $testPort === 465 ? 'SSL' : 'TLS';
-    $fp = @fsockopen($config['host'], $testPort, $errno, $errstr, 5);
+if ($isUsingSendGrid) {
+    echo "📨 Using SendGrid Web API (no sender verification needed)...\n\n";
+    $testEmail = $config['from_address'];
+    echo "  Sending test email to: $testEmail\n\n";
     
-    if ($fp) {
-        fclose($fp);
-        echo "  ✅ Port $testPort ($encryption): OPEN\n";
-    } else {
-        echo "  ❌ Port $testPort ($encryption): CLOSED/BLOCKED (Error: $errstr)\n";
+    try {
+        $emailService = new SendGridEmailService();
+        $result = $emailService->sendHtml(
+            $testEmail,
+            'SendGrid Email Configuration Test',
+            '<h2>Email Test Successful!</h2><p>If you received this, your SendGrid configuration is working correctly.</p><p>Test sent from: ' . gethostname() . '</p>'
+        );
+    } catch (\Throwable $e) {
+        $result = ['success' => false, 'message' => 'Service initialization failed: ' . $e->getMessage()];
     }
+} else {
+    // Test SMTP connectivity
+    echo "🔌 Testing SMTP Connectivity...\n";
+
+    $ports = [$config['port']];
+    if ($config['host'] === 'smtp.gmail.com' && $config['port'] == 587) {
+        $ports[] = 465;
+    }
+
+    foreach ($ports as $testPort) {
+        $encryption = $testPort === 465 ? 'SSL' : 'TLS';
+        $fp = @fsockopen($config['host'], $testPort, $errno, $errstr, 5);
+        
+        if ($fp) {
+            fclose($fp);
+            echo "  ✅ Port $testPort ($encryption): OPEN\n";
+        } else {
+            echo "  ❌ Port $testPort ($encryption): CLOSED/BLOCKED (Error: $errstr)\n";
+        }
+    }
+
+    echo "\n📨 Testing Email Delivery via SMTP...\n";
+
+    $testEmail = $config['from_address'];
+    echo "  Sending test email to: $testEmail\n\n";
+
+    $emailService = new EmailService();
+    $result = $emailService->sendHtml(
+        $testEmail,
+        'Email Configuration Test',
+        '<h2>Email Test Successful!</h2><p>If you received this, your email configuration is working correctly on this host.</p><p>Test sent from: ' . gethostname() . '</p>'
+    );
 }
-
-echo "\n📨 Testing Email Delivery...\n";
-
-$testEmail = $config['from_address'];
-echo "  Sending test email to: $testEmail\n\n";
-
-$emailService = new EmailService();
-$result = $emailService->sendHtml(
-    $testEmail,
-    'Email Configuration Test',
-    '<h2>Email Test Successful!</h2><p>If you received this, your email configuration is working correctly on this host.</p><p>Test sent from: ' . gethostname() . '</p>'
-);
 
 if ($result['success']) {
     echo "✅ SUCCESS: " . $result['message'] . "\n";
@@ -81,11 +102,17 @@ if ($result['success']) {
 } else {
     echo "❌ FAILED: " . $result['message'] . "\n";
     echo "\n📋 Troubleshooting:\n";
-    echo "  1. If port 587 is blocked, try port 465 (SSL)\n";
-    echo "  2. If using Gmail, ensure you have an App Password (not regular password)\n";
-    echo "  3. On Render, consider using SendGrid instead (port 587 is more reliable)\n";
-    echo "  4. Check .env file is in the root directory\n";
-    echo "  5. Ensure MAIL_USERNAME and MAIL_PASSWORD don't have extra spaces\n";
+    if ($isUsingSendGrid) {
+        echo "  1. Verify SendGrid API key in .env is correct\n";
+        echo "  2. Check MAIL_USERNAME is set to 'apikey'\n";
+        echo "  3. Ensure .env file in root directory\n";
+    } else {
+        echo "  1. If port 587 is blocked, try port 465 (SSL)\n";
+        echo "  2. If using Gmail, ensure App Password (not regular password)\n";
+        echo "  3. On Render, switch to SendGrid (less firewall issues)\n";
+        echo "  4. Check .env file is in root directory\n";
+        echo "  5. Ensure MAIL_USERNAME and MAIL_PASSWORD have no extra spaces\n";
+    }
     exit(1);
 }
 ?>
