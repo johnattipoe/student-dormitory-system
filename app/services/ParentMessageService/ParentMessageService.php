@@ -99,8 +99,9 @@ class ParentMessageService
             'sentByRole' => $sender['role'] ?? '',
             'createdAt' => (new \DateTime())->format(DATE_ATOM),
             'channel' => $channel,
-            'deliveryStatus' => $channel === 'sms' ? 'not_configured' : 'pending',
+            'deliveryStatus' => $channel === 'sms' ? 'pending' : 'pending',
             'emailStatus' => $channel === 'mail' ? 'pending' : 'not_sent',
+            'smsStatus' => $channel === 'sms' ? 'pending' : 'not_sent',
         ];
 
         $id = FirebaseService::getInstance()->addDocument(\COL_PARENT_MESSAGES, $data);
@@ -117,11 +118,9 @@ class ParentMessageService
                     $sendGridAvailable = true;
                 }
             } catch (\Throwable $e) {
-                // SendGrid not properly configured, will use SMTP fallback
                 error_log('SendGrid not available: ' . $e->getMessage());
             }
 
-            // Fall back to SMTP if SendGrid isn't available
             if (!$sendGridAvailable) {
                 $emailService = new EmailService();
             }
@@ -141,10 +140,35 @@ class ParentMessageService
             ]);
         }
 
+        if ($channel === 'sms') {
+            $smsResult = ['success' => false, 'message' => 'BMS Africa SMS not configured.'];
+
+            try {
+                $smsConfig = require APP_ROOT . '/app/config/sms/sms.php';
+                if (!empty($smsConfig['enabled']) && !empty($smsConfig['api_key'])) {
+                    $bmsSmsService = new BmsSmsService();
+                    $smsResult = $bmsSmsService->send($guardianPhone, $message);
+                }
+            } catch (\Throwable $e) {
+                $smsResult = ['success' => false, 'message' => 'SMS delivery failed: ' . $e->getMessage()];
+            }
+
+            $data['smsStatus'] = $smsResult['success'] ? 'sent' : 'failed';
+            $data['deliveryStatus'] = $smsResult['success'] ? 'sent' : 'failed';
+            $data['deliveryNote'] = $smsResult['message'] ?? '';
+            FirebaseService::getInstance()->updateDocument(\COL_PARENT_MESSAGES, $id, [
+                'smsStatus' => $data['smsStatus'],
+                'deliveryStatus' => $data['deliveryStatus'],
+                'deliveryNote' => $data['deliveryNote'],
+            ]);
+        }
+
         return [
             'success' => true,
             'message' => $channel === 'sms'
-                ? 'SMS recorded. Configure an SMS provider to deliver it.'
+                ? ($data['smsStatus'] === 'sent'
+                    ? 'SMS message recorded and sent to ' . $guardianPhone . '.'
+                    : 'SMS message recorded. Note: ' . ($data['deliveryNote'] ?? 'SMS not sent.'))
                 : ($data['emailStatus'] === 'sent'
                 ? 'Message recorded and successfully emailed to ' . $guardianEmail . '.'
                 : 'Message recorded. Note: ' . ($data['deliveryNote'] ?? 'Email not sent.')),
