@@ -207,6 +207,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
+        <br>
+
         <!-- Main Workspace: 2 Columns -->
         <div class="row g-4 mb-4">
 
