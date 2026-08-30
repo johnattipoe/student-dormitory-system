@@ -162,19 +162,21 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <td><?= e($note['message'] ?? '') ?></td>
                         <td><?= !empty($note['read']) ? 'Yes' : 'No' ?></td>
                         <td><?= e($userMap[$notificationUserId] ?? ($note['userId'] ?? '-')) ?></td>
-                        <td>
-                            <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/notifications/view/view.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>">View</a>
-                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/notifications/edit/edit.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>">Edit</a>
-                            <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/notifications/delete/delete.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>">Delete</a>
-                            <?php if (empty($note['read'])): ?>
-                                <form method="POST" action="<?= url('views/admin/notifications/index/index.php') ?>" class="d-inline">
+                        <td class="notification-actions-cell">
+                            <div class="notification-actions">
+                                <a class="notification-action notification-action-view" href="<?= url('views/admin/notifications/view/view.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>" title="View notification"><i class="bi bi-eye"></i><span>View</span></a>
+                                <a class="notification-action notification-action-edit" href="<?= url('views/admin/notifications/edit/edit.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>" title="Edit notification"><i class="bi bi-pencil-square"></i><span>Edit</span></a>
+                                <a class="notification-action notification-action-delete" href="<?= url('views/admin/notifications/delete/delete.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>" title="Delete notification"><i class="bi bi-trash3"></i><span>Delete</span></a>
+                                <?php if (empty($note['read'])): ?>
+                                    <form method="POST" action="<?= url('views/admin/notifications/index/index.php') ?>" class="d-inline">
                                     <input type="hidden" name="action" value="mark_read">
                                     <input type="hidden" name="id" value="<?= e((string) ($note['id'] ?? '')) ?>">
-                                    <button class="btn btn-sm btn-outline-primary">Mark read</button>
-                                </form>
-                            <?php else: ?>
-                                <span class="text-muted">Read</span>
-                            <?php endif; ?>
+                                        <button class="notification-action notification-action-read" type="submit" title="Mark as read"><i class="bi bi-check2-circle"></i><span>Mark read</span></button>
+                                    </form>
+                                <?php else: ?>
+                                    <span class="notification-read-state"><i class="bi bi-check2-all"></i> Read</span>
+                                <?php endif; ?>
+                            </div>
                         </td>
                     </tr>
                 <?php endforeach; ?>

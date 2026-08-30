@@ -8,7 +8,7 @@ $navItems = $navItems ?? [];
 <aside class="sidebar">
     <div class="sidebar-inner d-flex flex-column h-100">
         <div class="sidebar-brand d-flex align-items-center gap-2 px-3 py-3">
-            <img src="<?= asset('images/logo.svg') ?>" alt="STUDENT logo" width="32" height="32" onerror="this.remove()">
+            <img src="<?= asset('images/mawuli-school-logo.png') ?>" alt="Mawuli School crest" width="42" height="42" class="rounded bg-white p-1" style="object-fit: contain" onerror="this.remove()">
             <span class="fw-bold sidebar-brand-text">STUDENT DORMITORY SYSTEM</span>
         </div>
 

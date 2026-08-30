@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/favicon.png?v=mawuli-school-2">
+<link rel="shortcut icon" type="image/png" href="/favicon.png?v=mawuli-school-2">
 <title>Login | <?= e($appConfig['name'] ?? 'Student Dormitory System') ?></title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
@@ -12,7 +14,7 @@
   <div id="startupLoader" class="startup-loader is-hidden" hidden role="status" aria-live="polite" aria-label="Starting application">
     <div class="startup-loader-card">
       <div class="startup-logo">
-        <i class="bi bi-building"></i>
+        <img src="/assets/images/mawuli-school-logo.png" alt="Mawuli School crest">
       </div>
       <div class="startup-loader-title"><?= e($appConfig['name'] ?? 'Student Dormitory System') ?></div>
       <div class="startup-loader-text">Preparing your secure portal...</div>
@@ -25,7 +27,7 @@
   <div class="login-card card shadow-lg border-0">
     <div class="card-body p-4">
       <div class="text-center mb-4">
-        <i class="bi bi-building fs-1 text-primary"></i>
+        <img src="/assets/images/mawuli-school-logo.png" alt="Mawuli School crest" class="login-crest mb-2">
         <h4 class="mt-2 mb-0"><?= e($appConfig['name'] ?? 'Student Dormitory System') ?></h4>
         <p class="text-muted small">Sign in to your dashboard</p>
         <?php if (!empty($appConfig['support_email'])): ?>
