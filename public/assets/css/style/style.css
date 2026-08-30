@@ -21,6 +21,20 @@
   --sds-border: rgba(47, 95, 187, .12);
 }
 
+/* Keep full-page scrolling available without showing a browser scrollbar. */
+html,
+body {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 body {
   background:
     radial-gradient(circle at top left, rgba(47, 95, 187, .12), transparent 34rem),
@@ -233,6 +247,44 @@ a:hover {
   border-bottom: 1px solid rgba(47, 95, 187, .12);
   backdrop-filter: blur(10px);
 }
+
+.topbar-notification-menu {
+  width: min(380px, calc(100vw - 1.5rem));
+  margin-top: .55rem !important;
+  border: 1px solid rgba(47, 95, 187, .16);
+  border-radius: 12px;
+  box-shadow: var(--sds-shadow-lg);
+}
+
+.topbar-notification-list {
+  max-height: 340px;
+  overflow-y: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.topbar-notification-list::-webkit-scrollbar { display: none; }
+
+.topbar-notification-item {
+  display: flex;
+  gap: .7rem;
+  padding: .8rem 1rem;
+  color: #334155;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(47, 95, 187, .08);
+}
+
+.topbar-notification-item:hover { background: #f4f8ff; color: #14213d; }
+.topbar-notification-item.is-unread { background: #eef5ff; }
+.topbar-notification-item > i { font-size: 1.1rem; margin-top: .1rem; }
+.topbar-notification-item span { min-width: 0; display: grid; gap: .15rem; }
+.topbar-notification-item strong,
+.topbar-notification-item small,
+.topbar-notification-item em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-notification-item small { color: #64748b; }
+.topbar-notification-item em { color: #94a3b8; font-size: .72rem; font-style: normal; }
+.topbar-notification-empty { display: grid; place-items: center; gap: .5rem; padding: 2rem 1rem; color: #64748b; }
+.topbar-notification-empty i { font-size: 1.5rem; }
 .content-wrapper { padding: 1.5rem; }
 
 .page-title,
@@ -541,6 +593,14 @@ a:hover {
 
 .table-responsive {
   border-radius: var(--sds-radius);
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.table-responsive::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .sds-table-wrap {

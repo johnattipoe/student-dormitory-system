@@ -4,6 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="<?= base_url('favicon.png') ?>?v=mawuli-school-2">
+    <link rel="shortcut icon" type="image/png" href="<?= base_url('favicon.png') ?>?v=mawuli-school-2">
     <title><?= e($pageTitle ?? 'Dashboard') ?> — <?= e($appConfig['name'] ?? 'Student Dormitory System') ?></title>
     <?php $advancedConfig = $appConfig['advanced'] ?? []; ?>
     <style>

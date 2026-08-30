@@ -78,6 +78,34 @@
 .admin-role-card small { color: #64748b; font-size: .76rem; font-weight: 700; }
 .admin-role-card strong { color: #172554; font-size: 1.2rem; }
 .admin-dashboard-panel { overflow: hidden; position: relative; }
+
+/* Notification table actions */
+.notification-actions-cell { min-width: 230px; }
+.notification-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.notification-action {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  min-height: 32px;
+  padding: .35rem .6rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: .78rem;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  transition: transform .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+.notification-action:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(15, 42, 95, .14); }
+.notification-action-view { color: #475569; background: #f8fafc; border-color: #cbd5e1; }
+.notification-action-edit { color: #1d4ed8; background: #eff6ff; border-color: #93c5fd; }
+.notification-action-delete { color: #dc2626; background: #fff1f2; border-color: #fda4af; }
+.notification-action-read { color: #047857; background: #ecfdf5; border-color: #6ee7b7; cursor: pointer; }
+.notification-action-view:hover { color: #1e293b; background: #e2e8f0; }
+.notification-action-edit:hover { color: #fff; background: #2563eb; border-color: #2563eb; }
+.notification-action-delete:hover { color: #fff; background: #dc2626; border-color: #dc2626; }
+.notification-action-read:hover { color: #fff; background: #059669; border-color: #059669; }
+.notification-read-state { display: inline-flex; align-items: center; gap: .3rem; color: #059669; font-size: .8rem; font-weight: 700; padding: .35rem .1rem; }
 .admin-dashboard-page > .row.g-3.mb-4 { align-items: stretch; }
 .admin-dashboard-page > .row.g-3.mb-4 > .col-xl-4 { display: flex; flex-direction: column; }
 .admin-dashboard-page > .row.g-3.mb-4 > .col-xl-4 > .admin-dashboard-panel { flex: 0 0 auto; }
