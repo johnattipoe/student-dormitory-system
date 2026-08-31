@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use PHPMailer\PHPMailer\Exception;
+use PHPMailer\PHPMailer\PHPMailer;
+
 // Ensure PHPMailer classes are loaded safely (supports vendor and standalone PHPMailer-master)
-if (!class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) {
+if (!class_exists(PHPMailer::class)) {
     $phpMailerPaths = [
         APP_ROOT . '/vendor/phpmailer/phpmailer/src/',
         APP_ROOT . '/PHPMailer-master/src/',
@@ -19,9 +22,6 @@ if (!class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) {
         }
     }
 }
-
-use PHPMailer\PHPMailer\Exception;
-use PHPMailer\PHPMailer\PHPMailer;
 
 class EmailService
 {

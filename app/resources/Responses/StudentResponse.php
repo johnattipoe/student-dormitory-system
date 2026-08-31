@@ -1,54 +1,37 @@
 <?php
-/**
- * Example Response - Transform data for consistent output format
- * 
- * Responses format models/data into consistent JSON or HTML structures.
- * Use in API endpoints and complex view rendering.
- */
+/** Consistent public-facing representation of a student record. */
 
 namespace App\Resources\Responses;
 
-class StudentResponse
+final class StudentResponse
 {
-    public function __construct(private array $student) {}
-    
-    /**
-     * Convert student model to API response format
-     */
-    public function toArray(): array
+    public function __construct(private readonly array $student) {}
+
+    public function toArray(bool $includePrivateContactData = false): array
     {
-        return [
+        $data = [
             'id' => $this->student['id'] ?? null,
-            'name' => $this->formatName(),
-            'email' => $this->student['email'] ?? null,
-            'student_id' => $this->student['student_id'] ?? null,
-            'house' => $this->student['house_id'] ?? null,
-            'room' => $this->student['room_id'] ?? null,
-            'status' => $this->student['status'] ?? 'active',
-            'created_at' => $this->student['created_at'] ?? null,
+            'admissionNo' => $this->value('admissionNo', 'student_id'),
+            'firstName' => $this->value('firstName', 'first_name'),
+            'lastName' => $this->value('lastName', 'last_name'),
+            'name' => $this->fullName(),
+            'email' => $this->value('email'), 'phone' => $this->value('phone'),
+            'gender' => $this->value('gender'), 'dateOfBirth' => $this->value('dateOfBirth', 'date_of_birth'),
+            'class' => $this->value('class'), 'form' => $this->value('form', 'level'), 'course' => $this->value('course'),
+            'houseId' => $this->value('houseId', 'house_id'), 'roomId' => $this->value('roomId', 'room_id'),
+            'status' => $this->value('status') ?: 'active',
+            'createdAt' => $this->value('createdAt', 'created_at'), 'updatedAt' => $this->value('updatedAt', 'updated_at'),
         ];
+
+        if ($includePrivateContactData) {
+            $data['guardian'] = ['name' => $this->value('guardianName', 'guardian_name'), 'phone' => $this->value('guardianPhone', 'guardian_phone'), 'email' => $this->value('guardianEmail', 'guardian_email')];
+            $data['nhisNumber'] = $this->value('nhisNumber', 'nhis_number');
+        }
+        return $data;
     }
-    
-    /**
-     * Convert to JSON
-     */
-    public function toJson(): string
-    {
-        return json_encode($this->toArray());
-    }
-    
-    /**
-     * Collection response
-     */
-    public static function collection(array $students): array
-    {
-        return array_map(fn($student) => (new self($student))->toArray(), $students);
-    }
-    
-    private function formatName(): string
-    {
-        $first = $this->student['first_name'] ?? '';
-        $last = $this->student['last_name'] ?? '';
-        return trim("$first $last");
-    }
+
+    public function toJson(bool $includePrivateContactData = false): string { return json_encode($this->toArray($includePrivateContactData), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES); }
+    public static function collection(array $students, bool $includePrivateContactData = false): array { return array_map(static fn(array $student): array => (new self($student))->toArray($includePrivateContactData), $students); }
+    public function fullName(): string { return trim($this->value('firstName', 'first_name') . ' ' . $this->value('lastName', 'last_name')); }
+    private function value(string $camel, string $snake = ''): mixed { return $this->student[$camel] ?? ($snake !== '' ? ($this->student[$snake] ?? null) : null); }
 }
