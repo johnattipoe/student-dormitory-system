@@ -1,80 +1,62 @@
 <?php
-/**
- * Example Traits - Reusable Behavior
- * 
- * Traits provide shared functionality across multiple classes
- * without inheritance. Use for timestamping, auditing, logging, etc.
- */
+/** Reusable traits for models and services. Copy only what a concrete class needs. */
 
 namespace App\Traits;
 
-/**
- * HasTimestamps - Auto-manage created_at and updated_at
- */
 trait HasTimestamps
 {
-    private ?\DateTime $createdAt = null;
-    private ?\DateTime $updatedAt = null;
-    
-    public function touch(): void
+    private ?\DateTimeImmutable $createdAt = null;
+    private ?\DateTimeImmutable $updatedAt = null;
+
+    public function touch(?\DateTimeImmutable $when = null): void
     {
-        $now = new \DateTime();
-        if (!$this->createdAt) {
-            $this->createdAt = $now;
-        }
-        $this->updatedAt = $now;
+        $when ??= new \DateTimeImmutable();
+        $this->createdAt ??= $when;
+        $this->updatedAt = $when;
     }
-    
-    public function getCreatedAt(): ?\DateTime
+
+    public function setTimestamps(?string $createdAt, ?string $updatedAt = null): void
     {
-        return $this->createdAt;
+        $this->createdAt = $createdAt ? new \DateTimeImmutable($createdAt) : null;
+        $this->updatedAt = $updatedAt ? new \DateTimeImmutable($updatedAt) : $this->createdAt;
     }
-    
-    public function getUpdatedAt(): ?\DateTime
-    {
-        return $this->updatedAt;
-    }
+
+    public function createdAt(): ?\DateTimeImmutable { return $this->createdAt; }
+    public function updatedAt(): ?\DateTimeImmutable { return $this->updatedAt; }
+    public function timestampAttributes(): array { return ['createdAt' => $this->createdAt?->format(DATE_ATOM), 'updatedAt' => $this->updatedAt?->format(DATE_ATOM)]; }
 }
 
-/**
- * Auditable - Track who changed what
- */
 trait Auditable
 {
     private ?string $changedBy = null;
     private ?string $changeReason = null;
-    
-    public function recordChange(string $userId, string $reason): void
+    private ?\DateTimeImmutable $changedAt = null;
+
+    public function recordChange(string $userId, string $reason = ''): void
     {
-        $this->changedBy = $userId;
-        $this->changeReason = $reason;
-        $this->touch();
+        $this->changedBy = trim($userId) ?: null;
+        $this->changeReason = trim($reason) ?: null;
+        $this->changedAt = new \DateTimeImmutable();
+        if (method_exists($this, 'touch')) $this->touch($this->changedAt);
     }
-    
-    public function getChangedBy(): ?string
-    {
-        return $this->changedBy;
-    }
+
+    public function auditAttributes(): array { return ['changedBy' => $this->changedBy, 'changeReason' => $this->changeReason, 'changedAt' => $this->changedAt?->format(DATE_ATOM)]; }
 }
 
-/**
- * Loggable - Auto-log actions
- */
+trait HasMetadata
+{
+    private array $metadata = [];
+    public function setMetadata(string $key, mixed $value): void { $key = trim($key); if ($key === '') throw new \InvalidArgumentException('Metadata key cannot be empty.'); $this->metadata[$key] = $value; }
+    public function metadata(?string $key = null, mixed $default = null): mixed { return $key === null ? $this->metadata : ($this->metadata[$key] ?? $default); }
+    public function removeMetadata(string $key): void { unset($this->metadata[$key]); }
+}
+
 trait Loggable
 {
-    public function log(string $action, array $data = []): void
+    public function log(string $action, array $context = []): void
     {
-        // Log to activity_logs collection
-        error_log(json_encode([
-            'action' => $action,
-            'class' => static::class,
-            'data' => $data,
-            'timestamp' => date('c'),
-        ]));
+        error_log(json_encode(['action' => $action, 'class' => static::class, 'context' => $context, 'occurredAt' => (new \DateTimeImmutable())->format(DATE_ATOM)], JSON_UNESCAPED_SLASHES));
     }
 }
 
-// Usage in models/services:
-// class Student {
-//     use HasTimestamps, Auditable;
-// }
+// Example: final class StudentProfile { use HasTimestamps, Auditable, HasMetadata; }

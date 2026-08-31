@@ -96,7 +96,7 @@ class SendGridEmailService
             $response = curl_exec($curl);
             $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
             $error = curl_error($curl);
-            curl_close($curl);
+            unset($curl);
 
             if (!empty($error)) {
                 error_log('SendGrid cURL error: ' . $error);

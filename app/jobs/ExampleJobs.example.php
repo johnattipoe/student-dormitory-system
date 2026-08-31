@@ -1,77 +1,57 @@
 <?php
-/**
- * Example Jobs - Background Tasks for Async Processing
- * 
- * Jobs keep web requests fast by delegating heavy operations
- * to background workers. Implement your queue system (Redis, database, etc.)
- */
+/** Background job templates. A queue worker calls handle() and manages retries. */
 
 namespace App\Jobs;
 
-/**
- * Example Jobs - Background task classes
- * 
- * Jobs decouple heavy operations from web requests.
- * Implement your queue system (Redis, database, Supervisor, etc.)
- * and dispatch jobs asynchronously.
- * 
- * Usage pattern:
- *   dispatch(new SendNotificationJob($userId, $message, 'email'));
- * 
- * Worker processes queued jobs and calls handle().
- */
-class SendNotificationJob
+interface JobContract
 {
-    public function __construct(
-        private string $userId,
-        private string $message,
-        private string $type = 'email',
-    ) {}
-    
-    /**
-     * Execute when worker processes this job
-     * Implement your queue to call this method
-     */
-    public function execute(): void
+    /** @return array<string, mixed> */
+    public function handle(): array;
+    public function name(): string;
+    public function maxAttempts(): int;
+}
+
+abstract class QueueableJob implements JobContract
+{
+    public function __construct(protected readonly string $jobId, protected readonly int $attempt = 1) {}
+    public function maxAttempts(): int { return 3; }
+    protected function completed(array $data = []): array { return ['jobId' => $this->jobId, 'job' => $this->name(), 'attempt' => $this->attempt, 'completedAt' => date(DATE_ATOM)] + $data; }
+}
+
+final class SendNotificationJob extends QueueableJob
+{
+    public function __construct(string $jobId, private readonly string $userId, private readonly string $title, private readonly string $message, private readonly string $type = 'info', int $attempt = 1) { parent::__construct($jobId, $attempt); }
+    public function name(): string { return 'send_notification'; }
+    public function handle(): array
     {
-        // Example: Send notification
-        // $service = new NotificationService();
-        // $service->sendToUser($this->userId, $this->message, $this->type);
-        error_log("Sending $this->type notification to user $this->userId");
+        if ($this->userId === '' || $this->title === '') throw new \InvalidArgumentException('A user and notification title are required.');
+        // Production worker: (new NotificationService())->create([...]);
+        error_log("Queued notification for {$this->userId}: {$this->title}");
+        return $this->completed(['recipientId' => $this->userId, 'type' => $this->type]);
     }
 }
 
-class GenerateReportJob
+final class GenerateReportJob extends QueueableJob
 {
-    public function __construct(
-        private string $reportType,
-        private array $filters,
-    ) {}
-    
-    public function execute(): void
+    public function __construct(string $jobId, private readonly string $reportType, private readonly array $filters = [], int $attempt = 1) { parent::__construct($jobId, $attempt); }
+    public function name(): string { return 'generate_report'; }
+    public function handle(): array
     {
-        // Example: Generate and store report
-        // $service = new ReportService();
-        // $report = $service->generate($this->reportType, $this->filters);
-        error_log("Generating $this->reportType report with filters");
+        if ($this->reportType === '') throw new \InvalidArgumentException('Report type is required.');
+        // Production worker: generate, persist and notify the report requester.
+        return $this->completed(['reportType' => $this->reportType, 'filters' => $this->filters]);
     }
 }
 
-class ProcessAttendanceJob
+final class ProcessAttendanceJob extends QueueableJob
 {
-    public function __construct(
-        private string $attendanceId,
-    ) {}
-    
-    public function execute(): void
+    public function __construct(string $jobId, private readonly string $attendanceId, int $attempt = 1) { parent::__construct($jobId, $attempt); }
+    public function name(): string { return 'process_attendance'; }
+    public function handle(): array
     {
-        // Example: Process attendance check-in/out
-        // $service = new AttendanceService();
-        // $service->process($this->attendanceId);
-        error_log("Processing attendance record: $this->attendanceId");
+        if ($this->attendanceId === '') throw new \InvalidArgumentException('Attendance ID is required.');
+        return $this->completed(['attendanceId' => $this->attendanceId]);
     }
 }
 
-// Usage in controllers:
-// dispatch(new SendNotificationJob($userId, $message, 'sms'));
-// dispatch(new GenerateReportJob('attendance', ['month' => 'august']));
+// Worker example: try { $result = $job->handle(); } catch (Throwable $error) { /* retry or fail */ }

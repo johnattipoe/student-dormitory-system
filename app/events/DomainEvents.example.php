@@ -1,55 +1,57 @@
 <?php
-/**
- * Example Events - Domain Events for Async Processing
- * 
- * Events decouple the system: one action can trigger multiple reactions
- * without tight coupling. Listeners subscribe and react independently.
- */
+/** Domain event templates. Dispatch from services only after a successful write. */
 
 namespace App\Events;
 
-class StudentCreatedEvent
+interface DomainEvent
 {
-    public function __construct(
-        public readonly string $studentId,
-        public readonly string $firstName,
-        public readonly string $email,
-        public readonly string $houseId,
-    ) {}
+    public function eventName(): string;
+    public function occurredAt(): \DateTimeImmutable;
+    public function payload(): array;
 }
 
-class IncidentReportedEvent
+abstract class AbstractDomainEvent implements DomainEvent
 {
-    public function __construct(
-        public readonly string $incidentId,
-        public readonly string $title,
-        public readonly string $severity,
-        public readonly string $reportedBy,
-    ) {}
+    private readonly \DateTimeImmutable $occurredAt;
+    private readonly string $eventId;
+    public function __construct(?\DateTimeImmutable $occurredAt = null, ?string $eventId = null) { $this->occurredAt = $occurredAt ?? new \DateTimeImmutable(); $this->eventId = $eventId ?? bin2hex(random_bytes(16)); }
+    public function occurredAt(): \DateTimeImmutable { return $this->occurredAt; }
+    public function eventId(): string { return $this->eventId; }
 }
 
-class VisitorArrivedEvent
+final class StudentCreatedEvent extends AbstractDomainEvent
 {
-    public function __construct(
-        public readonly string $visitorId,
-        public readonly string $studentId,
-        public readonly \DateTime $arrivalTime,
-    ) {}
+    public function __construct(public readonly string $studentId, public readonly string $firstName, public readonly string $email, public readonly string $houseId, ?\DateTimeImmutable $occurredAt = null) { parent::__construct($occurredAt); }
+    public function eventName(): string { return 'student.created'; }
+    public function payload(): array { return ['eventId' => $this->eventId(), 'studentId' => $this->studentId, 'firstName' => $this->firstName, 'email' => $this->email, 'houseId' => $this->houseId]; }
 }
 
-class VisitorDepartedEvent
+final class StudentAllocatedEvent extends AbstractDomainEvent
 {
-    public function __construct(
-        public readonly string $visitorId,
-        public readonly string $studentId,
-        public readonly \DateTime $departureTime,
-        public readonly int $durationMinutes,
-    ) {}
+    public function __construct(public readonly string $studentId, public readonly string $roomId, public readonly string $allocationId, ?\DateTimeImmutable $occurredAt = null) { parent::__construct($occurredAt); }
+    public function eventName(): string { return 'student.allocated'; }
+    public function payload(): array { return ['eventId' => $this->eventId(), 'studentId' => $this->studentId, 'roomId' => $this->roomId, 'allocationId' => $this->allocationId]; }
 }
 
-// Usage in services:
-// event(new StudentCreatedEvent($id, $name, $email, $house));
-// This triggers listeners like:
-// - SendWelcomeEmailListener
-// - LogActivityListener
-// - NotifyHousemasterListener
+final class IncidentReportedEvent extends AbstractDomainEvent
+{
+    public function __construct(public readonly string $incidentId, public readonly string $title, public readonly string $severity, public readonly string $reportedBy, ?\DateTimeImmutable $occurredAt = null) { parent::__construct($occurredAt); }
+    public function eventName(): string { return 'incident.reported'; }
+    public function payload(): array { return ['eventId' => $this->eventId(), 'incidentId' => $this->incidentId, 'title' => $this->title, 'severity' => $this->severity, 'reportedBy' => $this->reportedBy]; }
+}
+
+final class MedicalRecordCreatedEvent extends AbstractDomainEvent
+{
+    public function __construct(public readonly string $recordId, public readonly string $studentId, public readonly string $severity, ?\DateTimeImmutable $occurredAt = null) { parent::__construct($occurredAt); }
+    public function eventName(): string { return 'medical_record.created'; }
+    public function payload(): array { return ['eventId' => $this->eventId(), 'recordId' => $this->recordId, 'studentId' => $this->studentId, 'severity' => $this->severity]; }
+}
+
+final class VisitorArrivedEvent extends AbstractDomainEvent
+{
+    public function __construct(public readonly string $visitorId, public readonly string $studentId, public readonly \DateTimeImmutable $arrivalTime, ?\DateTimeImmutable $occurredAt = null) { parent::__construct($occurredAt); }
+    public function eventName(): string { return 'visitor.arrived'; }
+    public function payload(): array { return ['eventId' => $this->eventId(), 'visitorId' => $this->visitorId, 'studentId' => $this->studentId, 'arrivalTime' => $this->arrivalTime->format(DATE_ATOM)]; }
+}
+
+// Example listener map: 'medical_record.created' => [NotifyHouseStaffListener::class].
