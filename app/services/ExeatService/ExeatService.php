@@ -150,6 +150,7 @@ class ExeatService
             'closeTime' => $closeTime,
             'endTime' => $closeTime,
             'destination' => $destination,
+            'guardianPhone' => trim((string) ($data['guardianPhone'] ?? $record['guardianPhone'] ?? '')),
             'reason' => $reason,
             'updatedAt' => date(DATE_ATOM),
         ];

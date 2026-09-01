@@ -18,6 +18,7 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\ExeatService;
 use App\Services\HouseService;
 use App\Services\StudentService;
+use App\Services\BmsSmsService;
 
 $role = current_role() ?? '';
 $user = current_user() ?? [];
@@ -88,6 +89,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
 
         flash($result['success'] ? 'success' : 'error', $result['message']);
+        
+        // Send SMS notification for exeat creation
+        if ($result['success']) {
+            try {
+                $guardianPhone = sanitize($_POST['guardianPhone'] ?? $requestStudent['guardianPhone'] ?? '');
+                $appConfig = app_config();
+                $smsEnabled = (string) ($appConfig['advanced']['sms_notifications'] ?? '0');
+                
+                // Log to file
+                $logFile = APP_ROOT . '/storage/logs/sms-exeat-' . date('Y-m-d') . '.log';
+                $logMsg = "[" . date('H:i:s') . "] [CREATE-INDEX] SMS enabled: {$smsEnabled}, Guardian phone: " . (!empty($guardianPhone) ? substr($guardianPhone, -4, 4) : 'EMPTY') . "\n";
+                @file_put_contents($logFile, $logMsg, FILE_APPEND);
+                
+                if ($guardianPhone !== '' && $smsEnabled === '1') {
+                    $smsService = new BmsSmsService();
+                    $studentName = trim(($requestStudent['firstName'] ?? '') . ' ' . ($requestStudent['lastName'] ?? ''));
+                    $startDate = sanitize($_POST['startDate'] ?? $_POST['date'] ?? '');
+                    $endDate = sanitize($_POST['endDate'] ?? $startDate);
+                    $destination = sanitize($_POST['destination'] ?? '');
+                    $reason = sanitize($_POST['reason'] ?? '');
+                    
+                    // Determine sender role label
+                    $roleSender = match($role) {
+                        ROLE_ADMIN => 'Dormitory Administration',
+                        ROLE_HOUSE_MASTER => 'House Master',
+                        ROLE_HOUSE_MISTRESS => 'House Mistress',
+                        ROLE_SENIOR_HOUSEPARENT => 'Senior Houseparent',
+                        default => 'Dormitory Staff',
+                    };
+                    
+                    if ($exeatType === 'internal') {
+                        $reasonStr = !empty($reason) ? " for {$reason}" : '';
+                        $smsMessage = "Your ward {$studentName} has been approved for internal exeat on {$startDate}{$reasonStr} by the {$roleSender}.";
+                    } else {
+                        $destStr = !empty($destination) ? " to {$destination}" : '';
+                        $reasonStr = !empty($reason) ? " for {$reason}" : '';
+                        $smsMessage = "Your ward {$studentName} has been approved for external exeat from {$startDate} to {$endDate}{$destStr}{$reasonStr} by the {$roleSender}.";
+                    }
+                    
+                    $logMsg = "[" . date('H:i:s') . "] [CREATE-INDEX] Sending SMS to {$guardianPhone}, length: " . mb_strlen($smsMessage) . "\n";
+                    @file_put_contents($logFile, $logMsg, FILE_APPEND);
+                    
+                    $smsResult = $smsService->send($guardianPhone, $smsMessage);
+                    if ($smsResult['success']) {
+                        $logMsg = "[" . date('H:i:s') . "] [CREATE-INDEX] ✓ SMS SENT to {$guardianPhone}\n";
+                        @file_put_contents($logFile, $logMsg, FILE_APPEND);
+                    } else {
+                        $logMsg = "[" . date('H:i:s') . "] [CREATE-INDEX] ✗ SMS FAILED: " . ($smsResult['message'] ?? 'Unknown error') . " | Response: " . json_encode($smsResult['provider_response'] ?? []) . "\n";
+                        @file_put_contents($logFile, $logMsg, FILE_APPEND);
+                    }
+                }
+            } catch (Throwable $e) {
+                $logFile = APP_ROOT . '/storage/logs/sms-exeat-' . date('Y-m-d') . '.log';
+                $logMsg = "[" . date('H:i:s') . "] [CREATE-INDEX] ✗ ERROR: " . $e->getMessage() . "\n";
+                @file_put_contents($logFile, $logMsg, FILE_APPEND);
+            }
+        }
+        
         redirect(url('views/exeat/index.php'));
     }
 
@@ -149,6 +208,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $result = $service->updateStatus($recordId, $action, $userId);
         flash($result['success'] ? 'success' : 'error', $result['message']);
+        
         redirect(url('views/exeat/index.php'));
     }
 
@@ -647,6 +707,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <th>House</th>
                                 <?php endif; ?>
                                 <th style="min-width: 95px;">Type</th>
+                                <th style="min-width: 120px;">Guardian Phone</th>
                                 <th style="min-width: 160px;">Schedule &amp; Dates</th>
                                 <th>Destination</th>
                                 <th>Reason</th>
@@ -658,7 +719,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <tbody>
                             <?php if (empty($records)): ?>
                                 <tr>
-                                    <td colspan="<?= e((string) ($isStudent ? 7 : ($role === ROLE_ADMIN ? 10 : 9))) ?>" class="text-center text-muted py-5">
+                                    <td colspan="<?= e((string) ($isStudent ? 8 : ($role === ROLE_ADMIN ? 11 : 10))) ?>" class="text-center text-muted py-5">
                                         <i class="bi bi-inbox fs-3 d-block mb-2"></i>No exeat requests found.
                                     </td>
                                 </tr>
@@ -688,6 +749,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                             <?php else: ?>
                                                 <span class="badge bg-primary-subtle text-primary border"><i class="bi bi-calendar-range me-1"></i>External</span>
                                             <?php endif; ?>
+                                        </td>
+                                        <td class="text-nowrap small">
+                                            <?= e($record['guardianPhone'] ?? $studentMap[$recordStudentId]['phone'] ?? '—') ?>
                                         </td>
                                         <td class="text-nowrap">
                                             <?php if ($isInternal): ?>

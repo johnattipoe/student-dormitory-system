@@ -51,6 +51,7 @@ $recStudentId = (string) ($exeat['studentId'] ?? '');
 $student = $recStudentId !== '' ? StudentService::find($recStudentId) : null;
 $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: ($exeat['studentName'] ?? 'Student');
 $admissionNo = $student['admissionNo'] ?? $student['studentId'] ?? $recStudentId;
+$guardianPhone = trim((string) ($exeat['guardianPhone'] ?? $student['guardianPhone'] ?? $student['phone'] ?? ''));
 
 $currentType = ($exeat['exeatType'] ?? $exeat['type'] ?? '') === 'internal' ? 'internal' : 'external';
 
@@ -69,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'startTime' => sanitize($_POST['startTime'] ?? ''),
         'closeTime' => sanitize($_POST['closeTime'] ?? ''),
         'destination' => sanitize($_POST['destination'] ?? ''),
+        'guardianPhone' => sanitize($_POST['guardianPhone'] ?? $guardianPhone),
         'reason' => sanitize($_POST['reason'] ?? ''),
     ];
 
@@ -217,6 +219,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 <span class="input-group-text bg-white"><i class="bi bi-geo-alt"></i></span>
                                 <input name="destination" class="form-control" value="<?= e($exeat['destination'] ?? '') ?>" placeholder="Where will the student be staying?">
                             </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Parent / Guardian Phone Number</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="bi bi-telephone"></i></span>
+                                <input type="tel" name="guardianPhone" class="form-control" value="<?= e($guardianPhone) ?>" placeholder="e.g. +233 24 000 0000">
+                            </div>
+                            <small class="text-muted">This is shown on the exeat and should match the student's registered parent/guardian number.</small>
                         </div>
 
                         <div class="col-12">

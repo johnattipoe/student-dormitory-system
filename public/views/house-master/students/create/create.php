@@ -84,11 +84,17 @@ $courseOptions = [
 ];
 $classRecords = FirebaseService::getInstance()->getCollection('classes', [], 500);
 $classOptions = array_values(array_unique(array_filter(array_map(
-    static fn(array $class): string => (string) ($class['className'] ?? ''),
+    static function (array $class): string {
+        $code = trim((string) ($class['classCode'] ?? ''));
+        return $code !== '' ? $code : trim((string) ($class['className'] ?? ''));
+    },
     array_filter($classRecords, static fn(array $class): bool => ($class['status'] ?? 'active') === 'active')
 ))));
 if (empty($classOptions)) {
     $classOptions = ['SHS 1A', 'SHS 1B', 'SHS 2A', 'SHS 2B', 'SHS 3A', 'SHS 3B'];
+}
+if (($old['class'] ?? '') !== '' && !in_array($old['class'], $classOptions, true)) {
+    $classOptions[] = $old['class'];
 }
 $formOptions = ['Form 1', 'Form 2', 'Form 3', 'Form 4'];
 
@@ -185,13 +191,13 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <label class="form-label fw-semibold">Class / Section</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-white"><i class="bi bi-journal-bookmark"></i></span>
-                                <input name="class" class="form-control" list="classList" placeholder="e.g. Science 1" value="<?= e($old['class'] ?? '') ?>">
+                                <select name="class" class="form-select">
+                                    <option value="">Select Class / Section</option>
+                                    <?php foreach ($classOptions as $opt): ?>
+                                        <option value="<?= e($opt) ?>" <?= ($old['class'] ?? '') === $opt ? 'selected' : '' ?>><?= e($opt) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
-                            <datalist id="classList">
-                                <?php foreach ($classOptions as $opt): ?>
-                                    <option value="<?= e($opt) ?>">
-                                <?php endforeach; ?>
-                            </datalist>
                         </div>
 
                         <div class="col-md-4">

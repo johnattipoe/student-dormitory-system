@@ -174,9 +174,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card p-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h6 class="mb-0 fw-bold">Incident Log Records</h6>
-                <a class="btn btn-sm btn-primary" href="<?= url('views/house-master/incidents/index/index.php') ?>">
-                    <i class="bi bi-flag me-1"></i> Manage Incidents
-                </a>
+                <div class="d-flex gap-2 print-hide">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()">
+                        <i class="bi bi-printer me-1"></i> Print
+                    </button>
+                    <a class="btn btn-sm btn-primary" href="<?= url('views/house-master/incidents/index/index.php') ?>">
+                        <i class="bi bi-flag me-1"></i> Manage Incidents
+                    </a>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-hover data-table w-100">
@@ -240,4 +245,45 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<style>
+@media print {
+    .print-hide,
+    .navbar,
+    .sidebar,
+    .page-header,
+    .main-content > .navbar,
+    .main-content > .alerts,
+    .btn,
+    .dataTables_wrapper .dataTables_filter,
+    .dataTables_wrapper .dataTables_length,
+    .dataTables_wrapper .dataTables_paginate,
+    .dataTables_wrapper .dataTables_info {
+        display: none !important;
+    }
+
+    body {
+        background: #fff !important;
+    }
+
+    .main-content {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    .content-wrapper {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .card.stat-card {
+        box-shadow: none !important;
+        border: 1px solid #dee2e6 !important;
+    }
+
+    table {
+        font-size: 12px;
+    }
+}
+</style>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

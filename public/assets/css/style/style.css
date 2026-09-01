@@ -558,6 +558,24 @@ a:hover {
   box-shadow: 0 0 0 .22rem rgba(37, 99, 235, .15);
 }
 
+/* Select2 replaces native selects with a span, so keep icon input groups joined. */
+.input-group > .select2-container {
+  flex: 1 1 auto;
+  width: 1% !important;
+  min-width: 0;
+}
+
+.input-group > .select2-container .select2-selection {
+  min-height: 38px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.input-group:has(> .select2-container) > .input-group-text {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
 .flatpickr-calendar {
   border: 1px solid var(--sds-border);
   border-radius: 14px;
