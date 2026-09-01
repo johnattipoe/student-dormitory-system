@@ -73,88 +73,6 @@ $getRecorderName = function (array $record) use (&$userMap): string {
     return 'Clinic Staff';
 };
 
-// Handle POST actions (Create, Update, Delete)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = sanitize($_POST['action'] ?? '');
-
-    if ($action === 'create_record') {
-        $studentId = sanitize($_POST['studentId'] ?? '');
-        $diagnosis = sanitize($_POST['diagnosis'] ?? '');
-        $severity = sanitize($_POST['severity'] ?? 'normal');
-        $treatment = sanitize($_POST['treatment'] ?? '');
-        $notes = sanitize($_POST['notes'] ?? '');
-
-        if (!$studentId || !isset($studentIds[$studentId])) {
-            flash('error', 'Please select a valid student from your house.');
-        } elseif ($diagnosis === '') {
-            flash('error', 'Diagnosis is required.');
-        } else {
-            $result = $medicalService->create([
-                'studentId' => $studentId,
-                'houseId' => $houseId,
-                'diagnosis' => $diagnosis,
-                'severity' => $severity,
-                'treatment' => $treatment,
-                'notes' => $notes,
-                'recordedBy' => current_user()['uid'] ?? current_user()['id'] ?? null,
-                'createdAt' => date('Y-m-d H:i:s'),
-            ]);
-
-            if ($result['success'] ?? false) {
-                flash('success', 'Medical report created successfully.');
-            } else {
-                flash('error', $result['message'] ?? 'Failed to save medical report.');
-            }
-        }
-        redirect(url('views/house-master/health-reports/index.php'));
-    }
-
-    if ($action === 'update_record') {
-        $id = sanitize($_POST['id'] ?? '');
-        $studentId = sanitize($_POST['studentId'] ?? '');
-        $diagnosis = sanitize($_POST['diagnosis'] ?? '');
-        $severity = sanitize($_POST['severity'] ?? 'normal');
-        $treatment = sanitize($_POST['treatment'] ?? '');
-        $notes = sanitize($_POST['notes'] ?? '');
-
-        $record = $id ? $medicalService->find($id) : null;
-        if (!$record || (!isset($studentIds[(string) ($record['studentId'] ?? '')]) && ($record['houseId'] ?? '') !== $houseId)) {
-            flash('error', 'Medical report not found for your house.');
-        } else {
-            $result = $medicalService->update($id, [
-                'studentId' => $studentId ?: $record['studentId'],
-                'diagnosis' => $diagnosis,
-                'severity' => $severity,
-                'treatment' => $treatment,
-                'notes' => $notes,
-            ]);
-
-            if ($result['success'] ?? false) {
-                flash('success', 'Medical report updated successfully.');
-            } else {
-                flash('error', $result['message'] ?? 'Failed to update medical report.');
-            }
-        }
-        redirect(url('views/house-master/health-reports/index.php'));
-    }
-
-    if ($action === 'delete_record') {
-        $id = sanitize($_POST['id'] ?? '');
-        $record = $id ? $medicalService->find($id) : null;
-        if (!$record || (!isset($studentIds[(string) ($record['studentId'] ?? '')]) && ($record['houseId'] ?? '') !== $houseId)) {
-            flash('error', 'Medical report not found.');
-        } else {
-            $result = $medicalService->delete($id);
-            if ($result['success'] ?? false) {
-                flash('success', 'Medical report deleted.');
-            } else {
-                flash('error', $result['message'] ?? 'Failed to delete record.');
-            }
-        }
-        redirect(url('views/house-master/health-reports/index.php'));
-    }
-}
-
 // Fetch all medical records and filter to current house
 $allRecords = $medicalService->all();
 $records = array_values(array_filter($allRecords, function (array $record) use ($studentIds, $houseId): bool {
@@ -223,11 +141,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div>
                 <h5 class="mb-1">Medical & Health Reports</h5>
                 <p class="text-muted mb-0">Health records from the school clinic/nurse and house medical activity.</p>
-            </div>
-            <div class="d-flex gap-2">
-                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createRecordModal">
-                    <i class="bi bi-plus-circle me-1"></i> New Health Report
-                </button>
             </div>
         </div>
 
@@ -299,7 +212,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <th>Severity</th>
                             <th>Recorded By</th>
                             <th>Date</th>
-                            <th>Actions</th>
+                            <th>View</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -345,131 +258,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                             onclick='viewRecord(<?= json_encode($record, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>, <?= json_encode($stName . $adm, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>, <?= json_encode($recorderName, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)' title="View Details">
                                             <i class="bi bi-eye"></i>
                                         </button>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" 
-                                            onclick='editRecord(<?= json_encode($record, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)' title="Edit Report">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <form method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this health report?');">
-                                            <input type="hidden" name="action" value="delete_record">
-                                            <input type="hidden" name="id" value="<?= e((string) ($record['id'] ?? '')) ?>">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
-                                        </form>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>
                 </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Create Health Report Modal -->
-    <div class="modal fade" id="createRecordModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-heart-pulse text-primary me-2"></i>New Health Report</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST">
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="create_record">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Student <span class="text-danger">*</span></label>
-                                <select name="studentId" class="form-select" required>
-                                    <option value="">Select student...</option>
-                                    <?php foreach ($students as $st): ?>
-                                        <option value="<?= e((string) ($st['id'] ?? '')) ?>">
-                                            <?= e(trim(($st['firstName'] ?? '') . ' ' . ($st['lastName'] ?? ''))) ?> (<?= e($st['admissionNo'] ?? '') ?>)
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Severity Level</label>
-                                <select name="severity" class="form-select" required>
-                                    <option value="normal">Normal / Mild</option>
-                                    <option value="moderate">Moderate Concern</option>
-                                    <option value="severe">Severe</option>
-                                    <option value="emergency">Emergency</option>
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Diagnosis / Symptoms <span class="text-danger">*</span></label>
-                                <input name="diagnosis" class="form-control" placeholder="e.g. High fever, Malaria symptoms, Asthma flare-up" required>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Treatment / Action Taken</label>
-                                <input name="treatment" class="form-control" placeholder="e.g. Administered first aid, Sent to school infirmary / hospital">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Observations / Notes</label>
-                                <textarea name="notes" class="form-control" rows="3" placeholder="Additional observations, guardian contact notes, temperature readings..."></textarea>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Save Report</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Health Report Modal -->
-    <div class="modal fade" id="editRecordModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-pencil-square text-secondary me-2"></i>Edit Health Report</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST">
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="update_record">
-                        <input type="hidden" name="id" id="edit_id">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Student</label>
-                                <select name="studentId" id="edit_studentId" class="form-select" required>
-                                    <?php foreach ($students as $st): ?>
-                                        <option value="<?= e((string) ($st['id'] ?? '')) ?>">
-                                            <?= e(trim(($st['firstName'] ?? '') . ' ' . ($st['lastName'] ?? ''))) ?> (<?= e($st['admissionNo'] ?? '') ?>)
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Severity Level</label>
-                                <select name="severity" id="edit_severity" class="form-select" required>
-                                    <option value="normal">Normal / Mild</option>
-                                    <option value="moderate">Moderate Concern</option>
-                                    <option value="severe">Severe</option>
-                                    <option value="emergency">Emergency</option>
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Diagnosis / Symptoms <span class="text-danger">*</span></label>
-                                <input name="diagnosis" id="edit_diagnosis" class="form-control" required>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Treatment / Action Taken</label>
-                                <input name="treatment" id="edit_treatment" class="form-control">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Observations / Notes</label>
-                                <textarea name="notes" id="edit_notes" class="form-control" rows="3"></textarea>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Update Report</button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
@@ -528,15 +322,6 @@ function viewRecord(rec, studentName, recorderName) {
     new bootstrap.Modal(document.getElementById('viewRecordModal')).show();
 }
 
-function editRecord(rec) {
-    document.getElementById('edit_id').value = rec.id || '';
-    document.getElementById('edit_studentId').value = rec.studentId || '';
-    document.getElementById('edit_severity').value = (rec.severity || 'normal').toLowerCase();
-    document.getElementById('edit_diagnosis').value = rec.diagnosis || '';
-    document.getElementById('edit_treatment').value = rec.treatment || '';
-    document.getElementById('edit_notes').value = rec.notes || '';
-    new bootstrap.Modal(document.getElementById('editRecordModal')).show();
-}
 </script>
 
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

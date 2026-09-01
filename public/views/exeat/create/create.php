@@ -18,6 +18,7 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\ExeatService;
 use App\Services\HouseService;
 use App\Services\StudentService;
+use App\Services\BmsSmsService;
 
 $role = current_role() ?? '';
 $user = current_user() ?? [];
@@ -30,6 +31,7 @@ $service = new ExeatService();
 $studentProfile = $isStudent ? $service->studentForUser($user) : null;
 $houseStudents = [];
 $houseMap = [];
+$studentDataMap = [];
 
 if ($canCreateForStudent) {
     try {
@@ -53,6 +55,19 @@ if ($canCreateForStudent) {
         }
     } catch (Throwable $e) {
         $houseMap = [];
+    }
+
+    foreach ($houseStudents as $student) {
+        $studentId = (string) ($student['id'] ?? '');
+        if ($studentId === '') {
+            continue;
+        }
+
+        $studentDataMap[$studentId] = [
+            'name' => trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')),
+            'guardianPhone' => (string) ($student['guardianPhone'] ?? ''),
+            'admissionNo' => (string) ($student['admissionNo'] ?? ''),
+        ];
     }
 }
 
@@ -91,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'studentName' => trim(($requestStudent['firstName'] ?? '') . ' ' . ($requestStudent['lastName'] ?? '')),
         'houseId' => $requestStudent['houseId'] ?? null,
         'roomId' => $requestStudent['roomId'] ?? null,
-        'guardianPhone' => $requestStudent['guardianPhone'] ?? '',
+        'guardianPhone' => sanitize($_POST['guardianPhone'] ?? $requestStudent['guardianPhone'] ?? ''),
         'exeatType' => $exeatType,
         'startDate' => sanitize($_POST['startDate'] ?? $_POST['date'] ?? ''),
         'endDate' => sanitize($_POST['endDate'] ?? $_POST['date'] ?? ''),
@@ -105,6 +120,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     flash($result['success'] ? 'success' : 'error', $result['message']);
     if ($result['success']) {
+        // Send SMS notification to parent/guardian
+        $guardianPhone = sanitize($_POST['guardianPhone'] ?? $requestStudent['guardianPhone'] ?? '');
+        $appConfig = app_config();
+        $smsEnabled = (string) ($appConfig['advanced']['sms_notifications'] ?? '0');
+        
+        // Log to file
+        $logFile = APP_ROOT . '/storage/logs/sms-exeat-' . date('Y-m-d') . '.log';
+        $logMsg = "[" . date('H:i:s') . "] [CREATE] SMS enabled: {$smsEnabled}, Guardian phone: " . (!empty($guardianPhone) ? substr($guardianPhone, -4, 4) : 'EMPTY') . "\n";
+        @file_put_contents($logFile, $logMsg, FILE_APPEND);
+        
+        if ($guardianPhone !== '' && $smsEnabled === '1') {
+            try {
+                $smsService = new BmsSmsService();
+                $studentName = trim(($requestStudent['firstName'] ?? '') . ' ' . ($requestStudent['lastName'] ?? ''));
+                $exeatType = sanitize($_POST['exeatType'] ?? 'external');
+                $startDate = sanitize($_POST['startDate'] ?? $_POST['date'] ?? '');
+                $endDate = sanitize($_POST['endDate'] ?? $startDate);
+                $destination = sanitize($_POST['destination'] ?? '');
+                $reason = sanitize($_POST['reason'] ?? '');
+                
+                // Determine sender role label
+                $roleSender = match($role) {
+                    ROLE_ADMIN => 'Dormitory Administration',
+                    ROLE_HOUSE_MASTER => 'House Master',
+                    ROLE_HOUSE_MISTRESS => 'House Mistress',
+                    ROLE_SENIOR_HOUSEPARENT => 'Senior Houseparent',
+                    default => 'Dormitory Staff',
+                };
+                
+                if ($exeatType === 'internal') {
+                    $reasonStr = !empty($reason) ? " for {$reason}" : '';
+                    $smsMessage = "Your ward {$studentName} has been approved for internal exeat on {$startDate}{$reasonStr} by the {$roleSender}.";
+                } else {
+                    $destStr = !empty($destination) ? " to {$destination}" : '';
+                    $reasonStr = !empty($reason) ? " for {$reason}" : '';
+                    $smsMessage = "Your ward {$studentName} has been approved for external exeat from {$startDate} to {$endDate}{$destStr}{$reasonStr} by the {$roleSender}.";
+                }
+                
+                $logMsg = "[" . date('H:i:s') . "] [CREATE] Sending SMS to {$guardianPhone}, length: " . mb_strlen($smsMessage) . "\n";
+                @file_put_contents($logFile, $logMsg, FILE_APPEND);
+                
+                $smsResult = $smsService->send($guardianPhone, $smsMessage);
+                
+                if ($smsResult['success']) {
+                    $logMsg = "[" . date('H:i:s') . "] [CREATE] ✓ SMS SENT to {$guardianPhone}\n";
+                    @file_put_contents($logFile, $logMsg, FILE_APPEND);
+                    flash('info', 'Exeat created successfully. Parent/guardian has been notified via SMS.');
+                } else {
+                    $logMsg = "[" . date('H:i:s') . "] [CREATE] ✗ SMS FAILED: " . ($smsResult['message'] ?? 'Unknown error') . " | Response: " . json_encode($smsResult['provider_response'] ?? []) . "\n";
+                    @file_put_contents($logFile, $logMsg, FILE_APPEND);
+                    flash('warning', 'Exeat created successfully, but SMS notification could not be sent: ' . ($smsResult['message'] ?? 'Unknown error'));
+                }
+            } catch (Throwable $e) {
+                $logMsg = "[" . date('H:i:s') . "] [CREATE] ✗ ERROR: " . $e->getMessage() . "\n";
+                @file_put_contents($logFile, $logMsg, FILE_APPEND);
+                flash('warning', 'Exeat created successfully, but SMS notification failed: ' . $e->getMessage());
+            }
+        } elseif ($guardianPhone === '' && $smsEnabled === '1') {
+            $logMsg = "[" . date('H:i:s') . "] [CREATE] ⚠ No guardian phone for student " . ($requestStudent['id'] ?? 'UNKNOWN') . "\n";
+            @file_put_contents($logFile, $logMsg, FILE_APPEND);
+            flash('info', 'Exeat created successfully. No guardian phone number was found to send SMS notification.');
+        } elseif ($guardianPhone !== '' && $smsEnabled !== '1') {
+            $logMsg = "[" . date('H:i:s') . "] [CREATE] ⚠ SMS notifications disabled in app settings\n";
+            @file_put_contents($logFile, $logMsg, FILE_APPEND);
+        }
+        
         redirect(url('views/exeat/index.php'));
     }
 }
@@ -165,7 +246,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <label class="form-label fw-semibold">Select Student <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-white"><i class="bi bi-person"></i></span>
-                                <select name="studentId" class="form-select" required <?= empty($houseStudents) ? 'disabled' : '' ?>>
+                                <select name="studentId" id="studentId" class="form-select" required <?= empty($houseStudents) ? 'disabled' : '' ?> onchange="updateStudentDetails()">
                                     <option value=""><?= empty($houseStudents) ? 'No students available' : 'Select student...' ?></option>
                                     <?php foreach ($houseStudents as $student): ?>
                                         <?php
@@ -181,6 +262,19 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <?php endif; ?>
                                     <?php endforeach; ?>
                                 </select>
+                            </div>
+                        </div>
+
+                        <div id="studentContactBox" class="alert alert-light border mb-4 d-none">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <div class="small text-muted text-uppercase fw-semibold">Selected student</div>
+                                    <div class="fw-bold" id="studentContactName">—</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="small text-muted text-uppercase fw-semibold">Parent / Guardian</div>
+                                    <div id="studentContactPhone" class="fw-semibold">—</div>
+                                </div>
                             </div>
                         </div>
                     <?php endif; ?>
@@ -253,6 +347,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </div>
 
                         <div class="col-12">
+                            <label class="form-label fw-semibold">Parent / Guardian Phone Number <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="bi bi-telephone"></i></span>
+                                <input type="tel" name="guardianPhone" id="guardianPhone" class="form-control" value="<?= e($requestStudent['guardianPhone'] ?? '') ?>" placeholder="e.g. +233 24 000 0000" required>
+                            </div>
+                            <small id="guardianPhoneHint" class="text-muted">This will be filled from the selected student's registered parent contact when available.</small>
+                        </div>
+
+                        <div class="col-12">
                             <label class="form-label fw-semibold">Reason <span class="text-danger">*</span></label>
                             <textarea name="reason" class="form-control" rows="4" required placeholder="Provide clear explanation for the exeat request..."></textarea>
                         </div>
@@ -271,6 +374,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 </div>
 
 <script>
+const studentData = <?php echo json_encode($studentDataMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+
 function setType(type) {
     document.getElementById('selectedExeatType').value = type;
     const internalFields = document.getElementById('internalFields');
@@ -284,5 +389,44 @@ function setType(type) {
         externalFields.classList.remove('d-none');
     }
 }
+
+function updateStudentDetails() {
+    const studentSelect = document.getElementById('studentId');
+    const guardianPhoneInput = document.getElementById('guardianPhone');
+    const studentContactBox = document.getElementById('studentContactBox');
+    const studentContactName = document.getElementById('studentContactName');
+    const studentContactPhone = document.getElementById('studentContactPhone');
+    const guardianPhoneHint = document.getElementById('guardianPhoneHint');
+
+    if (!studentSelect || !guardianPhoneInput) return;
+
+    const studentId = studentSelect.value;
+    const student = studentData[studentId] || null;
+    const guardianPhone = student && student.guardianPhone ? student.guardianPhone : '';
+
+    guardianPhoneInput.value = guardianPhone;
+
+    if (studentContactBox) {
+        if (student && studentId) {
+            const name = student.name || 'Student';
+            const phone = guardianPhone || 'No parent/guardian number on file';
+            studentContactName.textContent = name;
+            studentContactPhone.textContent = phone;
+            studentContactBox.classList.remove('d-none');
+        } else {
+            studentContactBox.classList.add('d-none');
+        }
+    }
+
+    if (guardianPhoneHint) {
+        guardianPhoneHint.textContent = guardianPhone
+            ? 'Using the selected student\'s registered parent/guardian phone number.'
+            : 'No parent/guardian phone number is registered for this student.';
+    }
+}
+
+window.addEventListener('DOMContentLoaded', function () {
+    updateStudentDetails();
+});
 </script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>
