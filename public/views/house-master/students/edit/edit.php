@@ -19,9 +19,10 @@ use App\Services\StudentService;
 use App\Services\FirebaseService;
 
 $id = sanitize($_GET['studentId'] ?? $_GET['id'] ?? $_POST['studentId'] ?? $_POST['id'] ?? '');
-$houseId = current_user()['houseId'] ?? null;
+$currentUser = current_user() ?? [];
+$houseId = $currentUser['houseId'] ?? null;
 $student = $id ? StudentService::find($id) : null;
-if (!$student || ($student['houseId'] ?? null) !== $houseId) {
+if (!is_array($student) || ($student['houseId'] ?? null) !== $houseId) {
     flash('error', 'Student not found in your assigned house.');
     redirect(url('views/house-master/students/index/index.php'));
 }
