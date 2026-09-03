@@ -13,7 +13,7 @@ if (!class_exists(FirebaseAuthService::class, false)) {
     require_once __DIR__ . '/../../services/FirebaseAuthService/FirebaseAuthService.php';
 }
 
-class AuthController
+class AdminController
 {
     private AuthService $authService;
 
@@ -71,7 +71,7 @@ class AuthController
             redirect(base_url('forgot-password.php'));
         }
 
-        $result = FirebaseAuthService::sendPasswordResetEmail($email);
+        $result = FirebaseAuthService::sendCustomPasswordResetEmail($email);
 
         if (!$result['success']) {
             flash('error', $result['message']);

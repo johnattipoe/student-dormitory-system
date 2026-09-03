@@ -68,7 +68,8 @@ function report_export_rows(array $data, string $prefix = ''): array
         $rows[] = [$label, (string) $value];
     }
 
-    return $rows;
+    $limit = max(1, (int) (app_config()['export_max_records'] ?? 5000));
+    return array_slice($rows, 0, $limit);
 }
 
 function export_report_csv(string $filename, string $title, array $rows): void

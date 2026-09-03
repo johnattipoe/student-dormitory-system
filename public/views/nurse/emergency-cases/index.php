@@ -113,9 +113,23 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <h4 class="mb-1 fw-bold text-dark"><i class="bi bi-exclamation-octagon-fill text-danger me-2"></i>Emergency Cases</h4>
                 <p class="text-muted mb-0">Prioritise severe, critical, and emergency medical records requiring clinical follow-up.</p>
             </div>
-            <a class="btn btn-danger btn-sm" href="<?= url('views/nurse/create-record/create-record.php') ?>">
-                <i class="bi bi-plus-circle me-1"></i>Log Emergency Record
-            </a>
+            <div class="d-flex gap-2 flex-wrap">
+                <a class="btn btn-outline-primary btn-sm" href="<?= url('views/nurse/emergency-cases/broadcast/broadcast.php') ?>">
+                    <i class="bi bi-megaphone me-1"></i>Broadcast
+                </a>
+                <a class="btn btn-outline-success btn-sm" href="<?= url('views/nurse/emergency-cases/contacts/add/add.php') ?>">
+                    <i class="bi bi-person-plus me-1"></i>Add Contact
+                </a>
+                <a class="btn btn-outline-warning btn-sm" href="<?= url('views/nurse/emergency-cases/referral/create.php') ?>">
+                    <i class="bi bi-file-medical me-1"></i>Referral
+                </a>
+                <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/nurse/emergency-cases/export/export.php') ?>">
+                    <i class="bi bi-download me-1"></i>Export
+                </a>
+                <a class="btn btn-danger btn-sm" href="<?= url('views/nurse/create-record/create-record.php') ?>">
+                    <i class="bi bi-plus-circle me-1"></i>Log Emergency Record
+                </a>
+            </div>
         </div>
 
         <div class="alert alert-danger border-0 shadow-sm d-flex align-items-start gap-3 mb-4" role="alert">
@@ -155,17 +169,17 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center"><h6 class="mb-0 fw-bold"><i class="bi bi-clipboard2-pulse me-2 text-danger"></i>Urgent medical queue</h6><small class="text-muted"><?= count($filteredRecords) ?> case(s) shown</small></div>
             <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0 data-table w-100">
-                <thead class="table-light"><tr><th>Student</th><th>Diagnosis</th><th>Treatment / Notes</th><th>Severity</th><th>Case status</th><th>Logged</th><th class="text-end">Actions</th></tr></thead>
+                <thead class="table-light"><tr><th>Student</th><th>Diagnosis</th><th>Treatment / Notes</th><th>Severity</th><th>Case status</th><th>Response due</th><th>Logged</th><th class="text-end">Actions</th></tr></thead>
                 <tbody>
                 <?php if ($filteredRecords): foreach ($filteredRecords as $record): ?>
                     <?php $severity = strtolower((string) ($record['severity'] ?? 'emergency')); $caseStatus = strtolower((string) ($record['caseStatus'] ?? 'open')); $recordId = (string) ($record['id'] ?? ''); ?>
                     <tr>
                         <td class="fw-semibold"><?= e($studentLabel($record)) ?></td><td><?= e($record['diagnosis'] ?? 'Not recorded') ?></td><td class="small text-muted"><?= e(trim(($record['treatment'] ?? '') . ' ' . ($record['notes'] ?? '')) ?: 'No treatment notes') ?></td>
-                        <td><span class="badge bg-<?= $severity === 'critical' ? 'warning text-dark' : 'danger' ?>"><?= e(ucfirst($severity)) ?></span></td><td><span class="badge <?= $caseStatus === 'reviewed' ? 'bg-success' : 'bg-danger' ?>"><?= $caseStatus === 'reviewed' ? 'Reviewed' : 'Open' ?></span></td><td class="small text-muted"><?= e(substr((string) ($record['createdAt'] ?? 'Not recorded'), 0, 16)) ?></td>
+                        <td><span class="badge bg-<?= $severity === 'critical' ? 'warning text-dark' : 'danger' ?>"><?= e(ucfirst($severity)) ?></span></td><td><span class="badge <?= $caseStatus === 'reviewed' ? 'bg-success' : 'bg-danger' ?>"><?= $caseStatus === 'reviewed' ? 'Reviewed' : 'Open' ?></span></td><td class="small text-muted"><?= e(substr((string) ($record['responseDueAt'] ?? 'Not set'), 0, 16)) ?></td><td class="small text-muted"><?= e(substr((string) ($record['createdAt'] ?? 'Not recorded'), 0, 16)) ?></td>
                         <td class="text-end text-nowrap"><?php if ($recordId !== ''): ?><a class="btn btn-sm btn-outline-primary" href="<?= url('views/nurse/edit-record/edit-record.php?id=' . urlencode($recordId)) ?>" title="Edit medical record"><i class="bi bi-pencil"></i></a><form class="d-inline" method="POST"><input type="hidden" name="recordId" value="<?= e($recordId) ?>"><input type="hidden" name="caseStatus" value="<?= $caseStatus === 'reviewed' ? 'open' : 'reviewed' ?>"><button class="btn btn-sm btn-outline-<?= $caseStatus === 'reviewed' ? 'secondary' : 'success' ?>" type="submit" title="<?= $caseStatus === 'reviewed' ? 'Reopen case' : 'Mark as reviewed' ?>"><i class="bi bi-<?= $caseStatus === 'reviewed' ? 'arrow-counterclockwise' : 'check2' ?>"></i></button></form><?php else: ?><span class="text-muted">—</span><?php endif; ?></td>
                     </tr>
                 <?php endforeach; else: ?>
-                    <tr><td colspan="7" class="text-center text-muted py-5"><i class="bi bi-shield-check fs-3 d-block mb-2 text-success"></i>No emergency cases match the selected filters.</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-shield-check fs-3 d-block mb-2 text-success"></i>No emergency cases match the selected filters.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table></div></div>

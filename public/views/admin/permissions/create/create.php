@@ -17,6 +17,7 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\FirebaseService;
 
+$permissionModules = ['users', 'students', 'houses', 'rooms', 'room_allocation', 'attendance', 'visitors', 'visitor_requests', 'incidents', 'medical_records', 'reports', 'notifications', 'activity_logs', 'settings', 'announcements', 'message_parents', 'emergency_alerts', 'emergency_contacts', 'health_reports', 'audit_trail', 'backup_restore', 'profile'];
 $roles = [
     ROLE_ADMIN => 'Admin',
     ROLE_HOUSE_MASTER => 'House Master',
@@ -26,7 +27,17 @@ $roles = [
     ROLE_NURSE => 'Nurse',
     ROLE_STUDENT => 'Student',
 ];
-// Custom roles managed via Firestore (roles collection)
+try {
+    $customRoles = FirebaseService::getInstance()->getCollection(COL_ROLES, [], 200);
+    foreach ($customRoles as $customRole) {
+        $roleKey = trim((string) ($customRole['key'] ?? ''));
+        if ($roleKey !== '') {
+            $roles[$roleKey] = (string) ($customRole['name'] ?? $roleKey);
+        }
+    }
+} catch (Throwable $e) {
+    // Built-in roles remain available when Firestore is unavailable.
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $roleKey = trim((string) ($_POST['role_key'] ?? ''));
@@ -39,6 +50,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'visitors' => trim((string) ($_POST['visitors'] ?? 'none')),
         'incidents' => trim((string) ($_POST['incidents'] ?? 'none')),
         'reports' => trim((string) ($_POST['reports'] ?? 'none')),
+        'notifications' => trim((string) ($_POST['notifications'] ?? 'none')),
+        'activity_logs' => trim((string) ($_POST['activity_logs'] ?? 'none')),
+        'settings' => trim((string) ($_POST['settings'] ?? 'none')),
+        'announcements' => trim((string) ($_POST['announcements'] ?? 'none')),
+        'message_parents' => trim((string) ($_POST['message_parents'] ?? 'none')),
+        'emergency_alerts' => trim((string) ($_POST['emergency_alerts'] ?? 'none')),
+        'emergency_contacts' => trim((string) ($_POST['emergency_contacts'] ?? 'none')),
+        'health_reports' => trim((string) ($_POST['health_reports'] ?? 'none')),
+        'audit_trail' => trim((string) ($_POST['audit_trail'] ?? 'none')),
+        'backup_restore' => trim((string) ($_POST['backup_restore'] ?? 'none')),
+        'profile' => trim((string) ($_POST['profile'] ?? 'none')),
+        'room_allocation' => trim((string) ($_POST['room_allocation'] ?? 'none')),
+        'visitor_requests' => trim((string) ($_POST['visitor_requests'] ?? 'none')),
+        'medical_records' => trim((string) ($_POST['medical_records'] ?? 'none')),
     ];
 
     if ($roleKey === '') {
@@ -99,7 +124,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach (['users','students','houses','rooms','attendance','visitors','incidents','reports'] as $module): ?>
+                            <?php foreach ($permissionModules as $module): ?>
                                 <tr>
                                     <td><?= ucfirst(str_replace('_', ' ', $module)) ?></td>
                                     <td>

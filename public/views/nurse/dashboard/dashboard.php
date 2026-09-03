@@ -41,8 +41,21 @@ $totalStudents  = count($students);
 $totalRecords   = count($records);
 $criticalCount  = count($criticalRecords);
 $moderateCount  = count($moderateRecords);
+$dailyLabels = [];
+$dailyValues = [];
+for ($daysAgo = 6; $daysAgo >= 0; $daysAgo--) {
+    $date = date('Y-m-d', strtotime('-' . $daysAgo . ' days'));
+    $dailyLabels[] = date('M j', strtotime($date));
+    $dailyValues[] = count(array_filter($records, static fn(array $record): bool => str_starts_with((string) ($record['createdAt'] ?? ''), $date)));
+}
+$severityLabels = ['Normal', 'Moderate', 'Severe', 'Critical', 'Emergency'];
+$severityValues = [];
+foreach (['normal', 'moderate', 'severe', 'critical', 'emergency'] as $severity) {
+    $severityValues[] = count(array_filter($records, static fn(array $record): bool => strtolower((string) ($record['severity'] ?? 'normal')) === $severity));
+}
 
 $pageTitle  = 'Nurse Dashboard';
+$pageScripts = ['reports.js'];
 $pageStyles = ['nurse.css'];
 $navItems = [
     ['icon' => 'bi-speedometer2',          'label' => 'Dashboard',       'href' => url('views/nurse/dashboard/dashboard.php'), 'active' => true],
@@ -168,6 +181,34 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <small class="text-muted fw-bold">INFIRMARY STATUS</small>
                     <div class="fs-4 fw-bold text-success mt-1">Open</div>
                     <small class="text-muted">Health desk operational</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-lg-8">
+                <div class="card stat-card shadow-sm h-100">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-activity me-2 text-info"></i>Seven-day clinic activity</h6>
+                            <small class="text-muted">Medical records logged by day</small>
+                        </div>
+                        <span class="badge bg-info bg-opacity-10 text-info">Last 7 days</span>
+                    </div>
+                    <div class="card-body">
+                        <canvas class="report-chart" data-type="line" data-label="Cases" data-labels="<?= e(implode(',', $dailyLabels)) ?>" data-values="<?= e(implode(',', $dailyValues)) ?>" style="max-height: 250px;"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card stat-card shadow-sm h-100">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-pie-chart me-2 text-danger"></i>Severity mix</h6>
+                        <small class="text-muted">All medical records</small>
+                    </div>
+                    <div class="card-body d-flex align-items-center justify-content-center">
+                        <canvas class="report-chart" data-type="doughnut" data-label="Records" data-labels="<?= e(implode(',', $severityLabels)) ?>" data-values="<?= e(implode(',', $severityValues)) ?>" style="max-height: 250px;"></canvas>
+                    </div>
                 </div>
             </div>
         </div>

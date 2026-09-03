@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
     $file = $_FILES['records_file'];
     $extension = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
 
-    if ($file['error'] !== UPLOAD_ERR_OK || !in_array($extension, ['csv', 'xlsx'], true)) {
+    if (validate_uploaded_file($file, ['csv', 'xlsx']) !== null) {
         $errors[] = 'Upload a valid CSV or XLSX file.';
     } else {
         try {
@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                 $map[$name] = $index;
             }
 
-            foreach (array_slice($rows, 0, 1000) as $row) {
+            foreach (array_slice($rows, 0, (int) (app_config()['import_max_records'] ?? 1000)) as $row) {
                 $value = fn($name, $fallback = -1) => $row[$map[strtolower(preg_replace('/[^a-z0-9]/i', '', $name))] ?? $fallback] ?? '';
                 $student = sanitize($value('studentid', 0));
                 if ($student === '') {

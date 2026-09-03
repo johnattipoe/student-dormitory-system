@@ -90,6 +90,12 @@ class UserService
                 $defaultPassword = trim((string) ($config['default_password'] ?? 'Dorm1234'));
                 $password = $defaultPassword !== '' ? $defaultPassword : $this->generateTempPassword();
             }
+            if (function_exists('validate_password_policy')) {
+                $passwordError = validate_password_policy((string) $password);
+                if ($passwordError !== null) {
+                    return ['success' => false, 'message' => $passwordError];
+                }
+            }
 
             // Try FirebaseAuthService signup (REST API)
             $createdViaAuth = false;
@@ -182,6 +188,26 @@ class UserService
                 'success' => false,
                 'message' => 'Unable to update user: ' . $e->getMessage()
             ];
+        }
+    }
+
+    public function updatePassword(string $id, string $newPassword, string $currentPassword): array
+    {
+        $passwordError = function_exists('validate_password_policy') ? validate_password_policy($newPassword) : null;
+        if ($passwordError !== null) {
+            return ['success' => false, 'message' => $passwordError];
+        }
+
+        $user = $this->find($id);
+        $email = trim((string) ($user['email'] ?? ''));
+        if ($email === '') {
+            return ['success' => false, 'message' => 'User email is not available for password verification.'];
+        }
+
+        try {
+            return FirebaseAuthService::changePassword($email, $currentPassword, $newPassword);
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Unable to update password.'];
         }
     }
 

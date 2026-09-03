@@ -18,6 +18,7 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\FirebaseService;
 
 $pageTitle = 'Permissions';
+$permissionModules = ['users', 'students', 'houses', 'rooms', 'room_allocation', 'attendance', 'visitors', 'visitor_requests', 'incidents', 'medical_records', 'reports', 'notifications', 'activity_logs', 'settings', 'announcements', 'message_parents', 'emergency_alerts', 'emergency_contacts', 'health_reports', 'audit_trail', 'backup_restore', 'profile'];
 $permissions = require APP_ROOT . '/app/config/permissions/permissions.php';
 $roles = [
     ROLE_ADMIN => 'Admin',
@@ -35,7 +36,7 @@ try {
     foreach ($savedPermissions as $savedPermission) {
         $roleKey = (string) ($savedPermission['role'] ?? '');
         if ($roleKey !== '' && !empty($savedPermission['levels']) && is_array($savedPermission['levels'])) {
-            $permissions[$roleKey] = $savedPermission['levels'];
+            $permissions[$roleKey] = array_replace($permissions[$roleKey] ?? [], $savedPermission['levels']);
             $roles[$roleKey] = ucwords(str_replace('_', ' ', $roleKey));
             $savedPermissionKeys[$roleKey] = true;
         }
@@ -63,7 +64,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
-        <div class="row g-3 mb-3"><div class="col-md-4"><div class="card stat-card p-3"><small class="text-muted">Roles covered</small><strong class="fs-2"><?= e((string) count($roles)) ?></strong></div></div><div class="col-md-4"><div class="card stat-card p-3"><small class="text-muted">Custom matrices</small><strong class="fs-2 text-primary"><?= e((string) count($savedPermissionKeys)) ?></strong></div></div><div class="col-md-4"><div class="card stat-card p-3"><small class="text-muted">Modules</small><strong class="fs-2">8</strong></div></div></div>
+        <div class="row g-3 mb-3"><div class="col-md-4"><div class="card stat-card p-3"><small class="text-muted">Roles covered</small><strong class="fs-2"><?= e((string) count($roles)) ?></strong></div></div><div class="col-md-4"><div class="card stat-card p-3"><small class="text-muted">Custom matrices</small><strong class="fs-2 text-primary"><?= e((string) count($savedPermissionKeys)) ?></strong></div></div><div class="col-md-4"><div class="card stat-card p-3"><small class="text-muted">Modules</small><strong class="fs-2"><?= e((string) count($permissionModules)) ?></strong></div></div></div>
 
         <div class="card stat-card p-3">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -79,14 +80,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <thead>
                         <tr>
                             <th>Role</th>
-                            <th>Users</th>
-                            <th>Students</th>
-                            <th>Houses</th>
-                            <th>Rooms</th>
-                            <th>Attendance</th>
-                            <th>Visitors</th>
-                            <th>Incidents</th>
-                            <th>Reports</th>
+                            <?php foreach ($permissionModules as $module): ?>
+                                <th><?= e(ucwords(str_replace('_', ' ', $module))) ?></th>
+                            <?php endforeach; ?>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -97,14 +93,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 <?php
                                 $level = $permissions[$roleKey] ?? [];
                                 ?>
-                                <td><?= e($level['users'] ?? 'none') ?></td>
-                                <td><?= e($level['students'] ?? 'none') ?></td>
-                                <td><?= e($level['houses'] ?? 'none') ?></td>
-                                <td><?= e($level['rooms'] ?? 'none') ?></td>
-                                <td><?= e($level['attendance'] ?? 'none') ?></td>
-                                <td><?= e($level['visitors'] ?? 'none') ?></td>
-                                <td><?= e($level['incidents'] ?? 'none') ?></td>
-                                <td><?= e($level['reports'] ?? 'none') ?></td>
+                                <?php foreach ($permissionModules as $module): ?>
+                                    <td><?= e($level[$module] ?? 'none') ?></td>
+                                <?php endforeach; ?>
                                 <td><?php if (!empty($savedPermissionKeys[$roleKey])): ?><a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/permissions/edit/edit.php?id=' . urlencode($roleKey)) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/permissions/delete/delete.php?id=' . urlencode($roleKey)) ?>">Delete</a><?php else: ?><span class="text-muted small">Config</span><?php endif; ?></td>
                             </tr>
                         <?php endforeach; ?>

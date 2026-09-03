@@ -71,7 +71,7 @@ class AuthController
             redirect(base_url('forgot-password.php'));
         }
 
-        $result = FirebaseAuthService::sendPasswordResetEmail($email);
+        $result = FirebaseAuthService::sendCustomPasswordResetEmail($email);
 
         if (!$result['success']) {
             flash('error', $result['message']);

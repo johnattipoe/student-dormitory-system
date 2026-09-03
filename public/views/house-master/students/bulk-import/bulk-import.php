@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                 $map[$name] = $i;
             }
 
-            foreach (array_slice($rows, 0, 1000) as $row) {
+            foreach (array_slice($rows, 0, (int) (app_config()['import_max_records'] ?? 1000)) as $row) {
                 $value = fn($name, $fallback = -1) => $row[$map[strtolower(preg_replace('/[^a-z0-9]/i', '', $name))] ?? $fallback] ?? '';
                 
                 $first = sanitize($value('firstname', 0));

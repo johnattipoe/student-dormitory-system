@@ -32,8 +32,9 @@ class BmsSmsService
             return ['success' => false, 'message' => 'Message content is required.'];
         }
 
-        if (mb_strlen($message) > 160) {
-            return ['success' => false, 'message' => 'SMS message must be 160 characters or fewer.'];
+        $maxLength = max(1, (int) (function_exists('app_config') ? (app_config()['sms_max_length'] ?? 160) : 160));
+        if (mb_strlen($message) > $maxLength) {
+            return ['success' => false, 'message' => 'SMS message must be ' . $maxLength . ' characters or fewer.'];
         }
 
         $payload = [

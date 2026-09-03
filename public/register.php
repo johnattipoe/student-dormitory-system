@@ -33,6 +33,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(base_url('register.php'));
     }
 
+    $passwordError = validate_password_policy($password);
+    if ($passwordError !== null) {
+        flash('error', $passwordError);
+        redirect(base_url('register.php'));
+    }
+
     $userService = new UserService();
     $requiresApproval = !empty($appConfig['advanced']['registration_requires_approval']);
     $result = $userService->create([

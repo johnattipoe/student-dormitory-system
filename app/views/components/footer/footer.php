@@ -14,6 +14,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>window.SDS = window.SDS || {}; window.SDS.paginationPerPage = <?= (int) (app_config()['pagination_per_page'] ?? 25) ?>;</script>
     <script src="<?= asset('js/app.js') ?>"></script>
     <?php
     $currentScript = str_replace('\\', '/', $_GET['route'] ?? $_SERVER['SCRIPT_NAME'] ?? '');

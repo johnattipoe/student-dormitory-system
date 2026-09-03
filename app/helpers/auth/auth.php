@@ -682,167 +682,60 @@ if (!function_exists('redirect_to_dashboard')) {
 |
 */
 
+if (!function_exists('permission_matrix')) {
+    function permission_matrix(): array
+    {
+        static $permissions;
+        if ($permissions !== null) {
+            return $permissions;
+        }
+
+        $permissions = require __DIR__ . '/../../config/permissions/permissions.php';
+        try {
+            $savedPermissions = \App\Services\FirebaseService::getInstance()->getCollection(COL_PERMISSIONS, [], 200);
+            foreach ($savedPermissions as $savedPermission) {
+                $role = (string) ($savedPermission['role'] ?? '');
+                if ($role !== '' && !empty($savedPermission['levels']) && is_array($savedPermission['levels'])) {
+                    $permissions[$role] = array_replace($permissions[$role] ?? [], $savedPermission['levels']);
+                }
+            }
+        } catch (\Throwable $e) {
+            // The built-in matrix remains available when Firestore is unavailable.
+        }
+
+        return $permissions;
+    }
+}
+
 if (!function_exists('has_permission')) {
 
     function has_permission(
         string $permission
     ): bool {
-
         $role = current_role();
-
         if (!$role) {
             return false;
         }
+        [$module, $action] = array_pad(explode('.', strtolower(trim($permission)), 2), 2, 'view');
+        $module = ['medical' => 'medical_records'][$module] ?? $module;
+        $requiredLevel = match ($action) {
+            'create', 'edit', 'mark', 'allocate', 'register', 'send' => 'manage',
+            'delete', 'generate' => 'full',
+            default => 'view',
+        };
 
-        $permissions = [
-
-            'admin' => [
-
-                'dashboard.view',
-
-                'users.view',
-                'users.create',
-                'users.edit',
-                'users.delete',
-
-                'students.view',
-                'students.create',
-                'students.edit',
-                'students.delete',
-
-                'houses.view',
-                'houses.create',
-                'houses.edit',
-                'houses.delete',
-
-                'rooms.view',
-                'rooms.create',
-                'rooms.edit',
-                'rooms.delete',
-                'rooms.allocate',
-
-                'attendance.view',
-                'attendance.mark',
-                'attendance.edit',
-
-                'visitors.view',
-                'visitors.register',
-                'visitors.edit',
-
-                'incidents.view',
-                'incidents.create',
-                'incidents.edit',
-
-                'medical.view',
-                'medical.create',
-                'medical.edit',
-
-                'reports.view',
-                'reports.generate',
-
-                'activity_logs.view',
-
-                'notifications.view',
-                'notifications.send'
-            ],
-
-            'house_master' => [
-
-                'dashboard.view',
-
-                'students.view',
-                'students.edit',
-
-                'houses.view',
-
-                'rooms.view',
-                'rooms.allocate',
-
-                'attendance.view',
-                'attendance.mark',
-
-                'visitors.view',
-                'visitors.register',
-
-                'incidents.view',
-                'incidents.create',
-
-                'reports.view'
-            ],
-
-            'senior-houseparent' => [
-
-                'dashboard.view',
-
-                'students.view',
-                'students.edit',
-
-                'rooms.view',
-
-                'attendance.view',
-                'attendance.mark',
-
-                'visitors.view',
-                'visitors.register',
-
-                'incidents.view',
-                'incidents.create',
-
-                'reports.view'
-            ],
-
-            'security' => [
-
-                'dashboard.view',
-
-                'students.view',
-
-                'visitors.view',
-                'visitors.register',
-                'visitors.edit',
-
-                'incidents.view',
-                'incidents.create',
-                'incidents.edit'
-            ],
-
-            'nurse' => [
-
-                'dashboard.view',
-
-                'students.view',
-
-                'medical.view',
-                'medical.create',
-                'medical.edit',
-
-                'incidents.view',
-                'incidents.create',
-
-                'reports.view'
-            ],
-
-            'student' => [
-
-                'dashboard.view',
-
-                'students.view',
-
-                'attendance.view',
-
-                'visitors.view',
-
-                'medical.view',
-
-                'notifications.view'
-            ]
+        $permissions = permission_matrix();
+        $currentLevel = $permissions[$role][$module] ?? 'none';
+        $levelOrder = [
+            'none' => 0,
+            'own' => 2,
+            'view' => 2,
+            'limited' => 3,
+            'manage' => 4,
+            'full' => 5,
         ];
 
-        return in_array(
-            $permission,
-            $permissions[$role] ?? [],
-            true
-        );
+        return ($levelOrder[$currentLevel] ?? 0) >= ($levelOrder[$requiredLevel] ?? 0);
     }
 }
 
@@ -856,7 +749,7 @@ if (!function_exists('can')) {
             return false;
         }
 
-        $permissions = require __DIR__ . '/../../config/permissions/permissions.php';
+        $permissions = permission_matrix();
         $currentLevel = $permissions[$role][$module] ?? 'none';
 
         $levelOrder = [

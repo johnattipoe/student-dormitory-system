@@ -15,13 +15,25 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\HouseService;
+use App\Services\FirebaseService;
 use App\Services\UserService;
 
 $pageTitle = 'Add User';
 $userService = new UserService();
 $houses = HouseService::all();
 $roleOptions = ['admin','house_master','house_mistress','senior-houseparent','security','nurse','student'];
-// Custom roles managed via Firestore (roles collection)
+try {
+    $customRoles = FirebaseService::getInstance()->getCollection(COL_ROLES, [], 200);
+    foreach ($customRoles as $customRole) {
+        $roleKey = trim((string) ($customRole['key'] ?? ''));
+        if ($roleKey !== '') {
+            $roleOptions[] = $roleKey;
+        }
+    }
+    $roleOptions = array_values(array_unique($roleOptions));
+} catch (Throwable $e) {
+    // Built-in roles remain available when Firestore is unavailable.
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role = sanitize($_POST['role'] ?? '');

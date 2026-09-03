@@ -17,7 +17,7 @@ $appConfig = app_config();
 use App\Services\FirebaseAuthService;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $token = $_POST['token'] ?? '';
+    $token = $_POST['oobCode'] ?? $_POST['token'] ?? '';
     $password = $_POST['password'] ?? '';
     $confirmPassword = $_POST['confirm_password'] ?? '';
 
@@ -26,8 +26,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(base_url('views/auth/reset-password/reset-password.php'));
     }
 
-    if (strlen($password) < 8) {
-        flash('error', 'Password must be at least 8 characters long.');
+    $passwordError = validate_password_policy($password);
+    if ($passwordError !== null) {
+        flash('error', $passwordError);
         redirect(base_url('views/auth/reset-password/reset-password.php?token=' . urlencode($token)));
     }
 
@@ -49,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $errorMessage = flash('error');
 $successMessage = flash('success');
-$token = $_GET['token'] ?? '';
+$token = $_GET['oobCode'] ?? $_GET['token'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -82,7 +83,7 @@ $token = $_GET['token'] ?? '';
             <?php endif; ?>
 
             <form method="POST" action="/index.php?route=/views/auth/reset-password/reset-password.php">
-                <input type="hidden" name="token" value="<?= e($token) ?>">
+                <input type="hidden" name="oobCode" value="<?= e($token) ?>">
 
                 <div class="mb-3">
                     <label class="form-label">New Password</label>

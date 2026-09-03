@@ -41,6 +41,34 @@ class FirebaseAdminAuthService
         return null;
     }
 
+    public static function generatePasswordResetLink(string $email, string $continueUrl): ?string
+    {
+        if (!self::credentialsAvailable()) return null;
+        $config = require APP_ROOT . '/app/config/firebase/firebase.php';
+        $project = $config['project_id'] ?? '';
+        $access = self::fetchAccessToken();
+        if (!$project || !$access) return null;
+
+        $url = sprintf('https://identitytoolkit.googleapis.com/v1/projects/%s/accounts:sendOobCode', $project);
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $access, 'Content-Type: application/json'],
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode([
+                'requestType' => 'PASSWORD_RESET',
+                'email' => $email,
+                'returnOobLink' => true,
+                'continueUrl' => $continueUrl,
+            ]),
+            CURLOPT_TIMEOUT => 20,
+        ]);
+        $raw = curl_exec($ch);
+        if ($raw === false) return null;
+        $response = json_decode($raw, true);
+        return is_array($response) ? (string) ($response['oobLink'] ?? '') ?: null : null;
+    }
+
     /**
      * List Auth users from Firebase Auth (Admin REST). Returns array of user
      * records or empty array on failure.

@@ -18,7 +18,11 @@ if (!empty($routeParts['query'])) {
 $route = str_replace(['..'], '', $route); // basic traversal guard
 $target = __DIR__ . $route;
 
-$publicRoutes = ['/views/auth/login/login.php'];
+$publicRoutes = [
+    '/views/auth/login/login.php',
+    '/views/auth/forgot-password/forgot-password.php',
+    '/views/auth/reset-password/reset-password.php',
+];
 
 if (!in_array($route, $publicRoutes, true)) {
     $currentUser = AuthMiddleware::handle(); // redirects to login if not authed

@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function () {
           || rowCount >= 8;
 
         const options = {
-          pageLength: 10,
+          pageLength: Number(window.SDS?.paginationPerPage || 25),
           order: [],
           responsive: true,
           autoWidth: false,

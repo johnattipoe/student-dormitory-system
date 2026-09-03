@@ -79,11 +79,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($errors)) {
         flash('error', 'Please fix the highlighted errors.');
     } else {
-        $result = StudentService::update($id, $data);
-        flash($result['success'] ? 'success' : 'error', $result['message']);
-        if ($result['success']) {
-            redirect(url('views/house-master/students/profile/profile.php?studentId=' . urlencode($id)));
-        }
+        StudentService::update($id, $data);
+        flash('success', 'Student profile updated successfully.');
+        redirect(url('views/house-master/students/profile/profile.php?studentId=' . urlencode($id)));
     }
     $student = array_merge($student, $data);
 }
