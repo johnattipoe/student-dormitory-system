@@ -30,8 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($currentPassword === '') {
         $errors['current_password'] = 'Current password is required.';
     }
-    if (strlen($newPassword) < 6) {
-        $errors['new_password'] = 'New password must be at least 6 characters.';
+    $passwordError = validate_password_policy($newPassword);
+    if ($passwordError !== null) {
+        $errors['new_password'] = $passwordError;
     }
     if ($newPassword !== $confirmPassword) {
         $errors['confirm_password'] = 'Password confirmation does not match.';

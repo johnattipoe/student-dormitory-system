@@ -707,7 +707,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <th>House</th>
                                 <?php endif; ?>
                                 <th style="min-width: 95px;">Type</th>
-                                <th style="min-width: 120px;">Guardian Phone</th>
                                 <th style="min-width: 160px;">Schedule &amp; Dates</th>
                                 <th>Destination</th>
                                 <th>Reason</th>
@@ -737,7 +736,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <?php if (!$isStudent): ?>
                                             <td>
                                                 <strong class="text-dark d-block"><?= e($recStudentName) ?></strong>
-                                                <small class="text-muted font-monospace"><?= e($recordStudentId ?: '') ?></small>
+                                                <small class="text-muted d-block"><span class="fw-semibold">Parent:</span> <?= e($record['guardianPhone'] ?? $studentMap[$recordStudentId]['phone'] ?? '—') ?></small>
                                             </td>
                                         <?php endif; ?>
                                         <?php if ($role === ROLE_ADMIN): ?>
@@ -749,9 +748,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                             <?php else: ?>
                                                 <span class="badge bg-primary-subtle text-primary border"><i class="bi bi-calendar-range me-1"></i>External</span>
                                             <?php endif; ?>
-                                        </td>
-                                        <td class="text-nowrap small">
-                                            <?= e($record['guardianPhone'] ?? $studentMap[$recordStudentId]['phone'] ?? '—') ?>
                                         </td>
                                         <td class="text-nowrap">
                                             <?php if ($isInternal): ?>
@@ -990,67 +986,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         </div>
                                     </div>
 
-                                    <!-- Internal Fields -->
-                                    <div id="edit_internal_fields_<?= $idx ?>" class="<?= !$isInternal ? 'd-none' : '' ?>">
-                                        <div class="row g-2 mb-3">
-                                            <div class="col-md-4">
-                                                <label class="form-label small fw-semibold">Pass Date</label>
-                                                <input type="date" name="date" class="form-control form-control-sm" value="<?= e($record['startDate'] ?? $record['date'] ?? date('Y-m-d')) ?>">
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label small fw-semibold">Time to Start</label>
-                                                <input type="time" name="startTime" class="form-control form-control-sm" value="<?= e($record['startTime'] ?? '08:00') ?>">
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label small fw-semibold">Time to Close</label>
-                                                <input type="time" name="closeTime" class="form-control form-control-sm" value="<?= e($record['closeTime'] ?? $record['endTime'] ?? '17:00') ?>">
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    <!-- External Fields -->
-                                    <div id="edit_external_fields_<?= $idx ?>" class="<?= $isInternal ? 'd-none' : '' ?>">
-                                        <div class="row g-2 mb-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label small fw-semibold">Start Date</label>
-                                                <input type="date" name="startDate" class="form-control form-control-sm" value="<?= e($record['startDate'] ?? date('Y-m-d')) ?>">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label small fw-semibold">End Date</label>
-                                                <input type="date" name="endDate" class="form-control form-control-sm" value="<?= e($record['endDate'] ?? date('Y-m-d', strtotime('+1 day'))) ?>">
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label small fw-semibold">Destination</label>
-                                        <input name="destination" class="form-control form-control-sm" value="<?= e($record['destination'] ?? '') ?>" placeholder="Destination address">
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label small fw-semibold">Reason</label>
-                                        <textarea name="reason" class="form-control form-control-sm" rows="3" required><?= e($record['reason'] ?? '') ?></textarea>
-                                    </div>
-
-                                    <?php if ($isStaff): ?>
-                                        <div class="mb-0 p-2 bg-light rounded border">
-                                            <label class="form-label small fw-semibold">Status Override</label>
-                                            <select name="status" class="form-select form-select-sm">
-                                                <?php foreach (['pending', 'approved', 'rejected', 'departed', 'returned'] as $st): ?>
-                                                    <option value="<?= e($st) ?>" <?= $recordStatus === $st ? 'selected' : '' ?>><?= e(ucfirst($st)) ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                                <div class="modal-footer bg-light">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-save me-1"></i>Save Changes</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- 3. DELETE MODAL -->
                 <div class="modal fade" id="deleteExeatModal_<?= $idx ?>" tabindex="-1" aria-labelledby="deleteModalLabel_<?= $idx ?>" aria-hidden="true">

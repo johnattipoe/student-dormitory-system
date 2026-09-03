@@ -16,6 +16,7 @@ class FirebaseAuthService
     private const SIGN_UP_URL = 'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=%s';
     private const SEND_OOB_URL = 'https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=%s';
     private const RESET_PASSWORD_URL = 'https://identitytoolkit.googleapis.com/v1/accounts:resetPassword?key=%s';
+    private const UPDATE_PASSWORD_URL = 'https://identitytoolkit.googleapis.com/v1/accounts:update?key=%s';
 
     private static function apiKey(): string
     {
@@ -97,6 +98,29 @@ class FirebaseAuthService
         ];
     }
 
+    public static function sendCustomPasswordResetEmail(string $email): array
+    {
+        $appConfig = require APP_ROOT . '/app/config/app/app.php';
+        $baseUrl = rtrim((string) ($appConfig['url'] ?? ''), '/');
+        $resetPage = $baseUrl . '/index.php?route=/views/auth/reset-password/reset-password.php';
+        $firebaseLink = FirebaseAdminAuthService::generatePasswordResetLink($email, $resetPage);
+        if (!$firebaseLink) return ['success' => false, 'message' => 'Unable to create a password reset link.'];
+
+        $parts = parse_url($firebaseLink);
+        parse_str((string) ($parts['query'] ?? ''), $query);
+        $oobCode = (string) ($query['oobCode'] ?? '');
+        if ($oobCode === '') return ['success' => false, 'message' => 'Unable to create a valid password reset link.'];
+
+        $customLink = $resetPage . '&oobCode=' . rawurlencode($oobCode);
+        $emailService = new EmailService();
+        $appName = (string) ($appConfig['name'] ?? 'Student Dormitory System');
+        $safeLink = htmlspecialchars($customLink, ENT_QUOTES, 'UTF-8');
+        $html = '<p>You requested a password reset for your account.</p><p><a href="' . $safeLink . '" style="display:inline-block;padding:12px 20px;background:#1f6feb;color:#fff;text-decoration:none;border-radius:4px">Reset your password</a></p><p>This link expires according to your Firebase Authentication settings. If you did not request this, you can ignore this email.</p>';
+        $text = "You requested a password reset for {$appName}. Open this link to continue: {$customLink}";
+        $result = $emailService->sendHtml($email, 'Reset your password - ' . $appName, $html, $text);
+        return !empty($result['success']) ? ['success' => true, 'message' => 'Password reset email sent successfully.'] : $result;
+    }
+
     public static function sendEmailVerification(string $email): array
     {
         $response = self::post(sprintf(self::SEND_OOB_URL, self::apiKey()), [
@@ -135,6 +159,25 @@ class FirebaseAuthService
             'success' => true,
             'message' => 'Your password was reset successfully.',
         ];
+    }
+
+    public static function changePassword(string $email, string $currentPassword, string $newPassword): array
+    {
+        $signedIn = self::signIn($email, $currentPassword);
+        if (!$signedIn || empty($signedIn['idToken'])) {
+            return ['success' => false, 'message' => 'Current password is incorrect.'];
+        }
+
+        $response = self::post(sprintf(self::UPDATE_PASSWORD_URL, self::apiKey()), [
+            'idToken' => $signedIn['idToken'],
+            'password' => $newPassword,
+            'returnSecureToken' => true,
+        ]);
+        if (!$response || isset($response['error'])) {
+            return ['success' => false, 'message' => $response['error']['message'] ?? 'Unable to update password.'];
+        }
+
+        return ['success' => true, 'message' => 'Password updated successfully.'];
     }
 
     private static function post(string $url, array $body): ?array

@@ -18,9 +18,47 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\MedicalService;
 
 $medicalService = new MedicalService();
-$report = $medicalService->reports();
 $records = $medicalService->all();
-$recentRecords = array_slice($records, 0, 8);
+$fromDate = trim((string) ($_GET['from'] ?? ''));
+$toDate = trim((string) ($_GET['to'] ?? ''));
+$severityFilter = strtolower(trim((string) ($_GET['severity'] ?? 'all')));
+$validSeverities = ['normal', 'moderate', 'severe', 'critical', 'emergency'];
+if (!in_array($severityFilter, array_merge(['all'], $validSeverities), true)) {
+    $severityFilter = 'all';
+}
+$filteredRecords = array_values(array_filter($records, static function (array $record) use ($fromDate, $toDate, $severityFilter): bool {
+    $createdDate = substr((string) ($record['createdAt'] ?? ''), 0, 10);
+    $severity = strtolower((string) ($record['severity'] ?? 'normal'));
+    return ($fromDate === '' || $createdDate >= $fromDate)
+        && ($toDate === '' || $createdDate <= $toDate)
+        && ($severityFilter === 'all' || $severity === $severityFilter);
+}));
+
+$report = ['total' => count($filteredRecords), 'normal' => 0, 'moderate' => 0, 'severe' => 0, 'critical' => 0, 'emergency' => 0];
+foreach ($filteredRecords as $record) {
+    $severity = strtolower((string) ($record['severity'] ?? 'normal'));
+    if (isset($report[$severity])) $report[$severity]++;
+}
+$recentRecords = array_slice($filteredRecords, 0, 8);
+
+if (isset($_GET['download']) && $_GET['download'] === 'csv') {
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="health-report-' . date('Y-m-d') . '.csv"');
+    $output = fopen('php://output', 'w');
+    fputcsv($output, ['Student', 'Diagnosis', 'Treatment', 'Notes', 'Severity', 'Created At']);
+    foreach ($filteredRecords as $record) {
+        fputcsv($output, [
+            $record['studentName'] ?? $record['studentId'] ?? 'Not linked',
+            $record['diagnosis'] ?? '',
+            $record['treatment'] ?? '',
+            $record['notes'] ?? '',
+            $record['severity'] ?? 'normal',
+            $record['createdAt'] ?? '',
+        ]);
+    }
+    fclose($output);
+    exit;
+}
 
 $pageTitle = 'Health Reports';
 $navItems = [
@@ -57,6 +95,25 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="col-md-3"><div class="nurse-stat"><span class="nurse-stat-icon orange"><i class="bi bi-exclamation-triangle"></i></span><div><small>Moderate / Severe</small><strong><?= e((string) (($report['moderate'] ?? 0) + ($report['severe'] ?? 0))) ?></strong></div></div></div>
             <div class="col-md-3"><div class="nurse-stat"><span class="nurse-stat-icon red"><i class="bi bi-activity"></i></span><div><small>Critical</small><strong><?= e((string) ($report['critical'] ?? 0)) ?></strong></div></div></div>
         </div>
+
+        <section class="nurse-card-panel mb-4">
+            <div class="nurse-card-header">
+                <div>
+                    <span class="nurse-kicker">Report filters</span>
+                    <h2>Focus the reporting period</h2>
+                </div>
+                <a class="btn btn-outline-primary btn-sm" href="<?= url('views/nurse/health-reports/health-reports.php?from=' . urlencode($fromDate) . '&to=' . urlencode($toDate) . '&severity=' . urlencode($severityFilter) . '&download=csv') ?>">
+                    <i class="bi bi-download me-1"></i>Download CSV
+                </a>
+            </div>
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-3"><label class="form-label small fw-semibold">From date</label><input type="date" name="from" class="form-control" value="<?= e($fromDate) ?>"></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">To date</label><input type="date" name="to" class="form-control" value="<?= e($toDate) ?>"></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Severity</label><select name="severity" class="form-select"><option value="all">All severities</option><?php foreach ($validSeverities as $severity): ?><option value="<?= e($severity) ?>" <?= $severityFilter === $severity ? 'selected' : '' ?>><?= e(ucfirst($severity)) ?></option><?php endforeach; ?></select></div>
+                <div class="col-md-3 d-flex gap-2"><button class="btn btn-primary flex-fill" type="submit"><i class="bi bi-funnel me-1"></i>Apply</button><a class="btn btn-outline-secondary" href="<?= url('views/nurse/health-reports/health-reports.php') ?>">Reset</a></div>
+            </form>
+            <small class="text-muted d-block mt-3">Showing <?= e((string) count($filteredRecords)) ?> matching record(s).</small>
+        </section>
 
         <div class="row g-4">
             <div class="col-lg-5">

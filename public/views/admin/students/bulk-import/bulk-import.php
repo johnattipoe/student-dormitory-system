@@ -21,6 +21,8 @@ use App\Services\UserService;
 use App\Services\HouseService;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
+$userService = new UserService();
+
 // Handle CSV template download
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download_template'])) {
     header('Content-Type: text/csv');
@@ -45,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'import_students' && !empty($_FILES['students_file'])) {
         $file = $_FILES['students_file'];
         $extension = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
-        if ($file['error'] === UPLOAD_ERR_OK && in_array($extension, ['csv', 'xlsx'], true)) {
+        if (validate_uploaded_file($file, ['csv', 'xlsx']) === null) {
             try {
                 $spreadsheet = IOFactory::load($file['tmp_name']);
                 $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
@@ -56,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $createAccounts = !empty($_POST['createAccounts']);
                 $userCount = 0;
                 $processedRows = 0;
-                foreach (array_slice($rows, 0, 1000) as $row) {
+                foreach (array_slice($rows, 0, (int) (app_config()['import_max_records'] ?? 1000)) as $row) {
                     $processedRows++;
                     $firstName = sanitize($row[$headerMap['firstname'] ?? 0] ?? '');
                     $lastName = sanitize($row[$headerMap['lastname'] ?? 1] ?? '');
@@ -87,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         try {
                             $userEmail = strtolower(preg_replace('/[^a-z0-9]/i', '', $admissionNo)) . '@student.local';
                             $password = $temporaryPassword !== '' ? $temporaryPassword : ('Student@' . substr($admissionNo, -4));
-                            UserService::create([
+                            $userService->create([
                                 'email' => $userEmail,
                                 'password' => $password,
                                 'role' => ROLE_STUDENT,

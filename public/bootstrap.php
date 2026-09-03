@@ -14,6 +14,12 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../app/config/constants/constants.php';
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+$routedPath = (string) ($_GET['route'] ?? '');
+if (str_contains($requestPath, '/forgot-password') || str_contains($requestPath, '/reset-password')
+    || str_contains($routedPath, '/forgot-password') || str_contains($routedPath, '/reset-password')) {
+    define('SKIP_REMOTE_SETTINGS', true);
+}
 $appConfig = require __DIR__ . '/../app/config/app/app.php';
 if (!empty($appConfig['timezone'])) {
     date_default_timezone_set((string) $appConfig['timezone']);
@@ -21,7 +27,6 @@ if (!empty($appConfig['timezone'])) {
 require_once __DIR__ . '/../app/helpers/functions/functions.php';
 
 // Keep the login and admin portal available while the rest of the system is offline.
-$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
 $isLoginRequest = str_ends_with($requestPath, '/login.php') || str_ends_with($requestPath, '/logout.php');
 $isEntryRequest = $requestPath === '/' || str_ends_with($requestPath, '/index.php');
 $isIncidentRequest = str_contains($requestPath, '/incidents/');
@@ -39,8 +44,9 @@ if (!empty($appConfig['advanced']['maintenance_mode']) && !$isLoginRequest && !$
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 $acceptsJson = str_contains(strtolower($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
 $isXmlHttpRequest = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
-$isSettingsExport = $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'export';
-$isStudentTemplateDownload = $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download_template']);
+$requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$isSettingsExport = $requestMethod === 'POST' && ($_POST['action'] ?? '') === 'export';
+$isStudentTemplateDownload = $requestMethod === 'GET' && isset($_GET['download_template']);
 if (!str_contains($requestUri, '/ajax/') && !str_contains($requestUri, '/reports/') && !$acceptsJson && !$isXmlHttpRequest && !$isSettingsExport && !$isStudentTemplateDownload) {
     if (ob_get_level() === 0) {
         ob_start();

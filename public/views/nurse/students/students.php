@@ -15,9 +15,18 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_NURSE];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
+use App\Services\MedicalService;
 use App\Services\StudentService;
 
 $students = StudentService::all();
+$medicalRecords = (new MedicalService())->all();
+$medicalRecordCounts = [];
+foreach ($medicalRecords as $medicalRecord) {
+    $recordStudentId = (string) ($medicalRecord['studentId'] ?? '');
+    if ($recordStudentId !== '') {
+        $medicalRecordCounts[$recordStudentId] = ($medicalRecordCounts[$recordStudentId] ?? 0) + 1;
+    }
+}
 $search = strtolower(trim(sanitize($_GET['search'] ?? '')));
 $statusFilter = strtolower(trim(sanitize($_GET['status'] ?? 'all')));
 $filteredStudents = array_values(array_filter($students, static function (array $student) use ($search, $statusFilter): bool {
@@ -28,6 +37,8 @@ $filteredStudents = array_values(array_filter($students, static function (array 
         (string) ($student['studentId'] ?? $student['id'] ?? ''),
         (string) ($student['admissionNo'] ?? ''),
         (string) ($student['course'] ?? ''),
+        (string) ($student['guardianName'] ?? $student['parentName'] ?? ''),
+        (string) ($student['guardianPhone'] ?? $student['parentPhone'] ?? ''),
     ]));
     return ($statusFilter === 'all' || $status === $statusFilter)
         && ($search === '' || str_contains($haystack, $search));
@@ -183,11 +194,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     </td>
                                     <td>
                                         <span class="d-block small"><?= e($student['email'] ?? 'No email') ?></span>
-                                        <small class="text-muted"><?= e($student['phone'] ?? 'No phone') ?></small>
+                                        <small class="text-muted d-block"><?= e($student['phone'] ?? 'No phone') ?></small>
+                                        <small class="text-primary d-block"><i class="bi bi-person-heart me-1"></i><?= e($student['guardianName'] ?? $student['parentName'] ?? 'Guardian not recorded') ?></small>
+                                        <small class="text-muted d-block"><i class="bi bi-telephone me-1"></i><?= e($student['guardianPhone'] ?? $student['parentPhone'] ?? 'No guardian phone') ?></small>
                                     </td>
                                     <td>
                                         <span class="d-block small fw-semibold"><?= e($student['course'] ?? 'Class code not specified') ?></span>
                                         <small class="text-muted">Level <?= e($student['level'] ?? '—') ?></small>
+                                        <small class="text-muted d-block"><i class="bi bi-journal-medical me-1"></i><?= e((string) ($medicalRecordCounts[$studentId] ?? 0)) ?> medical record(s)</small>
                                     </td>
                                     <td>
                                         <span class="badge bg-light text-dark border"><?= e($student['roomId'] ?? 'Unassigned') ?></span>

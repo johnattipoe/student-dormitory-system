@@ -1,7 +1,6 @@
 <?php
 require __DIR__ . '/bootstrap.php';
 
-use App\Services\UserService;
 use App\Services\FirebaseAuthService;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -12,24 +11,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(base_url('forgot-password.php'));
     }
 
-    $userService = new UserService();
-    $users = $userService->all();
-    $exists = false;
-
-    foreach ($users as $user) {
-        if (strtolower((string) ($user['email'] ?? '')) === strtolower($email)) {
-            $exists = true;
-            break;
-        }
-    }
-
-    if (!$exists) {
-        flash('error', 'No account was found for that email address.');
-        redirect(base_url('forgot-password.php'));
-    }
-
     try {
-        $result = FirebaseAuthService::sendPasswordResetEmail($email);
+        $result = FirebaseAuthService::sendCustomPasswordResetEmail($email);
         if (empty($result['success'])) {
             flash('error', $result['message'] ?? 'Unable to send password reset instructions.');
             redirect(base_url('forgot-password.php'));

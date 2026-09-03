@@ -81,8 +81,9 @@ class ParentMessageService
             return ['success' => false, 'message' => 'This parent does not have a phone number.'];
         }
 
-        if ($channel === 'sms' && mb_strlen($message) > 160) {
-            return ['success' => false, 'message' => 'SMS messages must be 160 characters or fewer.'];
+        $smsMaxLength = max(1, (int) (function_exists('app_config') ? (app_config()['sms_max_length'] ?? 160) : 160));
+        if ($channel === 'sms' && mb_strlen($message) > $smsMaxLength) {
+            return ['success' => false, 'message' => 'SMS messages must be ' . $smsMaxLength . ' characters or fewer.'];
         }
 
         $data = [

@@ -29,8 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
 
     if ($newPassword === '') {
         $errors['newPassword'] = 'New password is required.';
-    } elseif (strlen($newPassword) < 6) {
-        $errors['newPassword'] = 'Password must be at least 6 characters long.';
+    } elseif (($passwordError = validate_password_policy($newPassword)) !== null) {
+        $errors['newPassword'] = $passwordError;
     } elseif ($newPassword !== $confirmPassword) {
         $errors['confirmPassword'] = 'Password confirmation does not match.';
     }
@@ -47,8 +47,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
             if (!empty($user['email']) && !empty($currentPassword)) {
                 try {
                     $signIn = FirebaseAuthService::signIn($user['email'], $currentPassword);
-                    if (!empty($signIn['idToken'])) {
-                        FirebaseAuthService::changePassword($signIn['idToken'], $newPassword);
+                    if (!empty($signIn['email'])) {
+                        FirebaseAuthService::changePassword($signIn['email'], $currentPassword, $newPassword);
                     }
                 } catch (\Throwable $authErr) {}
             }

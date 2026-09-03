@@ -107,6 +107,9 @@ class MedicalService
             $studentName = $student ? trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) : '';
             $severity = $this->normalizeSeverity($data['severity'] ?? 'normal');
             $diagnosis = $data['diagnosis'] ?? '';
+            $isEmergency = in_array($severity, ['severe', 'critical', 'emergency'], true);
+            $createdAt = $data['createdAt'] ?? date('c');
+            $appConfig = function_exists('app_config') ? app_config() : [];
 
             $recordedByName = $data['recordedByName'] ?? null;
             if (!$recordedByName && !empty($data['recordedBy']) && function_exists('current_user')) {
@@ -129,7 +132,9 @@ class MedicalService
                 'severity' => $severity,
                 'recordedBy' => $data['recordedBy'] ?? null,
                 'recordedByName' => $recordedByName,
-                'createdAt' => $data['createdAt'] ?? date('c')
+                'createdAt' => $createdAt,
+                'followUpDate' => $data['followUpDate'] ?? ($isEmergency ? date('c', strtotime('+' . (int) ($appConfig['emergency_follow_up_hours'] ?? 24) . ' hours')) : null),
+                'responseDueAt' => $data['responseDueAt'] ?? ($isEmergency ? date('c', strtotime('+' . (int) ($appConfig['emergency_response_minutes'] ?? 15) . ' minutes')) : null),
             ];
 
             $id = $this->firebase->addDocument($this->collection, $recordData);

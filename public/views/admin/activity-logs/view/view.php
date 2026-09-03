@@ -32,6 +32,7 @@ if (!$log) {
 
 $actorName = (string) ($log['userName'] ?? $log['performedByName'] ?? '');
 $rawActorId = (string) ($log['userId'] ?? $log['performedBy'] ?? '');
+$displayActorId = $rawActorId === 'default-admin' ? 'Built-in Administrator' : ($rawActorId ?: '—');
 if ($rawActorId === 'default-admin') {
     $actorName = 'Administrator (Admin)';
 } elseif ($actorName === '' || $actorName === 'default-admin' || str_starts_with($actorName, 'Staff/User')) {
@@ -101,14 +102,17 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </div>
                 <div class="col-sm-6">
                     <span class="text-muted small d-block">User Identifier</span>
-                    <code class="small"><?= e($rawActorId ?: '—') ?></code>
+                    <strong><?= e($displayActorId) ?></strong>
+                    <?php if ($rawActorId === 'default-admin'): ?>
+                        <small class="text-muted d-block">Internal ID: <code><?= e($rawActorId) ?></code></small>
+                    <?php endif; ?>
                 </div>
                 <div class="col-sm-6">
                     <span class="text-muted small d-block">Client IP</span>
                     <span class="font-monospace small"><?= e($log['ip'] ?? $log['ipAddress'] ?? '—') ?></span>
                 </div>
                 <div class="col-sm-6">
-                    <span class="text-muted small d-block">Document Log ID</span>
+                    <span class="text-muted small d-block">Audit Reference</span>
                     <code class="small"><?= e($id) ?></code>
                 </div>
             </div>

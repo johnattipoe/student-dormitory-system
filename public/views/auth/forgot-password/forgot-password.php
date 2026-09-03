@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(base_url('views/auth/forgot-password/forgot-password.php'));
     }
 
-    $result = FirebaseAuthService::sendPasswordResetEmail($email);
+    $result = FirebaseAuthService::sendCustomPasswordResetEmail($email);
 
     if (!$result['success']) {
         flash('error', $result['message']);

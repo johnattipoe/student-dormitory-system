@@ -39,7 +39,7 @@ if (isset($_GET['download_template'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_FILES['beds_file'])) {
     $file = $_FILES['beds_file'];
     $extension = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !in_array($extension, ['csv', 'xlsx'], true)) {
+    if (validate_uploaded_file($file, ['csv', 'xlsx']) !== null) {
         $errors[] = 'Upload a valid CSV or XLSX file.';
     } else {
         try {
@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_FILES['beds_file'])) {
             $map = [];
             foreach ($header as $index => $name) $map[$name] = $index;
             $defaultRoomId = sanitize($_POST['defaultRoomId'] ?? '');
-            foreach (array_slice($rows, 0, 1000) as $row) {
+            foreach (array_slice($rows, 0, (int) (app_config()['import_max_records'] ?? 1000)) as $row) {
                 $value = static fn ($name, $fallback = -1) => $row[$map[strtolower(preg_replace('/[^a-z0-9]/i', '', $name))] ?? $fallback] ?? '';
                 $result = BedService::create([
                     'bedNumber' => sanitize($value('bednumber', 0)),
