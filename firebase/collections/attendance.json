@@ -1,0 +1,22 @@
+{
+  "collection": "attendance",
+  "description": "Daily student attendance logs.",
+  "fields": {
+    "studentId": "string",
+    "date": "string",
+    "status": "string",
+    "checkedInAt": "timestamp|null",
+    "checkedOutAt": "timestamp|null",
+    "createdAt": "timestamp",
+    "updatedAt": "timestamp"
+  },
+  "sample": {
+    "studentId": "STD-1001",
+    "date": "2026-08-12",
+    "status": "present",
+    "checkedInAt": "2026-08-12T08:00:00Z",
+    "checkedOutAt": null,
+    "createdAt": "2026-08-12T08:00:00Z",
+    "updatedAt": "2026-08-12T08:00:00Z"
+  }
+}

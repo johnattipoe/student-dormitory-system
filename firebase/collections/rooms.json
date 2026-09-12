@@ -1,0 +1,24 @@
+{
+  "collection": "rooms",
+  "description": "Room inventory and room assignment details.",
+  "fields": {
+    "roomNumber": "string",
+    "houseId": "string",
+    "type": "string",
+    "capacity": "number",
+    "occupied": "number",
+    "status": "string",
+    "createdAt": "timestamp",
+    "updatedAt": "timestamp"
+  },
+  "sample": {
+    "roomNumber": "A-101",
+    "houseId": "house-1",
+    "type": "Single",
+    "capacity": 2,
+    "occupied": 1,
+    "status": "available",
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "collection": "houses",
+  "description": "Dormitory house records and assignment metadata.",
+  "fields": {
+    "name": "string",
+    "managerId": "string|null",
+    "capacity": "number",
+    "status": "string",
+    "createdAt": "timestamp",
+    "updatedAt": "timestamp"
+  },
+  "sample": {
+    "name": "House A",
+    "managerId": "manager-user-id",
+    "capacity": 80,
+    "status": "active",
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "collection": "visitors",
+  "description": "Visitor check-ins and visit histories.",
+  "fields": {
+    "visitorName": "string",
+    "studentId": "string",
+    "phone": "string",
+    "purpose": "string",
+    "status": "string",
+    "visitDate": "string",
+    "registeredBy": "string|null",
+    "createdAt": "timestamp",
+    "updatedAt": "timestamp"
+  },
+  "sample": {
+    "visitorName": "John Smith",
+    "studentId": "STD-1001",
+    "phone": "+254700000002",
+    "purpose": "Family visit",
+    "status": "checked-in",
+    "visitDate": "2026-08-12",
+    "registeredBy": "security-user-id",
+    "createdAt": "2026-08-12T10:00:00Z",
+    "updatedAt": "2026-08-12T10:00:00Z"
+  }
+}

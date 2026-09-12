@@ -1,0 +1,22 @@
+{
+  "collection": "notifications",
+  "description": "Broadcast and targeted notifications for users.",
+  "fields": {
+    "title": "string",
+    "message": "string",
+    "type": "string",
+    "read": "boolean",
+    "userId": "string|null",
+    "createdAt": "timestamp",
+    "updatedAt": "timestamp"
+  },
+  "sample": {
+    "title": "Curfew reminder",
+    "message": "All students must return to the dorm by 10:00 PM.",
+    "type": "alert",
+    "read": false,
+    "userId": null,
+    "createdAt": "2026-08-12T09:00:00Z",
+    "updatedAt": "2026-08-12T09:00:00Z"
+  }
+}

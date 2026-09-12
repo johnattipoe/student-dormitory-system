@@ -1,0 +1,15 @@
+{
+    "intelephense.environment.phpVersion": "8.3.0",
+    "php.validate.enable": false,
+    "php.validate.exclude": {
+        "**/vendor/**": true,
+        "**/*.example.php": true
+    },
+    "files.exclude": {
+        "**/*.example.php": true
+    },
+    "intelephense.files.exclude": [
+        "**/vendor/**",
+        "**/*.example.php"
+    ]
+}

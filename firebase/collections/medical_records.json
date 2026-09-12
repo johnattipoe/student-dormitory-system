@@ -1,0 +1,22 @@
+{
+  "collection": "medical_records",
+  "description": "Medical treatment and health records for students.",
+  "fields": {
+    "studentId": "string",
+    "diagnosis": "string",
+    "treatment": "string",
+    "severity": "string",
+    "notes": "string",
+    "createdAt": "timestamp",
+    "updatedAt": "timestamp"
+  },
+  "sample": {
+    "studentId": "STD-1001",
+    "diagnosis": "Mild fever",
+    "treatment": "Rest and hydration",
+    "severity": "moderate",
+    "notes": "Student monitored for 24 hours.",
+    "createdAt": "2026-08-12T09:00:00Z",
+    "updatedAt": "2026-08-12T09:00:00Z"
+  }
+}

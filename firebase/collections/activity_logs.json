@@ -1,0 +1,16 @@
+{
+  "collection": "activity_logs",
+  "description": "Audit trail of login, updates, and user actions.",
+  "fields": {
+    "userId": "string",
+    "action": "string",
+    "details": "string",
+    "createdAt": "timestamp"
+  },
+  "sample": {
+    "userId": "demo-user-id",
+    "action": "login",
+    "details": "User logged in successfully",
+    "createdAt": "2026-08-12T09:00:00Z"
+  }
+}
