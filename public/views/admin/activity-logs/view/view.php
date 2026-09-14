@@ -30,11 +30,21 @@ if (!$log) {
     redirect(url('views/admin/activity-logs/index.php'));
 }
 
-$actorName = (string) ($log['userName'] ?? $log['performedByName'] ?? '');
-$rawActorId = (string) ($log['userId'] ?? $log['performedBy'] ?? '');
-$displayActorId = $rawActorId === 'default-admin' ? 'Built-in Administrator' : ($rawActorId ?: '—');
+$actorName = (string) ($log['userName'] ?? $log['performedByName'] ?? $log['name'] ?? '');
+$rawActorId = '';
+foreach (['userId', 'user_id', 'user', 'uid', 'performedBy', 'actorId', 'actor', 'adminId'] as $key) {
+    if (!empty($log[$key])) {
+        $rawActorId = (string) $log[$key];
+        break;
+    }
+}
+if ($rawActorId === '' && function_exists('current_user_id')) {
+    $rawActorId = (string) (current_user_id() ?? '');
+}
+
+$displayActorId = $rawActorId !== '' ? $rawActorId : '—';
 if ($rawActorId === 'default-admin') {
-    $actorName = 'Administrator (Admin)';
+    $actorName = 'Administrator';
 } elseif ($actorName === '' || $actorName === 'default-admin' || str_starts_with($actorName, 'Staff/User')) {
     if ($rawActorId !== '') {
         try {
@@ -50,6 +60,11 @@ if ($rawActorId === 'default-admin') {
     }
 }
 if ($actorName === '') $actorName = 'System / Administrator';
+
+$auditReference = (string) ($log['referenceId'] ?? $log['auditReference'] ?? $log['ref'] ?? $log['logId'] ?? $log['id'] ?? $id);
+if ($auditReference === '') {
+    $auditReference = $id;
+}
 
 $rawTime = (string) ($log['timestamp'] ?? $log['createdAt'] ?? $log['time'] ?? '');
 $formattedTime = $rawTime !== '' ? (date('F d, Y - H:i:s', strtotime($rawTime)) ?: $rawTime) : 'Not recorded';
@@ -103,9 +118,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <div class="col-sm-6">
                     <span class="text-muted small d-block">User Identifier</span>
                     <strong><?= e($displayActorId) ?></strong>
-                    <?php if ($rawActorId === 'default-admin'): ?>
-                        <small class="text-muted d-block">Internal ID: <code><?= e($rawActorId) ?></code></small>
-                    <?php endif; ?>
                 </div>
                 <div class="col-sm-6">
                     <span class="text-muted small d-block">Client IP</span>
@@ -113,7 +125,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </div>
                 <div class="col-sm-6">
                     <span class="text-muted small d-block">Audit Reference</span>
-                    <code class="small"><?= e($id) ?></code>
+                    <code class="small"><?= e($auditReference) ?></code>
                 </div>
             </div>
 

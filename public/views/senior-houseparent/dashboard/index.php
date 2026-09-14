@@ -93,7 +93,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </p>
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                <a href="<?= url('views/senior-houseparent/attendance/mark-attendance/mark-attendance.php') ?>" class="btn btn-primary btn-sm">
+                <a href="<?= url('views/senior-houseparent/attendance/index/index.php') ?>" class="btn btn-primary btn-sm">
                     <i class="bi bi-check2-circle me-1"></i> Mark Roll Call
                 </a>
                 <a href="<?= url('views/senior-houseparent/announcements/create/create.php') ?>" class="btn btn-outline-primary btn-sm">

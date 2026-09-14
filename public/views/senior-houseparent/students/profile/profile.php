@@ -170,6 +170,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
                 <div class="d-flex flex-wrap gap-2 mb-4">
                     <button type="button" class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#flagModal"><i class="bi bi-flag me-1"></i>Flag Student</button>
+                    <a class="btn btn-outline-info btn-sm" href="<?= url('views/gallery/index.php?houseId=' . urlencode((string) ($student['houseId'] ?? '')) . '&studentId=' . urlencode((string) $studentId)) ?>"><i class="bi bi-images me-1"></i>View Gallery</a>
                 </div>
 
                 <div class="row g-3 mt-1">

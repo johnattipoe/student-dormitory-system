@@ -3,6 +3,14 @@ RewriteEngine On
 # Block direct access to sensitive folders if they ever end up under public/
 RewriteRule ^(credentials|storage|vendor)/ - [F,L]
 
+# Explicit root-role aliases before the generic directory check
+RewriteRule ^views/admin/?$ index.php?route=/views/admin/dashboard.php [QSA,L]
+RewriteRule ^views/house-master/?$ index.php?route=/views/house-master/dashboard/index.php [QSA,L]
+RewriteRule ^views/senior-houseparent/?$ index.php?route=/views/senior-houseparent/dashboard/index.php [QSA,L]
+RewriteRule ^views/security/?$ index.php?route=/views/security/dashboard/dashboard.php [QSA,L]
+RewriteRule ^views/nurse/?$ index.php?route=/views/nurse/dashboard/dashboard.php [QSA,L]
+RewriteRule ^views/student/?$ index.php?route=/views/student/dashboard/index.php [QSA,L]
+
 # Keep the short dashboard URL compatible with the generic dashboard router.
 RewriteRule ^dashboard\.php$ index.php?route=/views/dashboard/dashboard.php [QSA,L]
 

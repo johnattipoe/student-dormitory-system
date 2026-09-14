@@ -56,6 +56,7 @@ $bedLabel = $bed['bedNumber'] ?? 'Not assigned';
 $pageTitle = 'Student Profile';
 $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: 'Student';
 $initials = strtoupper(substr((string) ($student['firstName'] ?? 'S'), 0, 1) . substr((string) ($student['lastName'] ?? ''), 0, 1));
+$formLevel = $student['form'] ?? $student['level'] ?? null;
 $status = strtolower((string) ($student['status'] ?? 'active'));
 $statusClass = $status === 'active' ? 'success' : ($status === 'suspended' ? 'danger' : 'secondary');
 
@@ -88,8 +89,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <h4 class="mb-1 fw-bold text-dark"><?= e($studentName) ?></h4>
                     <p class="text-muted mb-0">
                         <?= e($student['course'] ?? 'Course not specified') ?>
-                        <?php if (!empty($student['form'] ?? $student['level'])): ?>
-                            &bull; Form <?= e($student['form'] ?? $student['level']) ?>
+                        <?php if (!empty($formLevel)): ?>
+                            &bull; Form <?= e($formLevel) ?>
                         <?php endif; ?>
                         &bull; <span class="badge bg-<?= e($statusClass) ?>"><?= e(ucfirst($status)) ?></span>
                     </p>
@@ -168,7 +169,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             </div>
                             <div class="col-sm-6">
                                 <span class="text-muted small d-block">Form / Level</span>
-                                <strong><?= e($student['form'] ?? $student['level'] ?? 'Not specified') ?></strong>
+                                <strong><?= e($formLevel ?? 'Not specified') ?></strong>
                             </div>
                             <div class="col-sm-6">
                                 <span class="text-muted small d-block">NHIS Health Insurance No.</span>

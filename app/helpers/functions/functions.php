@@ -18,6 +18,21 @@ function app_config(): array
 
 function url(string $path = ''): string
 {
+    $path = trim((string) $path);
+    if ($path === '') {
+        return base_url();
+    }
+
+    if (preg_match('/^(https?:)?\/\//i', $path) === 1 || str_contains($path, '?route=')) {
+        return base_url($path);
+    }
+
+    $normalized = ltrim($path, '/');
+    if (str_starts_with($normalized, 'views/') || str_starts_with($normalized, 'public/views/')) {
+        $route = '/' . ltrim(str_replace('public/', '', $normalized), '/');
+        return base_url('index.php?route=' . urlencode($route));
+    }
+
     return base_url($path);
 }
 
@@ -25,9 +40,17 @@ function asset(string $path = ''): string
 {
     $path = ltrim($path, '/');
     $parts = explode('/', $path, 2);
+
     if (count($parts) === 2 && in_array($parts[0], ['css', 'js'], true)) {
-        $file = basename($parts[1]);
-        $path = $parts[0] . '/' . pathinfo($file, PATHINFO_FILENAME) . '/' . $file;
+        $subPath = $parts[1];
+        $hasNestedFolder = str_contains($subPath, '/');
+
+        if (!$hasNestedFolder) {
+            $file = basename($subPath);
+            $path = $parts[0] . '/' . pathinfo($file, PATHINFO_FILENAME) . '/' . $file;
+        } else {
+            $path = $parts[0] . '/' . $subPath;
+        }
     }
 
     return base_url('assets/' . $path);

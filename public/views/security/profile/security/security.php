@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $pageTitle = 'Account Security';
 $navItems = [
-    ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/security/dashboard/index.php')],
+    ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/security/dashboard/dashboard.php')],
     ['icon' => 'bi-person-circle', 'label' => 'Profile', 'href' => url('views/security/profile/index.php'), 'active' => true],
 ];
 

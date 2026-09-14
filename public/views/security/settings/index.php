@@ -52,7 +52,7 @@ $patrolLogReminders = $settingsDoc['patrolLogReminders'] ?? true;
 
 $pageTitle = 'Security Gate Settings';
 $navItems = [
-    ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/security/dashboard/index.php')],
+    ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/security/dashboard/dashboard.php')],
     ['icon' => 'bi-gear', 'label' => 'Settings', 'href' => url('views/security/settings/index.php'), 'active' => true],
 ];
 

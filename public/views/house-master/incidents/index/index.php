@@ -25,6 +25,7 @@ $dateFrom = sanitize($_GET['dateFrom'] ?? '');
 $dateTo = sanitize($_GET['dateTo'] ?? '');
 $severity = sanitize($_GET['severity'] ?? '');
 $status = sanitize($_GET['status'] ?? '');
+$externalStatus = sanitize($_GET['externalStatus'] ?? '');
 
 $houseId = current_user()['houseId'] ?? null;
 $students = StudentService::all($houseId);
@@ -82,6 +83,29 @@ $getReporterName = function (array $incident) use (&$reporterMap, $studentMap): 
 };
 
 $incidents = (new IncidentService())->byHouse($houseId);
+
+$externalIncidents = [];
+$externalDir = APP_ROOT . '/public/uploads/external-incidents';
+if (is_dir($externalDir)) {
+    $jsonFiles = glob($externalDir . '/*.json');
+    if (is_array($jsonFiles)) {
+        rsort($jsonFiles);
+        foreach ($jsonFiles as $jsonFile) {
+            $content = json_decode((string) file_get_contents($jsonFile), true);
+            if (!is_array($content)) {
+                continue;
+            }
+            $content['sourceFile'] = basename((string) ($content['fileName'] ?? ''));
+            $externalIncidents[] = $content;
+        }
+    }
+}
+
+if (!empty($externalStatus)) {
+    $externalIncidents = array_values(array_filter($externalIncidents, function ($incident) use ($externalStatus) {
+        return strtolower((string) ($incident['status'] ?? 'submitted')) === strtolower((string) $externalStatus);
+    }));
+}
 
 if (!empty($search)) {
     $searchLower = strtolower($search);
@@ -146,6 +170,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="d-flex gap-2 flex-wrap">
                 <a href="<?= url('views/house-master/reports/incidents/incidents.php') ?>" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-file-earmark-bar-graph me-1"></i>Reports
+                </a>
+                <a href="<?= url('views/house-master/incidents/upload/upload.php') ?>" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-upload me-1"></i>Upload External Incident
                 </a>
                 <a href="<?= url('views/house-master/incidents/create/create.php') ?>" class="btn btn-danger btn-sm">
                     <i class="bi bi-plus-lg me-1"></i>Report Incident
@@ -235,6 +262,84 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <a href="<?= url('views/house-master/incidents/index/index.php') ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-lg"></i></a>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <div class="card stat-card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-file-earmark-arrow-up me-2"></i>External Incident Records</h6>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <small class="text-muted">Showing <?= e((string) count($externalIncidents)) ?> uploaded forms</small>
+                    <form method="GET" class="d-flex gap-2 align-items-center">
+                        <input type="hidden" name="search" value="<?= e($search) ?>">
+                        <input type="hidden" name="dateFrom" value="<?= e($dateFrom) ?>">
+                        <input type="hidden" name="dateTo" value="<?= e($dateTo) ?>">
+                        <input type="hidden" name="severity" value="<?= e($severity) ?>">
+                        <input type="hidden" name="status" value="<?= e($status) ?>">
+                        <select name="externalStatus" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="">All statuses</option>
+                            <option value="submitted" <?= $externalStatus === 'submitted' ? 'selected' : '' ?>>Submitted</option>
+                            <option value="reviewed" <?= $externalStatus === 'reviewed' ? 'selected' : '' ?>>Reviewed</option>
+                            <option value="resolved" <?= $externalStatus === 'resolved' ? 'selected' : '' ?>>Resolved</option>
+                        </select>
+                    </form>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0 w-100">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Student</th>
+                            <th>Incident Type</th>
+                            <th>Incident Date</th>
+                            <th>Submitted</th>
+                            <th>Status</th>
+                            <th>Document</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!empty($externalIncidents)): ?>
+                            <?php foreach ($externalIncidents as $external): ?>
+                                <?php $fileName = (string) ($external['fileName'] ?? ''); $externalViewUrl = $fileName !== '' ? url('views/house-master/incidents/external-view/external-view.php?file=' . urlencode($fileName)) : '#'; ?>
+                                <tr>
+                                    <td class="fw-medium"><?= e((string) ($external['studentName'] ?? 'Unknown Student')) ?></td>
+                                    <td><?= e((string) ($external['incidentType'] ?? 'External Incident')) ?></td>
+                                    <td><?= e((string) ($external['incidentDate'] ?? '—')) ?></td>
+                                    <td><span class="small text-muted"><?= e((string) ($external['uploadedAt'] ?? '—')) ?></span></td>
+                                    <td>
+                                        <span class="badge bg-success">
+                                            <?= e((string) ($external['status'] ?? 'Submitted')) ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-nowrap">
+                                        <?php if ($fileName !== ''): ?>
+                                            <div class="d-flex gap-2">
+                                                <a class="btn btn-sm btn-outline-primary" href="<?= $externalViewUrl ?>">
+                                                    <i class="bi bi-eye me-1"></i>View
+                                                </a>
+                                                <a class="btn btn-sm btn-outline-warning" href="<?= url('views/house-master/incidents/external-edit/external-edit.php?file=' . urlencode($fileName)) ?>">
+                                                    <i class="bi bi-pencil me-1"></i>Edit
+                                                </a>
+                                                <a class="btn btn-sm btn-outline-danger" href="<?= url('views/house-master/incidents/external-delete/external-delete.php?file=' . urlencode($fileName)) ?>">
+                                                    <i class="bi bi-trash me-1"></i>Delete
+                                                </a>
+                                                <a class="btn btn-sm btn-outline-success" href="<?= url('uploads/external-incidents/' . $fileName) ?>" target="_blank" rel="noopener">
+                                                    <i class="bi bi-download me-1"></i>Open
+                                                </a>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="text-muted">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No external incident forms have been uploaded yet.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
 

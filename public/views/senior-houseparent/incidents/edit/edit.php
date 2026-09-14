@@ -33,6 +33,9 @@ if (!$incident) {
     redirect(url('views/senior-houseparent/incidents/index/index.php'));
 }
 
+flash('error', 'Senior houseparent access is read-only. Editing is not allowed.');
+redirect(url('views/senior-houseparent/incidents/view/view.php?id=' . urlencode($id)));
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = $service->update($id, [
         'title' => sanitize($_POST['title'] ?? ''),

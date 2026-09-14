@@ -16,6 +16,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
   const toggle = document.getElementById('sidebarToggle');
   const sidebar = document.querySelector('.sidebar');
+  const collapseBtn = document.getElementById('sidebarCollapseBtn');
+
+  const setSidebarCollapsed = (collapsed) => {
+    if (!sidebar) return;
+    sidebar.classList.toggle('collapsed', collapsed);
+    const icon = collapseBtn?.querySelector('i');
+    if (icon) {
+      icon.classList.toggle('bi-chevron-double-left', !collapsed);
+      icon.classList.toggle('bi-chevron-double-right', collapsed);
+    }
+  };
+
   if (toggle && sidebar) {
     toggle.addEventListener('click', () => sidebar.classList.toggle('show'));
     // Close sidebar on outside click when open (mobile)
@@ -24,6 +36,18 @@ document.addEventListener('DOMContentLoaded', function () {
         sidebar.classList.remove('show');
       }
     });
+  }
+
+  if (collapseBtn && sidebar) {
+    collapseBtn.addEventListener('click', () => {
+      const collapsed = !sidebar.classList.contains('collapsed');
+      setSidebarCollapsed(collapsed);
+      if (window.matchMedia('(max-width: 991.98px)').matches) {
+        sidebar.classList.remove('show');
+      }
+    });
+
+    setSidebarCollapsed(false);
   }
 
   // Defer optional table/plugin work so navigation and buttons become usable first.

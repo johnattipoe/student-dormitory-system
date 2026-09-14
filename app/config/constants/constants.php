@@ -71,6 +71,9 @@ define('COL_PARENT_MESSAGES', 'parent_messages');
 define('COL_REPORTS', 'reports');
 define('COL_ROLES', 'roles');
 define('COL_PERMISSIONS', 'permissions');
+define('COL_FINANCE_ACCESS', 'finance_access');
+define('COL_FINANCE_FEES', 'finance_fees');
+define('COL_FINANCE_PAYMENTS', 'finance_payments');
 define('COL_SETTINGS', 'settings');
 
 define('PERMISSION_FULL', 'full');

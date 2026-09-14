@@ -60,6 +60,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="d-flex gap-2 flex-wrap">
                 <a href="<?= url('views/admin/students/edit/edit.php?id=' . urlencode((string)($student['id'] ?? $id))) ?>"
                    class="btn btn-primary btn-sm"><i class="bi bi-pencil me-1"></i>Edit Student</a>
+                <a href="<?= url('views/gallery/index.php?houseId=' . urlencode((string) ($student['houseId'] ?? '')) . '&studentId=' . urlencode((string)($student['id'] ?? $id))) ?>"
+                   class="btn btn-outline-info btn-sm"><i class="bi bi-images me-1"></i>Gallery</a>
                 <a href="<?= url('views/admin/students/index/index.php') ?>"
                    class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back to List</a>
             </div>

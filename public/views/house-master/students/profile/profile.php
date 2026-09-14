@@ -106,6 +106,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <a class="btn btn-primary btn-sm" href="<?= url('views/house-master/students/edit/edit.php?studentId=' . urlencode($studentId)) ?>">
                         <i class="bi bi-pencil me-1"></i>Edit Student
                     </a>
+                    <a class="btn btn-outline-info btn-sm" href="<?= url('views/gallery/index.php?houseId=' . urlencode((string) ($student['houseId'] ?? '')) . '&studentId=' . urlencode((string) $studentId)) ?>">
+                        <i class="bi bi-images me-1"></i>Gallery
+                    </a>
                     <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/students/index/index.php') ?>">
                         <i class="bi bi-arrow-left me-1"></i>All Students
                     </a>

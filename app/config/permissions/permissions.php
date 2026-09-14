@@ -12,6 +12,7 @@ $permissions = [
         'settings' => 'full', 'announcements' => 'full', 'message_parents' => 'full',
         'emergency_alerts' => 'full', 'emergency_contacts' => 'full', 'health_reports' => 'full',
         'audit_trail' => 'full', 'backup_restore' => 'full', 'profile' => 'full',
+        'finance' => 'full',
     ],
     ROLE_HOUSE_MASTER => [
         'users' => 'view', 'students' => 'full', 'houses' => 'full', 'rooms' => 'full',
@@ -21,6 +22,7 @@ $permissions = [
         'settings' => 'none', 'announcements' => 'full', 'message_parents' => 'manage',
         'emergency_alerts' => 'manage', 'emergency_contacts' => 'view', 'health_reports' => 'full',
         'audit_trail' => 'view', 'backup_restore' => 'none', 'profile' => 'own',
+        'finance' => 'none',
     ],
     ROLE_HOUSE_MISTRESS => [
         'users' => 'view', 'students' => 'full', 'houses' => 'full', 'rooms' => 'full',
@@ -30,6 +32,7 @@ $permissions = [
         'settings' => 'none', 'announcements' => 'full', 'message_parents' => 'manage',
         'emergency_alerts' => 'manage', 'emergency_contacts' => 'view', 'health_reports' => 'full',
         'audit_trail' => 'view', 'backup_restore' => 'none', 'profile' => 'own',
+        'finance' => 'none',
     ],
     ROLE_SENIOR_HOUSEPARENT => [
         'users' => 'view', 'students' => 'full', 'houses' => 'view', 'rooms' => 'view',

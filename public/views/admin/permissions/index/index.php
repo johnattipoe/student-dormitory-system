@@ -70,37 +70,128 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                 <div>
                     <h6 class="mb-1">Access Matrix</h6>
-                    <p class="text-muted mb-0">Current permission levels assigned to each role.</p>
+                    <p class="text-muted mb-0">Click a role to view its detailed access permissions.</p>
                 </div>
                 <span class="badge bg-primary bg-opacity-10 text-primary">Current matrix</span>
             </div>
 
-            <div class="table-responsive">
-                <table class="table table-hover align-middle table-bordered data-table" data-no-data-table="true">
-                    <thead>
-                        <tr>
-                            <th>Role</th>
-                            <?php foreach ($permissionModules as $module): ?>
-                                <th><?= e(ucwords(str_replace('_', ' ', $module))) ?></th>
-                            <?php endforeach; ?>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($roles as $roleKey => $roleLabel): ?>
-                            <tr>
-                                <td><strong><?= e($roleLabel) ?></strong></td>
-                                <?php
-                                $level = $permissions[$roleKey] ?? [];
-                                ?>
-                                <?php foreach ($permissionModules as $module): ?>
-                                    <td><?= e($level[$module] ?? 'none') ?></td>
-                                <?php endforeach; ?>
-                                <td><?php if (!empty($savedPermissionKeys[$roleKey])): ?><a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/permissions/edit/edit.php?id=' . urlencode($roleKey)) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/permissions/delete/delete.php?id=' . urlencode($roleKey)) ?>">Delete</a><?php else: ?><span class="text-muted small">Config</span><?php endif; ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+            <style>
+                .role-permission-accordion {
+                    display: grid;
+                    gap: 0.8rem;
+                }
+                .role-permission-item {
+                    border: 1px solid rgba(15, 76, 150, 0.12);
+                    border-radius: 12px;
+                    overflow: hidden;
+                    background: #ffffff;
+                    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+                }
+                .role-permission-header {
+                    width: 100%;
+                    border: none;
+                    background: linear-gradient(90deg, #eef5ff 0%, #f9fbff 100%);
+                    border-left: 5px solid #1d7ef2;
+                    padding: 0.9rem 1.1rem;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    text-align: left;
+                    color: #0f172a;
+                    font-weight: 700;
+                    letter-spacing: 0.01em;
+                    border-radius: 0;
+                }
+                .role-permission-header small {
+                    font-weight: 600;
+                    color: #475569;
+                }
+                .role-permission-header .accordion-button::after {
+                    margin-left: 1rem;
+                }
+                .role-permission-header:focus,
+                .role-permission-header:active {
+                    box-shadow: none;
+                }
+                .role-permission-body {
+                    padding: 1rem 1rem 1.1rem;
+                    background: #ffffff;
+                }
+                .role-detail-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+                    gap: 0.7rem;
+                }
+                .role-detail-card {
+                    border: 1px solid #edf2f7;
+                    border-radius: 10px;
+                    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+                    padding: 0.75rem 0.8rem;
+                }
+                .role-detail-card .module-name {
+                    display: block;
+                    font-size: 0.7rem;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    margin-bottom: 0.38rem;
+                }
+                .permission-badge {
+                    display: inline-block;
+                    min-width: 74px;
+                    text-align: center;
+                    border-radius: 999px;
+                    padding: 0.3rem 0.65rem;
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    text-transform: capitalize;
+                    background: #edf5ff;
+                    color: #1b5fcc;
+                }
+                .permission-badge.full { background: rgba(25,135,84,0.12); color: #198754; }
+                .permission-badge.manage { background: rgba(255,193,7,0.12); color: #b7791f; }
+                .permission-badge.view { background: rgba(13,110,253,0.08); color: #0d6efd; }
+                .permission-badge.none { background: rgba(108,117,125,0.10); color: #6c757d; }
+            </style>
+
+            <div class="role-permission-accordion accordion" id="rolePermissionAccordion">
+                <?php foreach ($roles as $roleKey => $roleLabel): ?>
+                    <?php $level = $permissions[$roleKey] ?? []; ?>
+                    <?php $moduleCount = count(array_filter($permissionModules, static fn($module) => (($level[$module] ?? 'none') !== 'none'))); ?>
+                    <div class="role-permission-item accordion-item">
+                        <h2 class="accordion-header" id="heading-<?= e($roleKey) ?>">
+                            <button class="role-permission-header accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-<?= e($roleKey) ?>" aria-expanded="false" aria-controls="collapse-<?= e($roleKey) ?>">
+                                <span><?= e($roleLabel) ?></span>
+                                <small><?= e((string) $moduleCount) ?> modules active</small>
+                            </button>
+                        </h2>
+                        <div id="collapse-<?= e($roleKey) ?>" class="accordion-collapse collapse" aria-labelledby="heading-<?= e($roleKey) ?>" data-bs-parent="#rolePermissionAccordion">
+                            <div class="role-permission-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                    <strong><?= e($roleLabel) ?> access</strong>
+                                    <?php if (!empty($savedPermissionKeys[$roleKey])): ?>
+                                        <div class="d-flex gap-2">
+                                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/permissions/edit/edit.php?id=' . urlencode($roleKey)) ?>">Edit</a>
+                                            <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/permissions/delete/delete.php?id=' . urlencode($roleKey)) ?>">Delete</a>
+                                        </div>
+                                    <?php else: ?>
+                                        <span class="text-muted small">Built-in config</span>
+                                    <?php endif; ?>
+                                </div>
+
+                                <div class="role-detail-grid">
+                                    <?php foreach ($permissionModules as $module): ?>
+                                        <?php $moduleValue = strtolower((string) ($level[$module] ?? 'none')); ?>
+                                        <div class="role-detail-card">
+                                            <span class="module-name"><?= e(ucwords(str_replace('_', ' ', $module))) ?></span>
+                                            <span class="permission-badge <?= e($moduleValue) ?>"><?= e($moduleValue === '' ? 'none' : $moduleValue) ?></span>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
             </div>
         </div>
     </div>

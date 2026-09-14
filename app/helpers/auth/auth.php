@@ -707,6 +707,62 @@ if (!function_exists('permission_matrix')) {
     }
 }
 
+if (!function_exists('finance_access_allowed')) {
+    function finance_access_allowed(?string $userId = null, ?string $houseId = null, ?string $role = null): bool
+    {
+        $role = $role ?: current_role();
+        $userId = $userId ?: current_user_id();
+        $houseId = $houseId ?: current_house_id();
+
+        if (!$role || !$houseId || !$userId) {
+            return false;
+        }
+
+        if (is_admin()) {
+            return true;
+        }
+
+        if (!in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true)) {
+            return false;
+        }
+
+        try {
+            $records = \App\Services\FirebaseService::getInstance()->getCollection(COL_FINANCE_ACCESS, [], 200);
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        foreach ($records as $record) {
+            $recordRole = strtolower((string) ($record['role'] ?? ''));
+            $recordHouseId = (string) ($record['houseId'] ?? $record['house_id'] ?? '');
+            $recordUserId = (string) ($record['userId'] ?? $record['user_id'] ?? '');
+            $status = strtolower((string) ($record['status'] ?? 'pending'));
+
+            if ($status !== 'approved') {
+                continue;
+            }
+
+            if ($recordHouseId !== '' && $recordHouseId !== $houseId) {
+                continue;
+            }
+
+            if ($recordUserId !== '' && $recordUserId !== $userId) {
+                continue;
+            }
+
+            if ($recordUserId !== '' && $recordRole !== '' && $recordRole !== $role) {
+                continue;
+            }
+
+            if ($recordHouseId === $houseId && ($recordUserId === $userId || $recordRole === $role)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
 if (!function_exists('has_permission')) {
 
     function has_permission(
@@ -723,6 +779,12 @@ if (!function_exists('has_permission')) {
             'delete', 'generate' => 'full',
             default => 'view',
         };
+
+        if ($module === 'finance' && in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true)) {
+            if (finance_access_allowed()) {
+                return true;
+            }
+        }
 
         $permissions = permission_matrix();
         $currentLevel = $permissions[$role][$module] ?? 'none';
@@ -747,6 +809,12 @@ if (!function_exists('can')) {
         $role = current_role();
         if (!$role) {
             return false;
+        }
+
+        if ($module === 'finance' && in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true)) {
+            if (finance_access_allowed()) {
+                return true;
+            }
         }
 
         $permissions = permission_matrix();

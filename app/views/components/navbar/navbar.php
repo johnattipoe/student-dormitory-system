@@ -45,7 +45,9 @@ $topbarUnreadCount = count(array_filter($topbarNotifications, static fn(array $n
 $recentNotifications = array_slice($topbarNotifications, 0, 5);
 ?>
 <nav class="topbar navbar navbar-expand navbar-light bg-white border-bottom px-3 w-100">
-    <button class="btn btn-sm btn-outline-secondary d-lg-none" id="sidebarToggle"><i class="bi bi-list"></i></button>
+    <button type="button" class="btn btn-sm btn-outline-light sidebar-collapse-btn d-none d-lg-flex" id="sidebarCollapseBtn" aria-label="Toggle sidebar">
+                <i class="bi bi-chevron-double-left"></i>
+    </button>
     <span class="fw-semibold ms-2"><?= e($pageTitle ?? '') ?></span>
 
     <div class="ms-auto d-flex align-items-center gap-3">

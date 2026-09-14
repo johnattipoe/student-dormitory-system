@@ -70,47 +70,134 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                 <div>
                     <h6 class="mb-1">System Roles</h6>
-                    <p class="text-muted mb-0">Available user access levels across the dormitory system.</p>
+                    <p class="text-muted mb-0">Click a role to view its detailed access and configuration.</p>
                 </div>
                 <span class="badge bg-primary bg-opacity-10 text-primary"><?= count($displayRoles) ?> roles</span>
             </div>
 
-            <div class="table-responsive">
-                <table class="table table-hover align-middle data-table" data-no-data-table="true">
-                    <thead>
-                        <tr>
-                            <th>Role</th>
-                            <th>Dashboard</th>
-                            <th>House Access</th>
-                            <th>Description</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($displayRoles as $role): ?>
-                            <tr>
-                                <td>
-                                    <?php
-                                    $badgeClass = 'bg-secondary';
-                                    $roleName = strtolower((string) ($role['name'] ?? 'Custom'));
-                                    if (strpos($roleName, 'admin') !== false) $badgeClass = 'bg-primary';
-                                    elseif (strpos($roleName, 'master') !== false || strpos($roleName, 'mistress') !== false) $badgeClass = 'bg-info text-dark';
-                                    elseif (strpos($roleName, 'parent') !== false) $badgeClass = 'bg-secondary';
-                                    elseif (strpos($roleName, 'nurse') !== false) $badgeClass = 'bg-success';
-                                    elseif (strpos($roleName, 'security') !== false) $badgeClass = 'bg-warning text-dark';
-                                    elseif (strpos($roleName, 'student') !== false) $badgeClass = 'bg-dark';
-                                    elseif (isset($role['key']) && $role['key'] !== (string) $role['key']) { $badgeClass = 'bg-success'; }
-                                    ?>
-                                    <span class="badge <?= $badgeClass ?>"><?= e($role['name']) ?></span>
-                                </td>
-                                <td><?= e($role['dashboard']) ?></td>
-                                <td><?= e($role['house_access']) ?></td>
-                                <td><?= e($role['description']) ?></td>
-                                <td><?php if (!in_array($role['key'], ALL_ROLES, true)): ?><a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/roles/edit/edit.php?id=' . urlencode($role['key'])) ?>">Edit</a> <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/roles/delete/delete.php?id=' . urlencode($role['key'])) ?>">Delete</a><?php else: ?><span class="text-muted small">Built-in</span><?php endif; ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+            <style>
+                .role-detail-accordion {
+                    display: grid;
+                    gap: 0.8rem;
+                }
+                .role-detail-item {
+                    border: 1px solid rgba(15, 76, 150, 0.12);
+                    border-radius: 12px;
+                    overflow: hidden;
+                    background: #ffffff;
+                    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+                }
+                .role-detail-header {
+                    width: 100%;
+                    border: none;
+                    background: linear-gradient(90deg, #eef5ff 0%, #f9fbff 100%);
+                    border-left: 5px solid #1d7ef2;
+                    padding: 0.9rem 1.1rem;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    text-align: left;
+                    color: #0f172a;
+                    font-weight: 700;
+                    letter-spacing: 0.01em;
+                    border-radius: 0;
+                }
+                .role-detail-header small {
+                    font-weight: 600;
+                    color: #475569;
+                }
+                .role-detail-header:focus,
+                .role-detail-header:active {
+                    box-shadow: none;
+                }
+                .role-detail-body {
+                    padding: 1rem;
+                    background: #ffffff;
+                }
+                .role-detail-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                    gap: 0.75rem;
+                }
+                .role-detail-card {
+                    border: 1px solid #edf2f7;
+                    border-radius: 10px;
+                    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+                    padding: 0.75rem 0.8rem;
+                }
+                .role-detail-card .label {
+                    display: block;
+                    font-size: 0.7rem;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    margin-bottom: 0.38rem;
+                }
+                .role-detail-card .value {
+                    font-size: 0.98rem;
+                    color: #0f172a;
+                    font-weight: 600;
+                    line-height: 1.5;
+                }
+                .role-detail-card .value-muted {
+                    color: #475569;
+                    font-weight: 500;
+                }
+            </style>
+
+            <div class="role-detail-accordion accordion" id="roleDetailAccordion">
+                <?php foreach ($displayRoles as $role): ?>
+                    <?php
+                    $badgeClass = 'bg-secondary';
+                    $roleName = strtolower((string) ($role['name'] ?? 'Custom'));
+                    if (strpos($roleName, 'admin') !== false) $badgeClass = 'bg-primary';
+                    elseif (strpos($roleName, 'master') !== false || strpos($roleName, 'mistress') !== false) $badgeClass = 'bg-info text-dark';
+                    elseif (strpos($roleName, 'parent') !== false) $badgeClass = 'bg-secondary';
+                    elseif (strpos($roleName, 'nurse') !== false) $badgeClass = 'bg-success';
+                    elseif (strpos($roleName, 'security') !== false) $badgeClass = 'bg-warning text-dark';
+                    elseif (strpos($roleName, 'student') !== false) $badgeClass = 'bg-dark';
+                    ?>
+                    <div class="role-detail-item accordion-item">
+                        <h2 class="accordion-header" id="heading-role-<?= e($role['key']) ?>">
+                            <button class="role-detail-header accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-role-<?= e($role['key']) ?>" aria-expanded="false" aria-controls="collapse-role-<?= e($role['key']) ?>">
+                                <span>
+                                    <span class="badge <?= $badgeClass ?> me-2"><?= e($role['name']) ?></span>
+                                </span>
+                                <small><?= e($role['house_access']) ?></small>
+                            </button>
+                        </h2>
+                        <div id="collapse-role-<?= e($role['key']) ?>" class="accordion-collapse collapse" aria-labelledby="heading-role-<?= e($role['key']) ?>" data-bs-parent="#roleDetailAccordion">
+                            <div class="role-detail-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                    <strong><?= e($role['name']) ?> overview</strong>
+                                    <?php if (!in_array($role['key'], ALL_ROLES, true)): ?>
+                                        <div class="d-flex gap-2">
+                                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/roles/edit/edit.php?id=' . urlencode($role['key'])) ?>">Edit</a>
+                                            <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/roles/delete/delete.php?id=' . urlencode($role['key'])) ?>">Delete</a>
+                                        </div>
+                                    <?php else: ?>
+                                        <span class="text-muted small">Built-in role</span>
+                                    <?php endif; ?>
+                                </div>
+
+                                <div class="role-detail-grid">
+                                    <div class="role-detail-card">
+                                        <span class="label">Dashboard</span>
+                                        <div class="value"><?= e($role['dashboard']) ?></div>
+                                    </div>
+                                    <div class="role-detail-card">
+                                        <span class="label">House Access</span>
+                                        <div class="value value-muted"><?= e($role['house_access']) ?></div>
+                                    </div>
+                                    <div class="role-detail-card" style="grid-column: 1 / -1;">
+                                        <span class="label">Description</span>
+                                        <div class="value value-muted"><?= e($role['description']) ?: 'No description available.' ?></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
             </div>
         </div>
     </div>

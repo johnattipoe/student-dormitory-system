@@ -93,12 +93,40 @@ $getReporterName = function (array $incident) use (&$reporterMap, $studentMap): 
 };
 
 $search = strtolower(sanitize($_GET['search'] ?? ''));
+$externalIncidents = [];
+$externalDir = APP_ROOT . '/public/uploads/external-incidents';
+if (is_dir($externalDir)) {
+    $jsonFiles = glob($externalDir . '/*.json');
+    if (is_array($jsonFiles)) {
+        rsort($jsonFiles);
+        foreach ($jsonFiles as $jsonFile) {
+            $content = json_decode((string) file_get_contents($jsonFile), true);
+            if (!is_array($content)) {
+                continue;
+            }
+            $content['sourceFile'] = basename((string) ($content['fileName'] ?? ''));
+            $externalIncidents[] = $content;
+        }
+    }
+}
+
 if ($search !== '') {
     $incidents = array_values(array_filter($incidents, function ($incident) use ($search, $getReporterName, $studentMap) {
         $title = strtolower((string) ($incident['title'] ?? ''));
         $studentName = strtolower($studentMap[(string) ($incident['studentId'] ?? '')] ?? (string) ($incident['studentId'] ?? ''));
         $reporter = strtolower($getReporterName($incident));
         return str_contains($title, $search) || str_contains($studentName, $search) || str_contains($reporter, $search);
+    }));
+
+    $externalIncidents = array_values(array_filter($externalIncidents, function ($incident) use ($search) {
+        $studentName = strtolower((string) ($incident['studentName'] ?? ''));
+        $incidentType = strtolower((string) ($incident['incidentType'] ?? ''));
+        $status = strtolower((string) ($incident['status'] ?? ''));
+        $fileName = strtolower((string) ($incident['fileName'] ?? ''));
+        return str_contains($studentName, $search)
+            || str_contains($incidentType, $search)
+            || str_contains($status, $search)
+            || str_contains($fileName, $search);
     }));
 }
 
@@ -201,6 +229,62 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/incidents/index/index.php') ?>">Reset</a>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <div class="card stat-card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-file-earmark-arrow-up me-2 text-info"></i>External Incident Records</h6>
+                <small class="text-muted">Showing <?= count($externalIncidents) ?> uploaded forms</small>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th>Student</th>
+                            <th>Incident Type</th>
+                            <th>Incident Date</th>
+                            <th>Submitted</th>
+                            <th>Status</th>
+                            <th class="text-end">Document</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <?php if (empty($externalIncidents)): ?>
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    <i class="bi bi-inbox fs-3 d-block text-secondary mb-1"></i>
+                                    No external incident forms have been uploaded yet.
+                                </td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($externalIncidents as $external): ?>
+                                <?php $fileName = (string) ($external['fileName'] ?? ''); ?>
+                                <tr>
+                                    <td><?= e((string) ($external['studentName'] ?? 'Unknown Student')) ?></td>
+                                    <td><?= e((string) ($external['incidentType'] ?? 'External Incident')) ?></td>
+                                    <td><?= e((string) ($external['incidentDate'] ?? '—')) ?></td>
+                                    <td><small class="text-muted"><?= e((string) ($external['uploadedAt'] ?? '—')) ?></small></td>
+                                    <td>
+                                        <span class="badge bg-<?= (($external['status'] ?? 'submitted') === 'resolved' ? 'success' : (($external['status'] ?? '') === 'reviewed' ? 'warning text-dark' : 'info')) ?>">
+                                            <?= e(ucfirst((string) ($external['status'] ?? 'submitted'))) ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <?php if ($fileName !== ''): ?>
+                                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/incidents/external-view/external-view.php?file=' . urlencode($fileName)) ?>" title="View form"><i class="bi bi-eye"></i></a>
+                                            <a class="btn btn-sm btn-outline-success" href="<?= url('uploads/external-incidents/' . rawurlencode($fileName)) ?>" target="_blank" rel="noopener" title="Open file"><i class="bi bi-download"></i></a>
+                                        <?php else: ?>
+                                            <span class="text-muted">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 

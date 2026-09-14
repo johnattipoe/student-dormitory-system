@@ -62,6 +62,10 @@ https://student-dormitory-system-5hxq.onrender.com
 
 http://localhost:8000
 
+http://127.0.0.1:8000
+
+http://127.0.0.1:8000/login.php
+
 ## Deployment
 
 The deployed application is available at:

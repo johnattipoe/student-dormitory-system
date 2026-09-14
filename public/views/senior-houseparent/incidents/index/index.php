@@ -73,6 +73,22 @@ $getReporterName = function (array $incident) use (&$reporterMap, $studentMap): 
 };
 
 $incidents = (new IncidentService())->byHouse($houseId);
+$externalIncidents = [];
+$externalDir = APP_ROOT . '/public/uploads/external-incidents';
+if (is_dir($externalDir)) {
+    $jsonFiles = glob($externalDir . '/*.json');
+    if (is_array($jsonFiles)) {
+        rsort($jsonFiles);
+        foreach ($jsonFiles as $jsonFile) {
+            $content = json_decode((string) file_get_contents($jsonFile), true);
+            if (!is_array($content)) {
+                continue;
+            }
+            $content['sourceFile'] = basename((string) ($content['fileName'] ?? ''));
+            $externalIncidents[] = $content;
+        }
+    }
+}
 $openIncidents = array_values(array_filter($incidents, fn($incident) => ($incident['status'] ?? 'open') === 'open'));
 $resolvedIncidents = array_values(array_filter($incidents, fn($incident) => ($incident['status'] ?? '') === 'resolved'));
 
@@ -148,6 +164,59 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
+        <div class="card stat-card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-file-earmark-arrow-up me-2"></i>External Incident Records</h6>
+                <small class="text-muted">Showing <?= e((string) count($externalIncidents)) ?> uploaded forms</small>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0 w-100">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Student</th>
+                            <th>Incident Type</th>
+                            <th>Incident Date</th>
+                            <th>Submitted</th>
+                            <th>Status</th>
+                            <th>Document</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!empty($externalIncidents)): ?>
+                            <?php foreach ($externalIncidents as $external): ?>
+                                <?php $fileName = (string) ($external['fileName'] ?? ''); ?>
+                                <tr>
+                                    <td class="fw-medium"><?= e((string) ($external['studentName'] ?? 'Unknown Student')) ?></td>
+                                    <td><?= e((string) ($external['incidentType'] ?? 'External Incident')) ?></td>
+                                    <td><?= e((string) ($external['incidentDate'] ?? '—')) ?></td>
+                                    <td><span class="small text-muted"><?= e((string) ($external['uploadedAt'] ?? '—')) ?></span></td>
+                                    <td>
+                                        <span class="badge bg-<?= (($external['status'] ?? 'submitted') === 'resolved' ? 'success' : (($external['status'] ?? '') === 'reviewed' ? 'warning text-dark' : 'info')) ?>">
+                                            <?= e(ucfirst((string) ($external['status'] ?? 'submitted'))) ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-nowrap">
+                                        <?php if ($fileName !== ''): ?>
+                                            <div class="d-flex gap-2">
+                                                <a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/incidents/external-view/external-view.php?file=' . urlencode($fileName)) ?>"><i class="bi bi-eye me-1"></i>View</a>
+                                                <a class="btn btn-sm btn-outline-success" href="<?= url('uploads/external-incidents/' . rawurlencode($fileName)) ?>" target="_blank" rel="noopener"><i class="bi bi-download me-1"></i>Open</a>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="text-muted">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No external incident forms have been uploaded yet.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Incidents Table -->
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
@@ -192,9 +261,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td class="small"><?= e($reporterName) ?></td>
                                     <td><span class="small text-muted"><?= e(substr((string) ($incident['createdAt'] ?? $incident['reportedAt'] ?? ''), 0, 10)) ?></span></td>
                                     <td class="text-nowrap">
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/senior-houseparent/incidents/view/view.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>"><i class="bi bi-eye"></i></a> 
-                                        <a class="btn btn-sm btn-outline-warning" href="<?= url('views/senior-houseparent/incidents/edit/edit.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>"><i class="bi bi-pencil"></i></a> 
-                                        <a class="btn btn-sm btn-outline-danger" href="<?= url('views/senior-houseparent/incidents/delete/delete.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>"><i class="bi bi-trash"></i></a>
+                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/senior-houseparent/incidents/view/view.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>" title="View report"><i class="bi bi-eye"></i></a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

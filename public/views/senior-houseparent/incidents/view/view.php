@@ -119,9 +119,11 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <dt class="col-sm-3">Description</dt>
                 <dd class="col-sm-9"><?= nl2br(e($incident['description'] ?? $incident['notes'] ?? '—')) ?></dd>
             </dl>
-            <div class="mt-4">
-                <a class="btn btn-primary" href="<?= url('views/senior-houseparent/incidents/edit/edit.php?id=' . urlencode($id)) ?>"><i class="bi bi-pencil me-1"></i> Edit Incident</a>
-                <a class="btn btn-outline-secondary ms-1" href="<?= url('views/senior-houseparent/incidents/index/index.php') ?>">Back to list</a>
+            <div class="mt-4 d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-primary" onclick="window.print()">
+                    <i class="bi bi-printer me-1"></i> Print / Save as PDF
+                </button>
+                <a class="btn btn-outline-secondary" href="<?= url('views/senior-houseparent/incidents/index/index.php') ?>">Back to list</a>
             </div>
         </div>
     </div>
