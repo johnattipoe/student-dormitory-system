@@ -546,11 +546,16 @@ if (!function_exists('require_login')) {
 
 if (!function_exists('require_role')) {
 
-    function require_role(string $role): void
+    function require_role(string ...$roles): void
     {
         require_login();
 
-        if (has_role($role)) {
+        if ($roles === []) {
+            access_denied();
+            return;
+        }
+
+        if (has_any_role($roles)) {
             return;
         }
 
@@ -925,27 +930,6 @@ if (!function_exists('require_house_access')) {
         }
 
         access_denied();
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| Session Flash Message
-|--------------------------------------------------------------------------
-*/
-
-if (!function_exists('flash')) {
-
-    function flash(
-        string $type,
-        string $message
-    ): void {
-
-        $_SESSION['flash'] = [
-            'type' => $type,
-            'message' => $message
-        ];
     }
 }
 

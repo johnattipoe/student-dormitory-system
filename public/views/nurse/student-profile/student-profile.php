@@ -84,6 +84,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <dl class="row nurse-profile-details">
                             <dt class="col-sm-4">Email</dt>
                             <dd class="col-sm-8"><?= e($student['email'] ?? 'Not provided') ?></dd>
+                            <dt class="col-sm-4">Residence Type</dt>
+                            <dd class="col-sm-8"><?= e(strtolower((string) ($student['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></dd>
                             <dt class="col-sm-4">Student ID</dt>
                             <dd class="col-sm-8"><?= e($student['studentId'] ?? $student['admissionNo'] ?? $student['id'] ?? 'Not assigned') ?></dd>
                             <dt class="col-sm-4">Phone</dt>

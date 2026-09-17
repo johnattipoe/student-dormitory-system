@@ -49,8 +49,15 @@ $notifications = array_values(array_filter($notifications, function ($notificati
     return ($notificationSearch === '' || str_contains(strtolower((string) ($notification['title'] ?? '')), $notificationSearch) || str_contains(strtolower((string) ($notification['message'] ?? '')), $notificationSearch))
         && ($notificationRead === '' || ($notificationRead === 'unread' ? empty($notification['read']) : !empty($notification['read'])));
 }));
-$unreadNotifications = array_values(array_filter($notifications, fn($n) => empty($n['read'])));
-$readNotifications = array_values(array_filter($notifications, fn($n) => !empty($n['read'])));
+
+$filteredNotifications = $notifications;
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$totalNotifications = count($filteredNotifications);
+$totalPages = max(1, (int) ceil($totalNotifications / $limit));
+$notifications = array_slice($filteredNotifications, ($page - 1) * $limit, $limit);
+$unreadNotifications = array_values(array_filter($filteredNotifications, fn($n) => empty($n['read'])));
+$readNotifications = array_values(array_filter($filteredNotifications, fn($n) => !empty($n['read'])));
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/student/dashboard/index.php')],
@@ -94,7 +101,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold">Total</span>
-                            <h3 class="fw-bold my-1 text-primary"><?= e((string) count($notifications)) ?></h3>
+                            <h3 class="fw-bold my-1 text-primary"><?= e((string) $totalNotifications) ?></h3>
                             <span class="small text-muted">All notifications</span>
                         </div>
                         <div class="rounded-3 bg-primary bg-opacity-10 p-2 text-primary"><i class="bi bi-bell fs-4"></i></div>
@@ -173,9 +180,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <a href="#" id="selectAllLink" class="ms-2 small">Select all</a> |
                     <a href="#" id="clearAllLink" class="ms-1 small">Clear</a>
                 </div>
-                <small class="text-muted">Showing <?= count($notifications) ?> records</small>
+                <small class="text-muted">Showing <?= count($filteredNotifications) ?> records</small>
             </div>
             <div class="card-body p-0">
+                <?php $paginationBaseUrl = url('views/student/notifications/index/index.php'); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
                 <table class="table table-hover align-middle mb-0 data-table w-100">
                     <thead class="table-light">
                         <tr>
@@ -195,7 +203,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td>
                                         <input type="checkbox" class="form-check-input notification-checkbox" data-notification-id="<?= e((string) ($note['id'] ?? '')) ?>">
                                     </td>
-                                    <td><a class="fw-semibold text-decoration-none" href="<?= url('views/student/notifications/view/view.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>"><?= e((string) ($note['title'] ?? '')) ?></a></td>
+                                    <td><button type="button" class="btn btn-link p-0 fw-semibold text-decoration-none" data-bs-toggle="modal" data-bs-target="#studentNotificationView-<?= e((string) ($note['id'] ?? '')) ?>"><?= e((string) ($note['title'] ?? '')) ?></button></td>
                                     <td>
                                         <?php $typeBadge = match($note['type'] ?? 'info') { 'danger' => 'danger', 'warning' => 'warning text-dark', 'success' => 'success', 'urgent' => 'danger', default => 'info' }; ?>
                                         <span class="badge bg-<?= $typeBadge ?>"><?= e(ucfirst($note['type'] ?? 'info')) ?></span>
@@ -282,4 +290,33 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         updateSelection();
     </script>
 </div>
+<?php foreach ($notifications as $note): ?>
+    <?php
+    $modalNoteId = (string) ($note['id'] ?? '');
+    if ($modalNoteId === '') continue;
+    $modalTypeBadge = match($note['type'] ?? 'info') { 'danger' => 'danger', 'warning' => 'warning text-dark', 'success' => 'success', 'urgent' => 'danger', default => 'info' };
+    ?>
+    <div class="modal fade" id="studentNotificationView-<?= e($modalNoteId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Notification Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <span class="badge bg-<?= $modalTypeBadge ?>"><?= e(ucfirst($note['type'] ?? 'info')) ?></span>
+                    </div>
+                    <h5 class="fw-bold mb-3"><?= e((string) ($note['title'] ?? '')) ?></h5>
+                    <p class="mb-0" style="white-space: pre-wrap; line-height: 1.8;">
+                        <?= e((string) ($note['message'] ?? '')) ?>
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

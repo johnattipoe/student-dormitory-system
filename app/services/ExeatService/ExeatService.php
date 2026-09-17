@@ -13,10 +13,10 @@ class ExeatService
         $this->firebase = FirebaseService::getInstance();
     }
 
-    public function all(): array
+    public function all(int $limit = 150): array
     {
         try {
-            $records = $this->firebase->getCollection($this->collection, [], 1000);
+            $records = $this->firebase->getCollection($this->collection, [], $limit);
             usort($records, static fn(array $first, array $second): int => strcmp(
                 (string) ($second['createdAt'] ?? ''),
                 (string) ($first['createdAt'] ?? '')
@@ -242,46 +242,78 @@ class ExeatService
 
     public function visibleForRole(string $role, ?string $userId, ?string $houseId, ?string $studentId): array
     {
-        $records = $this->all();
+        $defaultLimit = 150;
 
         if ($role === \ROLE_STUDENT) {
-            return array_values(array_filter($records, static function (array $record) use ($studentId, $userId): bool {
-                $recordStudentId = (string) ($record['studentId'] ?? '');
-                $recordRequestedBy = (string) ($record['requestedBy'] ?? '');
-                return ($studentId && $recordStudentId === (string) $studentId)
-                    || ($userId && ($recordStudentId === (string) $userId || $recordRequestedBy === (string) $userId));
-            }));
+            $records = [];
+
+            if ($studentId) {
+                $records = array_merge(
+                    $records,
+                    $this->firebase->getCollection(
+                        $this->collection,
+                        [['studentId', '=', $studentId]],
+                        $defaultLimit
+                    )
+                );
+            }
+
+            if ($userId) {
+                $records = array_merge(
+                    $records,
+                    $this->firebase->getCollection(
+                        $this->collection,
+                        [['requestedBy', '=', $userId]],
+                        $defaultLimit
+                    )
+                );
+            }
+
+            $deduped = [];
+            foreach ($records as $record) {
+                $recordId = (string) ($record['id'] ?? '');
+                if ($recordId !== '' && !isset($deduped[$recordId])) {
+                    $deduped[$recordId] = $record;
+                }
+            }
+
+            $output = array_values($deduped);
+            usort($output, static fn(array $first, array $second): int => strcmp(
+                (string) ($second['createdAt'] ?? ''),
+                (string) ($first['createdAt'] ?? '')
+            ));
+
+            return $output;
         }
 
         if ($role === \ROLE_SENIOR_HOUSEPARENT && !$houseId) {
-            return $records;
+            return $this->all($defaultLimit);
         }
 
         if (in_array($role, [\ROLE_HOUSE_MASTER, \ROLE_HOUSE_MISTRESS, \ROLE_SENIOR_HOUSEPARENT], true)) {
             if (!$houseId) {
-                return $records;
+                return $this->all($defaultLimit);
             }
 
             try {
-                $houseStudentIds = [];
-                foreach (StudentService::all($houseId) as $student) {
-                    $studentIdKey = (string) ($student['id'] ?? '');
-                    if ($studentIdKey !== '') {
-                        $houseStudentIds[$studentIdKey] = true;
-                    }
-                }
-            } catch (\Throwable $e) {
-                $houseStudentIds = [];
-            }
+                $records = $this->firebase->getCollection(
+                    $this->collection,
+                    [['houseId', '=', $houseId]],
+                    $defaultLimit
+                );
 
-            return array_values(array_filter($records, static function (array $record) use ($houseId, $houseStudentIds): bool {
-                $recordHouseId = (string) ($record['houseId'] ?? '');
-                $recordStudentId = (string) ($record['studentId'] ?? '');
-                return $recordHouseId === (string) $houseId || isset($houseStudentIds[$recordStudentId]);
-            }));
+                usort($records, static fn(array $first, array $second): int => strcmp(
+                    (string) ($second['createdAt'] ?? ''),
+                    (string) ($first['createdAt'] ?? '')
+                ));
+
+                return $records;
+            } catch (\Throwable $e) {
+                return [];
+            }
         }
 
-        return $records;
+        return $this->all($defaultLimit);
     }
 
     public function studentForUser(array $user): ?array
@@ -306,10 +338,9 @@ class ExeatService
         $email = strtolower(trim((string) ($user['email'] ?? '')));
         if ($email !== '') {
             try {
-                foreach (StudentService::all() as $student) {
-                    if (strtolower(trim((string) ($student['email'] ?? ''))) === $email) {
-                        return $student;
-                    }
+                $student = StudentService::findByEmail($email);
+                if ($student) {
+                    return $student;
                 }
             } catch (\Throwable $e) {
                 // Ignore and fallback

@@ -1,5 +1,6 @@
 vendor/
 .env
+.tmp/
 credentials/*.json
 storage/logs/*
 storage/temp/*

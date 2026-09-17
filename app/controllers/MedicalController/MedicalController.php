@@ -20,7 +20,8 @@ class MedicalController
     {
         require_role(ROLE_ADMIN, ROLE_NURSE);
 
-        $records = $this->medicalService->all();
+        $limit = max(1, min(150, (int) ($_GET['limit'] ?? 150)));
+        $records = $this->medicalService->all($limit);
 
         include __DIR__ . '/../../../public/views/medical/index/index.php';
     }

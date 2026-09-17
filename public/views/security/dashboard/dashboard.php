@@ -227,7 +227,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                                 <td><span class="badge <?= $vBadge ?>"><?= ucfirst(e($vStatus)) ?></span></td>
                                                 <td class="text-end">
                                                     <?php if ($vId !== ''): ?>
-                                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/security/visitors/view/view.php?id=' . urlencode($vId)) ?>">View</a>
+                                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#securityDashboardVisitorView-<?= e($vId) ?>">View</button>
                                                     <?php endif; ?>
                                                 </td>
                                             </tr>
@@ -366,4 +366,37 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
     </div>
 </div>
+<?php foreach ($recentVisitors as $v): ?>
+    <?php
+    $modalVisitorId = (string) ($v['id'] ?? '');
+    if ($modalVisitorId === '') continue;
+    ?>
+    <div class="modal fade" id="securityDashboardVisitorView-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Recent Visitor Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Visitor</dt>
+                        <dd class="col-sm-8"><?= e($v['visitorName'] ?? $v['name'] ?? 'Visitor') ?></dd>
+                        <dt class="col-sm-4">Student</dt>
+                        <dd class="col-sm-8"><?= e($v['studentId'] ?? '—') ?></dd>
+                        <dt class="col-sm-4">Purpose</dt>
+                        <dd class="col-sm-8"><?= e($v['purpose'] ?? '—') ?></dd>
+                        <dt class="col-sm-4">Phone</dt>
+                        <dd class="col-sm-8"><?= e($v['phone'] ?? '—') ?></dd>
+                        <dt class="col-sm-4">Status</dt>
+                        <dd class="col-sm-8"><span class="badge <?= match(strtolower((string)($v['status'] ?? 'pending'))) { 'inside' => 'bg-success', 'pending' => 'bg-warning text-dark', 'outside', 'left' => 'bg-secondary', default => 'bg-primary' } ?>"><?= ucfirst(e(strtolower((string)($v['status'] ?? 'pending')))) ?></span></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

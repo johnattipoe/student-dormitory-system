@@ -19,6 +19,8 @@ use App\Services\MedicalService;
 use App\Services\StudentService;
 
 $records = (new MedicalService())->all();
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 $students = [];
 foreach (StudentService::all() as $student) {
     $studentId = (string) ($student['id'] ?? '');
@@ -42,6 +44,9 @@ $totalRecords = count($records);
 $criticalRecords = count(array_filter($records, fn($record) => in_array(strtolower((string) ($record['severity'] ?? '')), ['severe', 'critical', 'emergency'], true)));
 $moderateRecords = count(array_filter($records, fn($record) => strtolower((string) ($record['severity'] ?? '')) === 'moderate'));
 $routineRecords = count(array_filter($records, fn($record) => in_array(strtolower((string) ($record['severity'] ?? 'normal')), ['normal', 'minor', 'routine', 'mild'], true)));
+$totalPages = max(1, (int) ceil($totalRecords / $limit));
+$page = min($page, $totalPages);
+$records = array_slice($records, ($page - 1) * $limit, $limit);
 
 $pageTitle = 'Medical Records';
 $navItems = [
@@ -138,7 +143,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-journal-medical me-2 text-danger"></i>Clinical Attendance Records</h6>
-                <small class="text-muted">Showing <?= count($records) ?> entries</small>
+                <small class="text-muted">Showing <?= e((string) $totalRecords) ?> entries</small>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -173,9 +178,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <td><small class="text-muted"><?= e($record['createdAt'] ?? '—') ?></small></td>
                                         <td class="text-end">
                                             <?php if ($rId !== ''): ?>
-                                                <a class="btn btn-sm btn-outline-primary" href="<?= url('views/nurse/edit-record/edit-record.php?id=' . urlencode($rId)) ?>" title="Edit Record">
+                                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#nurseRecordEdit-<?= e($rId) ?>" title="Edit Record">
                                                     <i class="bi bi-pencil me-1"></i> Edit
-                                                </a>
+                                                </button>
                                             <?php else: ?>
                                                 <span class="text-muted small">—</span>
                                             <?php endif; ?>
@@ -190,9 +195,57 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </tbody>
                     </table>
                 </div>
+                <?php $paginationBaseUrl = url('views/nurse/medical-records/medical-records.php'); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
             </div>
         </div>
 
     </div>
 </div>
+<?php foreach ($records as $record): ?>
+    <?php
+    $modalRecordId = (string) ($record['id'] ?? '');
+    if ($modalRecordId === '') continue;
+    ?>
+    <div class="modal fade" id="nurseRecordEdit-<?= e($modalRecordId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="<?= url('views/nurse/edit-record/edit-record.php?id=' . urlencode($modalRecordId)) ?>">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Medical Record</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="id" value="<?= e($modalRecordId) ?>">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Diagnosis</label>
+                                <input type="text" name="diagnosis" class="form-control" value="<?= e($record['diagnosis'] ?? '') ?>" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Treatment</label>
+                                <input type="text" name="treatment" class="form-control" value="<?= e($record['treatment'] ?? '') ?>" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Severity</label>
+                                <select name="severity" class="form-select">
+                                    <?php foreach (['normal', 'moderate', 'critical'] as $severityOption): ?>
+                                        <option value="<?= e($severityOption) ?>" <?= strtolower((string) ($record['severity'] ?? 'normal')) === $severityOption ? 'selected' : '' ?>><?= e(ucfirst($severityOption)) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Notes</label>
+                                <textarea name="notes" class="form-control" rows="5"><?= e($record['notes'] ?? '') ?></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

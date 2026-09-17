@@ -4,9 +4,9 @@ namespace App\Services;
 
 class BedService
 {
-    public static function all(): array
+    public static function all(int $limit = 150): array
     {
-        return FirebaseService::getInstance()->getCollection(\COL_BEDS, [], 1000);
+        return FirebaseService::getInstance()->getCollection(\COL_BEDS, [], $limit);
     }
 
     public static function find(string $id): ?array
@@ -26,8 +26,8 @@ class BedService
             return ['success' => false, 'message' => 'Selected room was not found.'];
         }
 
-        foreach (self::all() as $bed) {
-            if ((string) ($bed['roomId'] ?? '') === $roomId && strtolower((string) ($bed['bedNumber'] ?? '')) === strtolower($bedNumber)) {
+        foreach (self::bedsForRoom($roomId) as $bed) {
+            if (strtolower((string) ($bed['bedNumber'] ?? '')) === strtolower($bedNumber)) {
                 return ['success' => false, 'message' => 'That bed number already exists in the selected room.'];
             }
         }
@@ -54,8 +54,8 @@ class BedService
 
         $roomId = (string) ($bed['roomId'] ?? '');
         if (!empty($student['roomId']) && (string) $student['roomId'] !== $roomId) return ['success' => false, 'message' => 'Student is assigned to a different room. Transfer the student first.'];
-        foreach (self::all() as $existingBed) {
-            if ((string) ($existingBed['studentId'] ?? '') === $studentId && (string) ($existingBed['id'] ?? '') !== $bedId) return ['success' => false, 'message' => 'Student already has another bed.'];
+        foreach (self::bedsForStudent($studentId) as $existingBed) {
+            if ((string) ($existingBed['id'] ?? '') !== $bedId) return ['success' => false, 'message' => 'Student already has another bed.'];
         }
 
         FirebaseService::getInstance()->updateDocument(\COL_BEDS, $bedId, ['studentId' => $studentId, 'status' => 'occupied']);
@@ -102,8 +102,8 @@ class BedService
         if ($bedNumber === '' || !$roomId || !RoomService::find($roomId)) return ['success' => false, 'message' => 'Bed number and a valid room are required.'];
         if ($status === 'maintenance' && !empty($bed['studentId'])) return ['success' => false, 'message' => 'Unassign the student before putting this bed under maintenance.'];
         if (!empty($bed['studentId']) && (string) ($bed['roomId'] ?? '') !== $roomId) return ['success' => false, 'message' => 'Unassign the student before moving this bed to another room.'];
-        foreach (self::all() as $existingBed) {
-            if ((string) ($existingBed['id'] ?? '') !== $id && (string) ($existingBed['roomId'] ?? '') === $roomId && strtolower((string) ($existingBed['bedNumber'] ?? '')) === strtolower($bedNumber)) return ['success' => false, 'message' => 'That bed number already exists in the selected room.'];
+        foreach (self::bedsForRoom($roomId) as $existingBed) {
+            if ((string) ($existingBed['id'] ?? '') !== $id && strtolower((string) ($existingBed['bedNumber'] ?? '')) === strtolower($bedNumber)) return ['success' => false, 'message' => 'That bed number already exists in the selected room.'];
         }
         FirebaseService::getInstance()->updateDocument(\COL_BEDS, $id, ['bedNumber' => $bedNumber, 'roomId' => $roomId, 'capacity' => $capacity, 'status' => $status]);
         return ['success' => true, 'message' => 'Bed updated successfully.'];
@@ -118,5 +118,23 @@ class BedService
         }
         FirebaseService::getInstance()->deleteDocument(\COL_BEDS, $id);
         return ['success' => true, 'message' => 'Bed deleted successfully.'];
+    }
+
+    private static function bedsForRoom(string $roomId): array
+    {
+        return FirebaseService::getInstance()->getCollection(
+            \COL_BEDS,
+            [['roomId', '=', $roomId]],
+            150
+        );
+    }
+
+    private static function bedsForStudent(string $studentId): array
+    {
+        return FirebaseService::getInstance()->getCollection(
+            \COL_BEDS,
+            [['studentId', '=', $studentId]],
+            150
+        );
     }
 }

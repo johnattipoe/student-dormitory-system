@@ -16,13 +16,40 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\FirebaseService;
 
+$defaultFees = [
+    ['id' => 'boarding-fee', 'name' => 'Boarding Fee', 'amount' => 650.00, 'period' => 'Monthly', 'status' => 'active'],
+    ['id' => 'utility-fee', 'name' => 'Utility Fee', 'amount' => 120.00, 'period' => 'Monthly', 'status' => 'active'],
+];
+
+$deletedFallbackFeeIds = $_SESSION['deleted_fallback_fee_ids'] ?? [];
+if (!is_array($deletedFallbackFeeIds)) {
+    $deletedFallbackFeeIds = [];
+}
+$deletedFallbackFeeIds = array_values(array_unique(array_map('strval', $deletedFallbackFeeIds)));
+$defaultFees = array_values(array_filter($defaultFees, static fn (array $fee): bool => !in_array((string) ($fee['id'] ?? ''), $deletedFallbackFeeIds, true)));
+
 $id = sanitize($_GET['id'] ?? '');
 if ($id === '') {
     flash('error', 'Fee ID is required.');
     redirect(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php')));
 }
 
-$fee = FirebaseService::getInstance()->getDocument(COL_FINANCE_FEES, $id);
+$fee = null;
+try {
+    $fee = FirebaseService::getInstance()->getDocument(COL_FINANCE_FEES, $id);
+} catch (Throwable $e) {
+    $fee = null;
+}
+
+if (!$fee) {
+    foreach ($defaultFees as $defaultFee) {
+        if ((string) ($defaultFee['id'] ?? '') === $id) {
+            $fee = $defaultFee;
+            break;
+        }
+    }
+}
+
 if (!$fee) {
     flash('error', 'Fee category not found.');
     redirect(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php')));

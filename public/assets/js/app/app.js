@@ -29,11 +29,15 @@ document.addEventListener('DOMContentLoaded', function () {
   };
 
   if (toggle && sidebar) {
-    toggle.addEventListener('click', () => sidebar.classList.toggle('show'));
+    toggle.addEventListener('click', () => {
+      const isOpen = sidebar.classList.toggle('show');
+      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
     // Close sidebar on outside click when open (mobile)
     document.addEventListener('click', (e) => {
       if (sidebar.classList.contains('show') && !sidebar.contains(e.target) && e.target !== toggle) {
         sidebar.classList.remove('show');
+        toggle.setAttribute('aria-expanded', 'false');
       }
     });
   }

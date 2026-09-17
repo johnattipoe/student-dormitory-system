@@ -196,9 +196,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     </div>
                                 </div>
                                 <?php if ($annId !== ''): ?>
-                                    <a class="btn btn-outline-primary btn-sm" href="<?= url('views/student/announcements/view/view.php?id=' . urlencode($annId)) ?>">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#studentAnnouncementView-<?= e($annId) ?>">
                                         Read Full Notice <i class="bi bi-arrow-right ms-1"></i>
-                                    </a>
+                                    </button>
                                 <?php endif; ?>
                             </div>
                             <p class="text-muted mb-0" style="line-height: 1.6;">
@@ -211,4 +211,49 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <?php endif; ?>
     </div>
 </div>
+<?php foreach ($filtered as $ann): ?>
+    <?php
+    $modalAnnId = (string) ($ann['id'] ?? '');
+    if ($modalAnnId === '') continue;
+    $modalType = $ann['type'] ?? 'info';
+    $modalBadgeClass = match($modalType) {
+        'danger' => 'bg-danger',
+        'warning' => 'bg-warning text-dark',
+        'success' => 'bg-success',
+        default => 'bg-primary',
+    };
+    $modalAuthor = (string) ($ann['createdByName'] ?? 'Dormitory Staff');
+    if ($modalAuthor === 'default-admin') $modalAuthor = 'Administrator (Admin)';
+    $modalRawDate = (string) ($ann['publishedAt'] ?? $ann['createdAt'] ?? '');
+    $modalFormattedDate = $modalRawDate !== '' ? (date('M d, Y h:i A', strtotime($modalRawDate)) ?: $modalRawDate) : 'Recently';
+    ?>
+    <div class="modal fade" id="studentAnnouncementView-<?= e($modalAnnId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Notice Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <span class="badge <?= $modalBadgeClass ?>"><?= ucfirst(e($modalType)) ?></span>
+                        <?php if (!empty($ann['isUrgent'])): ?>
+                            <span class="badge bg-danger ms-1"><i class="bi bi-exclamation-triangle-fill me-1"></i>Urgent</span>
+                        <?php endif; ?>
+                    </div>
+                    <h5 class="fw-bold mb-2"><?= e($ann['title'] ?? 'Notice') ?></h5>
+                    <div class="small text-muted mb-3">
+                        <i class="bi bi-person me-1"></i>Posted by <strong><?= e($modalAuthor) ?></strong> • <i class="bi bi-clock me-1"></i><?= e($modalFormattedDate) ?>
+                    </div>
+                    <div class="announcement-body" style="white-space: pre-line; line-height: 1.8;">
+                        <?= e($ann['message'] ?? $ann['content'] ?? '') ?>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

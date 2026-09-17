@@ -83,6 +83,12 @@ $getReporterName = function (array $incident) use (&$reporterMap, $studentMap): 
 };
 
 $incidents = (new IncidentService())->byHouse($houseId);
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$totalIncidents = count($incidents);
+$totalPages = max(1, (int) ceil($totalIncidents / $limit));
+$page = min($page, $totalPages);
+$incidents = array_slice($incidents, ($page - 1) * $limit, $limit);
 
 $externalIncidents = [];
 $externalDir = APP_ROOT . '/public/uploads/external-incidents';
@@ -314,15 +320,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td class="text-nowrap">
                                         <?php if ($fileName !== ''): ?>
                                             <div class="d-flex gap-2">
-                                                <a class="btn btn-sm btn-outline-primary" href="<?= $externalViewUrl ?>">
+                                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#houseExternalIncidentViewModal-<?= e(md5($fileName)) ?>">
                                                     <i class="bi bi-eye me-1"></i>View
-                                                </a>
-                                                <a class="btn btn-sm btn-outline-warning" href="<?= url('views/house-master/incidents/external-edit/external-edit.php?file=' . urlencode($fileName)) ?>">
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#houseExternalIncidentEditModal-<?= e(md5($fileName)) ?>">
                                                     <i class="bi bi-pencil me-1"></i>Edit
-                                                </a>
-                                                <a class="btn btn-sm btn-outline-danger" href="<?= url('views/house-master/incidents/external-delete/external-delete.php?file=' . urlencode($fileName)) ?>">
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#houseExternalIncidentDeleteModal-<?= e(md5($fileName)) ?>">
                                                     <i class="bi bi-trash me-1"></i>Delete
-                                                </a>
+                                                </button>
                                                 <a class="btn btn-sm btn-outline-success" href="<?= url('uploads/external-incidents/' . $fileName) ?>" target="_blank" rel="noopener">
                                                     <i class="bi bi-download me-1"></i>Open
                                                 </a>
@@ -387,9 +393,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td><?= e($reporterName) ?></td>
                                     <td><span class="small text-muted"><?= e(substr((string) ($incident['createdAt'] ?? $incident['reportedAt'] ?? ''), 0, 10)) ?></span></td>
                                     <td class="text-nowrap">
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/incidents/view/view.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>"><i class="bi bi-eye"></i></a> 
-                                        <a class="btn btn-sm btn-outline-warning" href="<?= url('views/house-master/incidents/edit/edit.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>"><i class="bi bi-pencil"></i></a> 
-                                        <a class="btn btn-sm btn-outline-danger" href="<?= url('views/house-master/incidents/delete/delete.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>"><i class="bi bi-trash"></i></a>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#houseIncidentViewModal-<?= e((string) ($incident['id'] ?? '')) ?>"><i class="bi bi-eye"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#houseIncidentEditModal-<?= e((string) ($incident['id'] ?? '')) ?>"><i class="bi bi-pencil"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#houseIncidentDeleteModal-<?= e((string) ($incident['id'] ?? '')) ?>"><i class="bi bi-trash"></i></button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -402,6 +408,20 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </table>
             </div>
         </div>
+
+        <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
     </div>
 </div>
+<?php foreach ($incidents as $incident): ?>
+    <?php $modalIncidentId = (string) ($incident['id'] ?? ''); $modalIncidentPriority = (string) ($incident['priority'] ?? $incident['severity'] ?? 'medium'); $modalIncidentStatus = (string) ($incident['status'] ?? 'open'); ?>
+    <div class="modal fade" id="houseIncidentViewModal-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Incident Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-4">Title</dt><dd class="col-sm-8"><?= e($incident['title'] ?? $incident['type'] ?? 'Incident') ?></dd><dt class="col-sm-4">Student</dt><dd class="col-sm-8"><?= e($studentName) ?></dd><dt class="col-sm-4">Priority</dt><dd class="col-sm-8"><?= e(ucfirst($modalIncidentPriority)) ?></dd><dt class="col-sm-4">Status</dt><dd class="col-sm-8"><?= e(ucwords(str_replace('_', ' ', $modalIncidentStatus))) ?></dd><dt class="col-sm-4">Details</dt><dd class="col-sm-8"><?= e($incident['description'] ?? $incident['notes'] ?? '—') ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+    <div class="modal fade" id="houseIncidentEditModal-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><form method="POST" action="<?= url('views/house-master/incidents/edit/edit.php?id=' . urlencode($modalIncidentId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalIncidentId) ?>"><label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($incident['title'] ?? $incident['type'] ?? '') ?>" required><div class="row g-3"><div class="col-md-6"><label class="form-label">Priority</label><select name="priority" class="form-select"><option value="low" <?= $modalIncidentPriority === 'low' ? 'selected' : '' ?>>Low</option><option value="medium" <?= $modalIncidentPriority === 'medium' ? 'selected' : '' ?>>Medium</option><option value="high" <?= $modalIncidentPriority === 'high' ? 'selected' : '' ?>>High</option></select></div><div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><option value="open" <?= $modalIncidentStatus === 'open' ? 'selected' : '' ?>>Open</option><option value="investigating" <?= $modalIncidentStatus === 'investigating' ? 'selected' : '' ?>>Investigating</option><option value="resolved" <?= $modalIncidentStatus === 'resolved' ? 'selected' : '' ?>>Resolved</option></select></div></div><label class="form-label mt-3">Description</label><textarea name="description" class="form-control" rows="5"><?= e($incident['description'] ?? $incident['notes'] ?? '') ?></textarea></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
+    <div class="modal fade" id="houseIncidentDeleteModal-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete <strong><?= e($incident['title'] ?? $incident['type'] ?? 'this incident') ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/incidents/delete/delete.php?id=' . urlencode($modalIncidentId)) ?>"><input type="hidden" name="id" value="<?= e($modalIncidentId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
+<?php endforeach; ?>
+<?php foreach ($externalIncidents as $external): ?>
+    <?php $modalExternalFile = (string) ($external['fileName'] ?? ''); if ($modalExternalFile === '') continue; $modalExternalKey = md5($modalExternalFile); ?>
+    <div class="modal fade" id="houseExternalIncidentViewModal-<?= e($modalExternalKey) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">External Incident Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e($external['studentName'] ?? 'Unknown Student') ?></dd><dt class="col-sm-5">Incident Type</dt><dd class="col-sm-7"><?= e($external['incidentType'] ?? 'External Incident') ?></dd><dt class="col-sm-5">Incident Date</dt><dd class="col-sm-7"><?= e($external['incidentDate'] ?? '—') ?></dd><dt class="col-sm-5">Submitted</dt><dd class="col-sm-7"><?= e($external['uploadedAt'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e($external['status'] ?? 'Submitted') ?></dd></dl></div><div class="modal-footer"><a class="btn btn-outline-success" href="<?= url('uploads/external-incidents/' . basename($modalExternalFile)) ?>" target="_blank" rel="noopener"><i class="bi bi-download me-1"></i>Open file</a><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+    <div class="modal fade" id="houseExternalIncidentEditModal-<?= e($modalExternalKey) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><form method="POST" action="<?= url('views/house-master/incidents/external-edit/external-edit.php?file=' . urlencode($modalExternalFile)) ?>"><div class="modal-header"><h5 class="modal-title">Edit External Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><label class="form-label">Student Name</label><input name="studentName" class="form-control mb-3" value="<?= e($external['studentName'] ?? '') ?>" required><label class="form-label">Incident Type</label><input name="incidentType" class="form-control mb-3" value="<?= e($external['incidentType'] ?? '') ?>" required><label class="form-label">Incident Date</label><input type="date" name="incidentDate" class="form-control mb-3" value="<?= e($external['incidentDate'] ?? '') ?>" required><label class="form-label">Status</label><select name="status" class="form-select"><option value="submitted" <?= ($external['status'] ?? 'submitted') === 'submitted' ? 'selected' : '' ?>>Submitted</option><option value="reviewed" <?= ($external['status'] ?? '') === 'reviewed' ? 'selected' : '' ?>>Reviewed</option><option value="resolved" <?= ($external['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>Resolved</option></select></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
+    <div class="modal fade" id="houseExternalIncidentDeleteModal-<?= e($modalExternalKey) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete External Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete the uploaded incident record for <strong><?= e($external['studentName'] ?? 'this student') ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/incidents/external-delete/external-delete.php?file=' . urlencode($modalExternalFile)) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

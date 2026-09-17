@@ -17,7 +17,8 @@ class UserController
     {
         require_role(ROLE_ADMIN);
 
-        $users = $this->userService->all();
+        $limit = max(1, min(150, (int) ($_GET['limit'] ?? 150)));
+        $users = $this->userService->all($limit);
 
         include __DIR__ . '/../../../public/views/admin/users/index/index.php';
     }

@@ -35,6 +35,12 @@ if ($visitorSearch !== '') {
             || str_contains(strtolower(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))), $visitorSearch);
     }));
 }
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$totalVisitors = count($visitors);
+$totalPages = max(1, (int) ceil($totalVisitors / $limit));
+$page = min($page, $totalPages);
+$visitors = array_slice($visitors, ($page - 1) * $limit, $limit);
 
 $pageTitle = 'Senior Houseparent Visitors';
 $navItems = [
@@ -133,7 +139,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-person-lines-fill me-2"></i>Visitor Records</h6>
-                <small class="text-muted">Showing <?= e((string) count($visitors)) ?> records</small>
+                <small class="text-muted">Showing <?= e((string) count($visitors)) ?> of <?= e((string) $totalVisitors) ?> records</small>
             </div>
             <div class="card-body p-0">
                 <table class="table table-hover align-middle mb-0 data-table w-100">
@@ -161,7 +167,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td class="small"><?= e($visitor['purpose'] ?? $visitor['relationship'] ?? '—') ?></td>
                                     <td class="small text-muted"><?= e($visitor['visitDate'] ?? ($visitor['checkInTime'] ?? '—')) ?></td>
                                     <td><span class="badge bg-<?= ($visitor['status'] ?? '') === 'inside' || ($visitor['status'] ?? '') === 'checked_in' ? 'success' : (($visitor['status'] ?? '') === 'pending' ? 'warning text-dark' : 'secondary') ?>"><?= e(ucfirst($visitor['status'] ?? 'pending')) ?></span></td>
-                                    <td class="text-nowrap"><a class="btn btn-sm btn-outline-primary" href="<?= url('views/senior-houseparent/visitors/view/view.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>"><i class="bi bi-eye me-1"></i>View</a></td>
+                                    <td class="text-nowrap"><button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#seniorVisitorView-<?= e((string) ($visitor['id'] ?? '')) ?>"><i class="bi bi-eye me-1"></i>View</button></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -169,6 +175,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </table>
             </div>
         </div>
+
+        <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
     </div>
 </div>
+<?php foreach ($visitors as $visitor): ?>
+    <?php $modalVisitorId = (string) ($visitor['id'] ?? ''); $modalVisitorStudent = $studentMap[(string) ($visitor['studentId'] ?? '')] ?? []; ?>
+    <div class="modal fade" id="seniorVisitorView-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Visitor Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Visitor</dt><dd class="col-sm-7"><?= e($visitor['visitorName'] ?? 'Visitor') ?></dd><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e(trim(($modalVisitorStudent['firstName'] ?? '') . ' ' . ($modalVisitorStudent['lastName'] ?? '')) ?: ($visitor['studentId'] ?? '—')) ?></dd><dt class="col-sm-5">Purpose</dt><dd class="col-sm-7"><?= e($visitor['purpose'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucwords(str_replace('_', ' ', (string) ($visitor['status'] ?? 'pending')))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

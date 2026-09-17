@@ -156,7 +156,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 <td><?= e($request['relationship'] ?? '—') ?></td>
                                 <td><span class="badge bg-<?= ($request['status'] ?? '') === 'approved' ? 'success' : (($request['status'] ?? '') === 'rejected' ? 'danger' : 'warning') ?>"><?= e($request['status'] ?? 'pending') ?></span></td>
                                 <td>
-                                    <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/senior-houseparent/visitors/request-view/request-view.php?id=' . urlencode((string) ($request['id'] ?? ''))) ?>">View</a>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#seniorRequestView-<?= e((string) ($request['id'] ?? '')) ?>">View</button>
                                     <?php if (($request['status'] ?? 'pending') === 'pending'): ?>
                                         <div class="btn-group btn-group-sm" role="group">
                                             <form method="POST" style="display:inline;">
@@ -178,6 +178,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
 
         <?php foreach ($filteredRequests as $request): ?>
+            <?php $requestStudent = $studentMap[(string) ($request['studentId'] ?? '')] ?? null; ?>
+            <div class="modal fade" id="seniorRequestView-<?= e((string) ($request['id'] ?? '')) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Visitor Request Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Visitor</dt><dd class="col-sm-7"><?= e($request['visitorName'] ?? '—') ?></dd><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e(trim((($requestStudent['firstName'] ?? '') . ' ' . ($requestStudent['lastName'] ?? ''))) ?: ($request['studentId'] ?? '—')) ?></dd><dt class="col-sm-5">Visit Date</dt><dd class="col-sm-7"><?= e($request['requestedDate'] ?? ($request['visitDate'] ?? '—')) ?></dd><dt class="col-sm-5">Relationship</dt><dd class="col-sm-7"><?= e($request['relationship'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e($request['status'] ?? 'pending') ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
             <?php if (($request['status'] ?? 'pending') === 'pending'): ?>
                 <div class="modal fade" id="rejectModal_<?= md5((string) ($request['id'] ?? '')) ?>" tabindex="-1">
                     <div class="modal-dialog">

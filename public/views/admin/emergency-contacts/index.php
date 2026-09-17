@@ -21,6 +21,22 @@ use App\Services\FirebaseService;
 $firebase = FirebaseService::getInstance();
 $allContacts = $firebase->getCollection('emergency_contacts', [], 500);
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_contact') {
+    $contactId = sanitize($_POST['id'] ?? '');
+    if ($contactId !== '') {
+        $firebase->updateDocument('emergency_contacts', $contactId, [
+            'name' => sanitize($_POST['name'] ?? ''),
+            'roleTitle' => sanitize($_POST['roleTitle'] ?? ''),
+            'phone' => sanitize($_POST['phone'] ?? ''),
+            'email' => sanitize($_POST['email'] ?? ''),
+            'priority' => sanitize($_POST['priority'] ?? 'normal'),
+            'updatedAt' => date(DATE_ATOM),
+        ]);
+        flash('success', 'Emergency contact updated.');
+    }
+    redirect(url('views/admin/emergency-contacts/index.php'));
+}
+
 if (empty($allContacts)) {
     $seed = [
         ['name' => 'Campus Clinic / Infirmary', 'roleTitle' => 'School Nurse Desk', 'phone' => '+233 24 000 0001', 'email' => 'clinic@dormitory.edu', 'priority' => 'critical', 'status' => 'active', 'createdAt' => date(DATE_ATOM)],
@@ -149,9 +165,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/emergency-contacts/log/create.php?contactId=' . urlencode($contactId)) ?>">
                                 <i class="bi bi-journal-plus me-1"></i> Log Call
                             </a>
-                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/emergency-contacts/contacts/edit/edit.php?id=' . urlencode($contactId)) ?>">
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#contactEditModal-<?= e($contactId) ?>" title="Edit contact">
                                 <i class="bi bi-pencil"></i>
-                            </a>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -193,9 +209,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td><?= e($inc['triggeredByName'] ?? 'Staff') ?></td>
                                     <td class="text-end">
                                         <?php if ($incId !== ''): ?>
-                                            <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/emergency-contacts/log/view.php?id=' . urlencode($incId)) ?>">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#emergencyLogViewModal-<?= e($incId) ?>">
                                                 <i class="bi bi-eye"></i> View
-                                            </a>
+                                            </button>
                                         <?php else: ?>
                                             <span class="text-muted small">—</span>
                                         <?php endif; ?>
@@ -209,4 +225,16 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($contacts as $contact): ?>
+    <?php $contactId = (string) ($contact['id'] ?? ''); ?>
+    <div class="modal fade" id="contactEditModal-<?= e($contactId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><form method="POST" action="<?= url('views/admin/emergency-contacts/index.php') ?>"><input type="hidden" name="action" value="update_contact"><input type="hidden" name="id" value="<?= e($contactId) ?>"><div class="modal-header"><h5 class="modal-title">Edit Emergency Contact</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div class="row g-3"><div class="col-md-6"><label class="form-label">Contact name</label><input name="name" class="form-control" value="<?= e($contact['name'] ?? '') ?>" required></div><div class="col-md-6"><label class="form-label">Role / title</label><input name="roleTitle" class="form-control" value="<?= e($contact['roleTitle'] ?? '') ?>"></div><div class="col-md-6"><label class="form-label">Phone</label><input name="phone" class="form-control" value="<?= e($contact['phone'] ?? '') ?>" required></div><div class="col-md-6"><label class="form-label">Email</label><input type="email" name="email" class="form-control" value="<?= e($contact['email'] ?? '') ?>"></div><div class="col-md-6"><label class="form-label">Priority</label><select name="priority" class="form-select"><option value="critical" <?= ($contact['priority'] ?? '') === 'critical' ? 'selected' : '' ?>>Critical</option><option value="high" <?= ($contact['priority'] ?? '') === 'high' ? 'selected' : '' ?>>High</option><option value="normal" <?= ($contact['priority'] ?? '') === 'normal' ? 'selected' : '' ?>>Normal</option></select></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div>
+    </div>
+<?php endforeach; ?>
+<?php foreach ($incidents as $inc): ?>
+    <?php $incId = (string) ($inc['id'] ?? ''); ?>
+    <div class="modal fade" id="emergencyLogViewModal-<?= e($incId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Emergency Call Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Timestamp</dt><dd class="col-sm-7"><?= !empty($inc['triggeredAt']) ? e(date('M d, Y H:i', strtotime((string) $inc['triggeredAt']))) : '—' ?></dd><dt class="col-sm-5">Contact</dt><dd class="col-sm-7"><?= e($inc['contactName'] ?? '—') ?></dd><dt class="col-sm-5">Logged by</dt><dd class="col-sm-7"><?= e($inc['triggeredByName'] ?? 'Staff') ?></dd><dt class="col-sm-5">Summary</dt><dd class="col-sm-7"><?= e($inc['notes'] ?? '—') ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

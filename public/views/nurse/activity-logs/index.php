@@ -235,9 +235,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td><?= e($nurse) ?></td>
                                     <td class="text-end">
                                         <?php if ($logId !== ''): ?>
-                                            <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/nurse/activity-logs/view/view.php?id=' . urlencode($logId)) ?>">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#nurseActivityLogView-<?= e($logId) ?>">
                                                 <i class="bi bi-eye"></i> View
-                                            </a>
+                                            </button>
                                         <?php else: ?>
                                             <span class="text-muted small">—</span>
                                         <?php endif; ?>
@@ -255,5 +255,50 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($logs as $log): ?>
+    <?php
+    $modalLogId = (string) ($log['id'] ?? '');
+    if ($modalLogId === '') continue;
+    $modalRawTime = (string) ($log['timestamp'] ?? $log['createdAt'] ?? $log['time'] ?? '');
+    $modalFormattedTime = $modalRawTime !== '' ? (date('M d, Y H:i', strtotime($modalRawTime)) ?: $modalRawTime) : '—';
+    $modalStName = $log['studentName'] ?? ($studentMap[$log['studentId'] ?? ''] ?? 'General Patient');
+    $modalEvent = (string) ($log['event'] ?? $log['action'] ?? 'Clinical Activity');
+    $modalDetails = (string) ($log['details'] ?? $log['description'] ?? '—');
+    $modalNurse = (string) ($log['performedByName'] ?? $log['userName'] ?? 'Staff Nurse');
+    $modalSeverity = strtolower((string)($log['severity'] ?? $log['priority'] ?? 'normal'));
+    $modalBadgeColor = match($modalSeverity) {
+        'emergency', 'critical', 'urgent' => 'danger',
+        'high', 'warning' => 'warning',
+        default => 'success'
+    };
+    ?>
+    <div class="modal fade" id="nurseActivityLogView-<?= e($modalLogId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Clinical Activity Log</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Timestamp</dt>
+                        <dd class="col-sm-8"><?= e($modalFormattedTime) ?></dd>
+                        <dt class="col-sm-4">Student Patient</dt>
+                        <dd class="col-sm-8"><?= e($modalStName) ?></dd>
+                        <dt class="col-sm-4">Clinical Event</dt>
+                        <dd class="col-sm-8"><span class="badge bg-<?= e($modalBadgeColor) ?>-subtle text-<?= e($modalBadgeColor) ?> border"><?= e(ucwords(str_replace(['_', '-'], ' ', $modalEvent))) ?></span></dd>
+                        <dt class="col-sm-4">Attending Nurse</dt>
+                        <dd class="col-sm-8"><?= e($modalNurse) ?></dd>
+                        <dt class="col-sm-4">Details</dt>
+                        <dd class="col-sm-8"><?= e($modalDetails) ?></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>
 

@@ -149,9 +149,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     </td>
                                     <td class="text-nowrap small text-muted"><?= e($visitDate) ?></td>
                                     <td>
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/visitors/view/view.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#houseReportVisitorModal-<?= e((string) ($visitor['id'] ?? '')) ?>">
                                             <i class="bi bi-eye"></i> Details
-                                        </a>
+                                        </button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -162,4 +162,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($visitors as $visitor): ?>
+    <?php $modalReportVisitorId = (string) ($visitor['id'] ?? ''); $modalReportVisitorStudent = $studentMap[(string) ($visitor['studentId'] ?? '')] ?? []; ?>
+    <div class="modal fade" id="houseReportVisitorModal-<?= e($modalReportVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Visitor Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Visitor</dt><dd class="col-sm-7"><?= e($visitor['visitorName'] ?? $visitor['name'] ?? 'Visitor') ?></dd><dt class="col-sm-5">Phone</dt><dd class="col-sm-7"><?= e($visitor['phone'] ?? $visitor['contact'] ?? '—') ?></dd><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e(trim(($modalReportVisitorStudent['firstName'] ?? '') . ' ' . ($modalReportVisitorStudent['lastName'] ?? '')) ?: ($visitor['studentId'] ?? '—')) ?></dd><dt class="col-sm-5">Purpose</dt><dd class="col-sm-7"><?= e($visitor['purpose'] ?? 'General Visit') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucwords(str_replace('_', ' ', (string) ($visitor['status'] ?? 'unknown')))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

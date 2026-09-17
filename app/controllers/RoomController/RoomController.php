@@ -20,7 +20,8 @@ class RoomController
     {
         require_role(ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS, ROLE_SENIOR_HOUSEPARENT);
 
-        $rooms = $this->roomService->all();
+        $limit = max(1, min(150, (int) ($_GET['limit'] ?? 150)));
+        $rooms = $this->roomService->all(null, $limit);
 
         include __DIR__ . '/../../../public/views/rooms/index/index.php';
     }
@@ -44,8 +45,8 @@ class RoomController
         $result = $this->roomService->create($data);
 
         flash(
-            $result['success'] ? 'success' : 'error',
-            $result['message']
+            (int) ($result['success'] ?? 0),
+            (string) ($result['message'] ?? '')
         );
 
         redirect(
@@ -79,8 +80,8 @@ class RoomController
             $result = $this->allocationService->allocate($data);
 
             flash(
-                $result['success'] ? 'success' : 'error',
-                $result['message']
+                (int) ($result['success'] ?? 0),
+                (string) ($result['message'] ?? '')
             );
 
             redirect(

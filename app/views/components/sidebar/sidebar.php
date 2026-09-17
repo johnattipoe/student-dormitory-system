@@ -92,7 +92,7 @@ $navItems = $navItems ?? [];
                 [
                     'icon' => 'bi-currency-dollar',
                     'label' => 'Finance',
-                    'href' => url('views/admin/finance/index.php'),
+                    'href' => url('views/admin/finance/index/index.php'),
                     'section' => 'Administration',
                     'activePath' => '/views/admin/finance/',
                 ],
@@ -136,7 +136,7 @@ $navItems = $navItems ?? [];
                 ['icon' => 'bi-currency-dollar', 'label' => 'Finance', 'href' => 'views/house-master/finance/index.php', 'section' => 'Administration'],
                 ['icon' => 'bi-clock-history', 'label' => 'Activity Logs', 'href' => 'views/house-master/activity-logs/index.php', 'section' => 'Administration'],
                 ['icon' => 'bi-gear', 'label' => 'Settings', 'href' => 'views/house-master/settings/index.php', 'section' => 'Administration'],
-                ['icon' => 'bi-person-circle', 'label' => 'Profile', 'href' => url('views/house-master/profile.php'), 'section' => 'Administration'],
+                ['icon' => 'bi-person-circle', 'label' => 'Profile', 'href' => url('views/house-master/profile/index.php'), 'section' => 'Administration'],
             ];
 
             $currentScript = str_replace('\\', '/', $_GET['route'] ?? $_SERVER['SCRIPT_NAME'] ?? '');
@@ -172,7 +172,7 @@ $navItems = $navItems ?? [];
                 ['icon' => 'bi-clock-history', 'label' => 'Activity Logs', 'href' => 'views/senior-houseparent/activity-logs/index.php', 'section' => 'Administration'],
                 ['icon' => 'bi-gear', 'label' => 'Settings', 'href' => 'views/senior-houseparent/settings/index.php', 'section' => 'Administration'],
                 ['icon' => 'bi-person-vcard', 'label' => 'Account Overview', 'href' => 'views/senior-houseparent/settings/account/index.php', 'section' => 'Administration'],
-                ['icon' => 'bi-person-circle', 'label' => 'Profile', 'href' => url('views/senior-houseparent/profile.php'), 'section' => 'Administration'],
+                ['icon' => 'bi-person-circle', 'label' => 'Profile', 'href' => url('views/senior-houseparent/profile/index.php'), 'section' => 'Administration'],
             ];
 
             $currentScript = str_replace('\\', '/', $_GET['route'] ?? $_SERVER['SCRIPT_NAME'] ?? '');
@@ -203,7 +203,7 @@ $navItems = $navItems ?? [];
                 ['icon' => 'bi-bell', 'label' => 'Notifications', 'href' => 'views/nurse/notifications/notifications.php', 'section' => 'Administration'],
                 ['icon' => 'bi-gear', 'label' => 'Settings', 'href' => 'views/nurse/settings/index.php', 'section' => 'Administration'],
                 ['icon' => 'bi-person-vcard', 'label' => 'Account Overview', 'href' => 'views/nurse/settings/account/index.php', 'section' => 'Administration'],
-                ['icon' => 'bi-person-circle', 'label' => 'Profile', 'href' => url('views/nurse/profile.php'), 'section' => 'Administration'],
+                ['icon' => 'bi-person-circle', 'label' => 'Profile', 'href' => url('views/nurse/profile/index.php'), 'section' => 'Administration'],
             ];
 
             $currentScript = str_replace('\\', '/', $_GET['route'] ?? $_SERVER['SCRIPT_NAME'] ?? '');
@@ -233,7 +233,7 @@ $navItems = $navItems ?? [];
                 ['icon' => 'bi-clock-history', 'label' => 'Activity Logs', 'href' => 'views/security/activity-logs/index.php', 'section' => 'Administration'],
                 ['icon' => 'bi-gear', 'label' => 'Settings', 'href' => 'views/security/settings/index.php', 'section' => 'Administration'],
                 ['icon' => 'bi-person-vcard', 'label' => 'Account Overview', 'href' => 'views/security/settings/account/index.php', 'section' => 'Administration'],
-                ['icon' => 'bi-person-circle', 'label' => 'Profile', 'href' => url('views/security/profile.php'), 'section' => 'Administration'],
+                ['icon' => 'bi-person-circle', 'label' => 'Profile', 'href' => url('views/security/profile/index.php'), 'section' => 'Administration'],
             ];
 
             $currentScript = str_replace('\\', '/', $_GET['route'] ?? $_SERVER['SCRIPT_NAME'] ?? '');
@@ -258,7 +258,7 @@ $navItems = $navItems ?? [];
                 ['icon' => 'bi-file-earmark-text', 'label' => 'Reports', 'href' => 'views/student/reports/index.php', 'section' => 'Administration'],
                 ['icon' => 'bi-gear', 'label' => 'Settings', 'href' => 'views/student/settings/index/index.php', 'section' => 'Administration'],
                 ['icon' => 'bi-person-vcard', 'label' => 'Account Overview', 'href' => 'views/student/settings/account/index.php', 'section' => 'Administration'],
-                ['icon' => 'bi-person-circle', 'label' => 'Profile', 'href' => 'views/student/profile/index/index.php', 'section' => 'Administration'],
+                ['icon' => 'bi-person-circle', 'label' => 'Profile', 'href' => url('views/student/profile/index/index.php'), 'section' => 'Administration'],
             ];
 
             $currentScript = str_replace('\\', '/', $_GET['route'] ?? $_SERVER['SCRIPT_NAME'] ?? '');

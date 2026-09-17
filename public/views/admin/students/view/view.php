@@ -143,6 +143,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <h6 class="mb-0 fw-bold"><i class="bi bi-house-door me-2 text-info"></i>Residence Assignment</h6>
                     </div>
                     <div class="card-body">
+                        <p class="mb-2"><span class="text-muted small d-block">Residence Type</span><strong><?= e(strtolower((string) ($student['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></strong></p>
                         <div class="d-flex align-items-center gap-3 mb-3 p-3 bg-primary bg-opacity-5 rounded-3">
                             <div class="rounded-3 bg-primary bg-opacity-15 p-2 text-primary"><i class="bi bi-building fs-4"></i></div>
                             <div>

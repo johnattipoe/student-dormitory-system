@@ -171,8 +171,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <strong><?= e($roleLabel) ?> access</strong>
                                     <?php if (!empty($savedPermissionKeys[$roleKey])): ?>
                                         <div class="d-flex gap-2">
-                                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/permissions/edit/edit.php?id=' . urlencode($roleKey)) ?>">Edit</a>
-                                            <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/permissions/delete/delete.php?id=' . urlencode($roleKey)) ?>">Delete</a>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#permissionEditModal-<?= e($roleKey) ?>">Edit</button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#permissionDeleteModal-<?= e($roleKey) ?>">Delete</button>
                                         </div>
                                     <?php else: ?>
                                         <span class="text-muted small">Built-in config</span>
@@ -196,4 +196,26 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($savedPermissionKeys as $roleKey => $_): ?>
+    <?php $permissionLevel = $permissions[$roleKey] ?? []; ?>
+    <div class="modal fade" id="permissionEditModal-<?= e($roleKey) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="<?= url('views/admin/permissions/edit/edit.php?id=' . urlencode($roleKey)) ?>">
+                    <div class="modal-header"><h5 class="modal-title">Edit <?= e(ucwords(str_replace('_', ' ', $roleKey))) ?> Permissions</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body">
+                        <input type="hidden" name="id" value="<?= e($roleKey) ?>">
+                        <div class="table-responsive"><table class="table table-bordered align-middle mb-0"><thead><tr><th>Module</th><th>Access level</th></tr></thead><tbody>
+                            <?php foreach ($permissionModules as $module): ?><tr><td><?= e(ucwords(str_replace('_', ' ', $module))) ?></td><td><select name="<?= e($module) ?>" class="form-select"><option value="none" <?= ($permissionLevel[$module] ?? 'none') === 'none' ? 'selected' : '' ?>>None</option><option value="view" <?= ($permissionLevel[$module] ?? '') === 'view' ? 'selected' : '' ?>>View</option><option value="manage" <?= ($permissionLevel[$module] ?? '') === 'manage' ? 'selected' : '' ?>>Manage</option><option value="full" <?= ($permissionLevel[$module] ?? '') === 'full' ? 'selected' : '' ?>>Full</option><option value="own" <?= ($permissionLevel[$module] ?? '') === 'own' ? 'selected' : '' ?>>Own</option></select></td></tr><?php endforeach; ?>
+                        </tbody></table></div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Save changes</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="permissionDeleteModal-<?= e($roleKey) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Permission Matrix</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete the saved permission matrix for <strong><?= e(ucwords(str_replace('_', ' ', $roleKey))) ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/admin/permissions/delete/delete.php?id=' . urlencode($roleKey)) ?>"><input type="hidden" name="id" value="<?= e($roleKey) ?>"><button class="btn btn-danger" type="submit">Delete</button></form></div></div></div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

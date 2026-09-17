@@ -19,7 +19,12 @@ use App\Services\HouseService;
 use App\Services\RoomService;
 
 $pageTitle = 'Rooms';
-$rooms = RoomService::all();
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$allRooms = RoomService::all();
+$rooms = array_slice($allRooms, ($page - 1) * $limit, $limit);
+$totalRooms = count($allRooms);
+$totalPages = max(1, (int) ceil($totalRooms / $limit));
 $houses = HouseService::all();
 $houseMap = [];
 foreach ($houses as $house) {
@@ -46,6 +51,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
 
         <div class="card stat-card p-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <small class="text-muted">Showing <?= count($rooms) ?> of <?= e((string) $totalRooms) ?> rooms</small>
+            </div>
             <table class="table table-hover data-table w-100">
                 <thead>
                 <tr>
@@ -65,9 +73,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <td><?= e((string) ($room['capacity'] ?? 0)) ?></td>
                         <td><?= e((string) ($room['occupied'] ?? 0)) ?></td>
                         <td><span class="badge bg-<?= ($room['status'] ?? 'available') === 'available' ? 'success' : 'secondary' ?>"><?= e($room['status'] ?? 'available') ?></span></td>
-                        <td>
+                        <td class="text-nowrap">
                             <?php if (current_role() === ROLE_ADMIN): ?>
-                                <a href="<?= url('views/rooms/edit/edit.php?id=' . urlencode($room['id'] ?? '')) ?>" class="btn btn-sm btn-outline-primary">Edit</a>
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#roomEditModal-<?= e((string) ($room['id'] ?? '')) ?>">Edit</button>
                             <?php else: ?>
                                 <span class="text-muted small">View only</span>
                             <?php endif; ?>
@@ -77,6 +85,30 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </tbody>
             </table>
         </div>
+
+        <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
     </div>
 </div>
+<?php foreach ($rooms as $room): ?>
+    <?php
+        $roomId = (string) ($room['id'] ?? '');
+        if ($roomId === '') continue;
+    ?>
+    <div class="modal fade" id="roomEditModal-<?= e($roomId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Room</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">Open the full edit form to update room <strong><?= e($room['roomNumber'] ?? 'this room') ?></strong>.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

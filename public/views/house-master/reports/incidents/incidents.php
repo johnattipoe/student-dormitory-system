@@ -232,9 +232,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td><?= e($reporterName) ?></td>
                                     <td class="text-nowrap small text-muted"><?= e($dateStr) ?></td>
                                     <td>
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/incidents/view/view.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#houseReportIncidentModal-<?= e((string) ($incident['id'] ?? '')) ?>">
                                             <i class="bi bi-eye"></i> Details
-                                        </a>
+                                        </button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -286,4 +286,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     }
 }
 </style>
+<?php foreach ($incidents as $incident): ?>
+    <?php $modalReportIncidentId = (string) ($incident['id'] ?? ''); $modalReportIncidentStudent = $studentMap[(string) ($incident['studentId'] ?? '')] ?? []; ?>
+    <div class="modal fade" id="houseReportIncidentModal-<?= e($modalReportIncidentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Incident Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e(trim(($modalReportIncidentStudent['firstName'] ?? '') . ' ' . ($modalReportIncidentStudent['lastName'] ?? '')) ?: ($incident['studentId'] ?? '—')) ?></dd><dt class="col-sm-5">Title</dt><dd class="col-sm-7"><?= e($incident['title'] ?? $incident['type'] ?? 'Incident') ?></dd><dt class="col-sm-5">Priority</dt><dd class="col-sm-7"><?= e(ucfirst((string) ($incident['priority'] ?? $incident['severity'] ?? 'low'))) ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucwords(str_replace('_', ' ', (string) ($incident['status'] ?? 'open')))) ?></dd><dt class="col-sm-5">Details</dt><dd class="col-sm-7"><?= e($incident['description'] ?? $incident['details'] ?? '—') ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

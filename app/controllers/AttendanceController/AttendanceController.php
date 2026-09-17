@@ -25,7 +25,8 @@ class AttendanceController
             ROLE_SENIOR_HOUSEPARENT
         );
 
-        $attendance = $this->attendanceService->all();
+        $limit = max(1, min(150, (int) ($_GET['limit'] ?? 150)));
+        $attendance = $this->attendanceService->all(null, null, $limit);
 
         include __DIR__ . '/../../../public/views/attendance/index/index.php';
     }
@@ -74,7 +75,11 @@ class AttendanceController
             ROLE_SENIOR_HOUSEPARENT
         );
 
-        $attendance = $this->attendanceService->history();
+        $studentId = sanitize($_GET['studentId'] ?? current_user()['studentId'] ?? '');
+
+        $attendance = $studentId !== ''
+            ? $this->attendanceService->history($studentId)
+            : [];
 
         include __DIR__ . '/../../../public/views/attendance/history/history.php';
     }

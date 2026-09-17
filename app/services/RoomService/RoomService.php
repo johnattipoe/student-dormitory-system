@@ -4,12 +4,12 @@ namespace App\Services;
 
 class RoomService
 {
-    public static function all(?string $houseId = null): array
+    public static function all(?string $houseId = null, int $limit = 150): array
     {
         if ($houseId) {
-            return FirebaseService::getInstance()->where(\COL_ROOMS, 'houseId', '=', $houseId);
+            return FirebaseService::getInstance()->where(\COL_ROOMS, 'houseId', '=', $houseId, $limit);
         }
-        return FirebaseService::getInstance()->getCollection(\COL_ROOMS, [], 500);
+        return FirebaseService::getInstance()->getCollection(\COL_ROOMS, [], $limit);
     }
 
     public static function find(string $id): ?array
@@ -80,7 +80,12 @@ class RoomService
 
     public static function count(?string $houseId = null): int
     {
-        return count(self::all($houseId));
+        $wheres = [];
+        if ($houseId) {
+            $wheres[] = ['houseId', '=', $houseId];
+        }
+
+        return FirebaseService::getInstance()->count(\COL_ROOMS, $wheres);
     }
 
     public static function byHouse(?string $houseId): array
@@ -94,7 +99,7 @@ class RoomService
 
     public static function countByHouse(?string $houseId): int
     {
-        return count(self::byHouse($houseId));
+        return self::count($houseId);
     }
 
     public static function available(): array
@@ -148,11 +153,25 @@ class RoomService
 
     public static function occupancyStats(?string $houseId = null): array
     {
-        $rooms = self::all($houseId);
-        $totalCapacity = array_sum(array_column($rooms, 'capacity'));
-        $totalOccupied = array_sum(array_column($rooms, 'occupied'));
+        $wheres = [];
+        if ($houseId) {
+            $wheres[] = ['houseId', '=', $houseId];
+        }
+
+        $db = FirebaseService::getInstance();
+        if ($houseId) {
+            $roomRecords = self::all($houseId, 150);
+            $rooms = count($roomRecords);
+            $totalCapacity = array_sum(array_map(static fn(array $room): int => (int) ($room['capacity'] ?? 0), $roomRecords));
+            $totalOccupied = array_sum(array_map(static fn(array $room): int => (int) ($room['occupied'] ?? 0), $roomRecords));
+        } else {
+            $rooms = $db->count(\COL_ROOMS, $wheres);
+            $totalCapacity = (int) $db->sum(\COL_ROOMS, 'capacity');
+            $totalOccupied = (int) $db->sum(\COL_ROOMS, 'occupied');
+        }
+
         return [
-            'rooms'       => count($rooms),
+            'rooms'       => $rooms,
             'capacity'    => $totalCapacity,
             'occupied'    => $totalOccupied,
             'vacant'      => max(0, $totalCapacity - $totalOccupied),

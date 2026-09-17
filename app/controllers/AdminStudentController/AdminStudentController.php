@@ -17,7 +17,8 @@ class AdminStudentController
     {
         require_role(ROLE_ADMIN);
 
-        $students = $this->studentService->all();
+        $limit = max(1, min(150, (int) ($_GET['limit'] ?? 150)));
+        $students = $this->studentService->all(null, $limit);
 
         include __DIR__ . '/../../../public/views/admin/students/index/index.php';
     }

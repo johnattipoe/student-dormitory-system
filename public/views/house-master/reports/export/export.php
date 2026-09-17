@@ -105,7 +105,7 @@ if ($type === 'attendance') {
         ]);
     }
 } elseif ($type === 'students') {
-    fputcsv($output, ['Admission No.', 'Full Name', 'Form', 'Class', 'Gender', 'Course', 'Room', 'Status', 'Guardian Name', 'Guardian Phone', 'Guardian Email']);
+    fputcsv($output, ['Admission No.', 'Full Name', 'Form', 'Class', 'Gender', 'Course', 'Room', 'Residence Type', 'Status', 'Guardian Name', 'Guardian Phone', 'Guardian Email']);
     foreach (StudentService::all($houseId) as $student) {
         fputcsv($output, [
             $student['admissionNo'] ?? '',
@@ -115,6 +115,7 @@ if ($type === 'attendance') {
             $student['gender'] ?? '',
             $student['course'] ?? '',
             $student['roomId'] ?? $student['room'] ?? '',
+            ucfirst((string) ($student['residenceType'] ?? 'boarding')),
             ucfirst((string) ($student['status'] ?? 'active')),
             $student['guardianName'] ?? '',
             $student['guardianPhone'] ?? '',

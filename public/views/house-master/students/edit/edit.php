@@ -65,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'course' => sanitize($_POST['course'] ?? ''),
         'gender' => sanitize($_POST['gender'] ?? 'Male'),
         'phone' => sanitize($_POST['phone'] ?? ''),
+        'residenceType' => sanitize($_POST['residenceType'] ?? 'boarding'),
         'status' => sanitize($_POST['status'] ?? 'active'),
         'guardianName' => sanitize($_POST['guardianName'] ?? ''),
         'guardianPhone' => sanitize($_POST['guardianPhone'] ?? ''),
@@ -157,6 +158,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 <select name="gender" class="form-select" required>
                                     <option value="Male" <?= ($student['gender'] ?? 'Male') === 'Male' ? 'selected' : '' ?>>Male</option>
                                     <option value="Female" <?= ($student['gender'] ?? '') === 'Female' ? 'selected' : '' ?>>Female</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Residence Type</label>
+                                <?php $currentResidenceType = strtolower((string) ($student['residenceType'] ?? 'boarding')); ?>
+                                <select name="residenceType" class="form-select">
+                                    <option value="boarding" <?= $currentResidenceType === 'boarding' ? 'selected' : '' ?>>Boarding</option>
+                                    <option value="day" <?= $currentResidenceType === 'day' ? 'selected' : '' ?>>Day</option>
                                 </select>
                             </div>
                         </div>

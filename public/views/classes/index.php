@@ -94,6 +94,12 @@ usort($classes, static fn(array $first, array $second): int => strcasecmp(
     (string) ($first['className'] ?? ''),
     (string) ($second['className'] ?? '')
 ));
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$totalClasses = count($classes);
+$totalPages = max(1, (int) ceil($totalClasses / $limit));
+$page = min($page, $totalPages);
+$classes = array_slice($classes, ($page - 1) * $limit, $limit);
 
 $pageTitle = 'Classes';
 $dashboardRoute = $role === ROLE_ADMIN
@@ -186,7 +192,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <div class="card stat-card p-3">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h6 class="mb-0">Existing Classes</h6>
-                        <span class="badge bg-primary"><?= e((string) count($classes)) ?> total</span>
+                        <span class="badge bg-primary"><?= e((string) $totalClasses) ?> total</span>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-hover data-table w-100">
@@ -221,6 +227,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             </tbody>
                         </table>
                     </div>
+                    <?php $paginationBaseUrl = url('views/classes/index.php'); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
                 </div>
             </div>
         </div>

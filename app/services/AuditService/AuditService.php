@@ -92,14 +92,15 @@ class AuditService
     /**
      * Get all audit entries with optional filtering
      */
-    public function all(?string $action = null, ?int $limit = 1000): array
+    public function all(?string $action = null, ?int $limit = 150): array
     {
         try {
-            $audits = $this->firebase->getCollection('medical_record_audits', [], $limit);
-
+            $wheres = [];
             if ($action) {
-                $audits = array_filter($audits, fn($a) => ($a['action'] ?? '') === $action);
+                $wheres[] = ['action', '=', $action];
             }
+
+            $audits = $this->firebase->getCollection('medical_record_audits', $wheres, $limit ?? 150);
 
             // Sort by timestamp descending
             usort($audits, function($a, $b) {

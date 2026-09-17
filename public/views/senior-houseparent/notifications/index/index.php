@@ -50,6 +50,12 @@ if ($notificationSearch !== '' || $notificationRead !== '') {
             && ($notificationRead === '' || ($notificationRead === 'unread' ? empty($notification['read']) : !empty($notification['read'])));
     }));
 }
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$totalNotifications = count($notifications);
+$totalPages = max(1, (int) ceil($totalNotifications / $limit));
+$page = min($page, $totalPages);
+$notifications = array_slice($notifications, ($page - 1) * $limit, $limit);
 $unreadNotifications = array_values(array_filter($notifications, fn($note) => empty($note['read'])));
 $readNotifications = array_values(array_filter($notifications, fn($note) => !empty($note['read'])));
 $notificationCount = count($notifications);
@@ -141,6 +147,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
 
         <div class="card stat-card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <small class="text-muted">Showing <?= e((string) count($notifications)) ?> of <?= e((string) $totalNotifications) ?> notifications</small>
+            </div>
             <table class="table table-hover data-table w-100">
                 <thead>
                     <tr>
@@ -156,17 +165,17 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <?php foreach ($notifications as $note): ?>
                             <tr>
                                 <td>
-                                    <a href="<?= e(url('views/senior-houseparent/notifications/detail/detail.php?id=' . urlencode((string) ($note['id'] ?? '')))) ?>" class="fw-semibold text-decoration-none">
+                                    <button type="button" class="btn btn-link p-0 fw-semibold text-decoration-none" data-bs-toggle="modal" data-bs-target="#seniorNotificationView-<?= e((string) ($note['id'] ?? '')) ?>">
                                         <?= e($note['title'] ?? 'Untitled notification') ?>
-                                    </a>
+                                    </button>
                                 </td>
                                 <td><?= e($note['type'] ?? 'info') ?></td>
                                 <td><?= e($note['message'] ?? '') ?></td>
                                 <td><?= !empty($note['read']) ? 'Yes' : 'No' ?></td>
                                 <td>
-                                    <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/senior-houseparent/notifications/view/view.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>">View</a>
-                                    <a class="btn btn-sm btn-outline-primary" href="<?= url('views/senior-houseparent/notifications/edit/edit.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>">Edit</a>
-                                    <a class="btn btn-sm btn-outline-danger" href="<?= url('views/senior-houseparent/notifications/delete/delete.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>">Delete</a>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#seniorNotificationView-<?= e((string) ($note['id'] ?? '')) ?>">View</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#seniorNotificationEdit-<?= e((string) ($note['id'] ?? '')) ?>">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#seniorNotificationDelete-<?= e((string) ($note['id'] ?? '')) ?>">Delete</button>
                                     <?php if (empty($note['read'])): ?>
                                         <form method="POST" action="<?= url('views/senior-houseparent/notifications/index/index.php') ?>" class="d-inline">
                                             <input type="hidden" name="action" value="mark_read">
@@ -187,6 +196,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </tbody>
             </table>
         </div>
+
+        <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
     </div>
 </div>
+<?php foreach ($notifications as $note): ?>
+    <?php $modalNotificationId = (string) ($note['id'] ?? ''); $modalNotificationType = (string) ($note['type'] ?? 'info'); ?>
+    <div class="modal fade" id="seniorNotificationView-<?= e($modalNotificationId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Notification Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><h5><?= e($note['title'] ?? 'Notification') ?></h5><p style="white-space:pre-line;"><?= e($note['message'] ?? '') ?></p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+    <div class="modal fade" id="seniorNotificationEdit-<?= e($modalNotificationId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><form method="POST" action="<?= url('views/senior-houseparent/notifications/edit/edit.php?id=' . urlencode($modalNotificationId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Notification</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalNotificationId) ?>"><label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($note['title'] ?? '') ?>" required><label class="form-label">Type</label><select name="type" class="form-select mb-3"><option value="info" <?= $modalNotificationType === 'info' ? 'selected' : '' ?>>Info</option><option value="success" <?= $modalNotificationType === 'success' ? 'selected' : '' ?>>Success</option><option value="warning" <?= $modalNotificationType === 'warning' ? 'selected' : '' ?>>Warning</option><option value="danger" <?= $modalNotificationType === 'danger' ? 'selected' : '' ?>>Danger</option></select><label class="form-label">Message</label><textarea name="message" class="form-control" rows="4" required><?= e($note['message'] ?? '') ?></textarea></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
+    <div class="modal fade" id="seniorNotificationDelete-<?= e($modalNotificationId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Notification</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">Delete <strong><?= e($note['title'] ?? 'this notification') ?></strong>?</div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/senior-houseparent/notifications/delete/delete.php?id=' . urlencode($modalNotificationId)) ?>"><input type="hidden" name="id" value="<?= e($modalNotificationId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

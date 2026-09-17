@@ -13,10 +13,10 @@ class ExternalIncidentService
         $this->firebase = FirebaseService::getInstance();
     }
 
-    public function all(): array
+    public function all(int $limit = 150): array
     {
         try {
-            return $this->firebase->getCollection($this->collection, [], 500);
+            return $this->firebase->getCollection($this->collection, [], $limit);
         } catch (\Throwable $e) {
             return [];
         }
@@ -29,7 +29,7 @@ class ExternalIncidentService
         }
 
         try {
-            $records = $this->firebase->getCollection($this->collection, [['houseId', '=', $houseId]], 500);
+            $records = $this->firebase->getCollection($this->collection, [['houseId', '=', $houseId]], 150);
             usort($records, function ($a, $b) {
                 $aTime = (string) ($a['uploadedAt'] ?? $a['createdAt'] ?? '');
                 $bTime = (string) ($b['uploadedAt'] ?? $b['createdAt'] ?? '');
@@ -47,10 +47,20 @@ class ExternalIncidentService
             return null;
         }
 
-        foreach ($this->all() as $record) {
-            if ((string) ($record['fileName'] ?? '') === $fileName) {
-                return $record;
+        try {
+            $records = $this->firebase->getCollection(
+                $this->collection,
+                [['fileName', '=', $fileName]],
+                20
+            );
+
+            foreach ($records as $record) {
+                if ((string) ($record['fileName'] ?? '') === $fileName) {
+                    return $record;
+                }
             }
+        } catch (\Throwable $e) {
+            return null;
         }
 
         return null;

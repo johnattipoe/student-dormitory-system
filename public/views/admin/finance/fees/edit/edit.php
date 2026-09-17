@@ -16,13 +16,40 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\FirebaseService;
 
+$defaultFees = [
+    ['id' => 'boarding-fee', 'name' => 'Boarding Fee', 'amount' => 650.00, 'period' => 'Monthly', 'status' => 'active'],
+    ['id' => 'utility-fee', 'name' => 'Utility Fee', 'amount' => 120.00, 'period' => 'Monthly', 'status' => 'active'],
+];
+
+$deletedFallbackFeeIds = $_SESSION['deleted_fallback_fee_ids'] ?? [];
+if (!is_array($deletedFallbackFeeIds)) {
+    $deletedFallbackFeeIds = [];
+}
+$deletedFallbackFeeIds = array_values(array_unique(array_map('strval', $deletedFallbackFeeIds)));
+$defaultFees = array_values(array_filter($defaultFees, static fn (array $fee): bool => !in_array((string) ($fee['id'] ?? ''), $deletedFallbackFeeIds, true)));
+
 $id = sanitize($_GET['id'] ?? $_POST['id'] ?? '');
 if ($id === '') {
     flash('error', 'Fee ID is required.');
     redirect(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php')));
 }
 
-$fee = FirebaseService::getInstance()->getDocument(COL_FINANCE_FEES, $id);
+$fee = null;
+try {
+    $fee = FirebaseService::getInstance()->getDocument(COL_FINANCE_FEES, $id);
+} catch (Throwable $e) {
+    $fee = null;
+}
+
+if (!$fee) {
+    foreach ($defaultFees as $defaultFee) {
+        if ((string) ($defaultFee['id'] ?? '') === $id) {
+            $fee = $defaultFee;
+            break;
+        }
+    }
+}
+
 if (!$fee) {
     flash('error', 'Fee category not found.');
     redirect(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php')));
@@ -35,12 +62,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($name !== '' && $amount > 0) {
         try {
-            FirebaseService::getInstance()->updateDocument(COL_FINANCE_FEES, $id, [
+            $payload = [
                 'name' => $name,
                 'amount' => $amount,
                 'period' => $period,
                 'status' => 'active',
-            ]);
+            ];
+
+            $recordExists = false;
+            try {
+                $recordExists = FirebaseService::getInstance()->getDocument(COL_FINANCE_FEES, $id) !== null;
+            } catch (Throwable $e) {
+                $recordExists = false;
+            }
+
+            if ($recordExists) {
+                FirebaseService::getInstance()->updateDocument(COL_FINANCE_FEES, $id, $payload);
+            } else {
+                FirebaseService::getInstance()->addDocument(COL_FINANCE_FEES, $payload, $id);
+            }
+
             flash('success', 'Fee category updated.');
             redirect(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php')));
         } catch (Throwable $e) {

@@ -30,21 +30,28 @@ $topbarNotifications = [];
 
 try {
     $notificationService = new NotificationService();
+    $topbarUnreadCount = $role === ROLE_ADMIN
+        ? $notificationService->unreadCount()
+        : $notificationService->unreadCount($currentUserId);
+
     $topbarNotifications = $role === ROLE_ADMIN
-        ? $notificationService->all()
-        : $notificationService->forUser($currentUserId);
+        ? $notificationService->all(50)
+        : $notificationService->forUser($currentUserId, 50);
 } catch (Throwable $e) {
     $topbarNotifications = [];
+    $topbarUnreadCount = 0;
 }
 
 usort($topbarNotifications, static fn(array $first, array $second): int => strcmp(
     (string) ($second['createdAt'] ?? ''),
     (string) ($first['createdAt'] ?? '')
 ));
-$topbarUnreadCount = count(array_filter($topbarNotifications, static fn(array $notification): bool => empty($notification['read'])));
 $recentNotifications = array_slice($topbarNotifications, 0, 5);
 ?>
 <nav class="topbar navbar navbar-expand navbar-light bg-white border-bottom px-3 w-100">
+    <button type="button" class="btn btn-sm btn-outline-primary sidebar-mobile-toggle d-lg-none" id="sidebarToggle" aria-label="Open navigation menu" aria-controls="mainSidebar" aria-expanded="false">
+        <i class="bi bi-list" aria-hidden="true"></i>
+    </button>
     <button type="button" class="btn btn-sm btn-outline-light sidebar-collapse-btn d-none d-lg-flex" id="sidebarCollapseBtn" aria-label="Toggle sidebar">
                 <i class="bi bi-chevron-double-left"></i>
     </button>

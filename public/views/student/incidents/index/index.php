@@ -55,9 +55,16 @@ if (!empty($status)) {
     $incidents = array_values(array_filter($incidents, fn($i) => ($i['status'] ?? '') === $status));
 }
 
-$openCount = count(array_filter($incidents, fn($i) => ($i['status'] ?? 'open') === 'open'));
-$resolvedCount = count(array_filter($incidents, fn($i) => ($i['status'] ?? '') === 'resolved'));
-$highCount = count(array_filter($incidents, fn($i) => ($i['severity'] ?? 'low') === 'high'));
+$filteredIncidents = $incidents;
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$totalIncidents = count($filteredIncidents);
+$totalPages = max(1, (int) ceil($totalIncidents / $limit));
+$incidents = array_slice($filteredIncidents, ($page - 1) * $limit, $limit);
+
+$openCount = count(array_filter($filteredIncidents, fn($i) => ($i['status'] ?? 'open') === 'open'));
+$resolvedCount = count(array_filter($filteredIncidents, fn($i) => ($i['status'] ?? '') === 'resolved'));
+$highCount = count(array_filter($filteredIncidents, fn($i) => ($i['severity'] ?? 'low') === 'high'));
 
 $pageTitle = 'Student Incidents';
 $navItems = [
@@ -99,7 +106,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold">Total Reports</span>
-                            <h3 class="fw-bold my-1 text-primary"><?= e((string) count($incidents)) ?></h3>
+                            <h3 class="fw-bold my-1 text-primary"><?= e((string) $totalIncidents) ?></h3>
                             <span class="small text-muted">All records</span>
                         </div>
                         <div class="rounded-3 bg-primary bg-opacity-10 p-2 text-primary"><i class="bi bi-flag fs-4"></i></div>
@@ -195,13 +202,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-flag me-2"></i>Incident Records</h6>
                 <small class="text-muted">
-                    Showing <strong><?= count($incidents) ?></strong> incident(s)
+                    Showing <strong><?= $totalIncidents ?></strong> incident(s)
                     <?php if (!empty($search) || !empty($dateFrom) || !empty($dateTo) || !empty($severity) || !empty($status)): ?>
                         (filtered)
                     <?php endif; ?>
                 </small>
             </div>
             <div class="card-body p-0">
+                <?php $paginationBaseUrl = url('views/student/incidents/index/index.php'); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
                 <table class="table table-hover align-middle mb-0 data-table w-100">
                     <thead class="table-light">
                         <tr>
@@ -243,9 +251,11 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     </td>
                                     <td class="small text-muted"><?= e(substr((string) ($incident['createdAt'] ?? ''), 0, 10)) ?></td>
                                     <td class="text-nowrap">
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/student/incidents/view/view.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>"><i class="bi bi-eye"></i></a>
-                                        <a class="btn btn-sm btn-outline-warning" href="<?= url('views/student/incidents/edit/edit.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>"><i class="bi bi-pencil"></i></a>
-                                        <a class="btn btn-sm btn-outline-danger" href="<?= url('views/student/incidents/delete/delete.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>"><i class="bi bi-trash"></i></a>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#studentIncidentView-<?= e((string) ($incident['id'] ?? '')) ?>"><i class="bi bi-eye"></i></button>
+                                        <?php if (($incident['status'] ?? 'open') === 'open'): ?>
+                                            <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#studentIncidentEdit-<?= e((string) ($incident['id'] ?? '')) ?>"><i class="bi bi-pencil"></i></button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#studentIncidentDelete-<?= e((string) ($incident['id'] ?? '')) ?>"><i class="bi bi-trash"></i></button>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -260,4 +270,77 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($incidents as $incident): ?>
+    <?php
+    $modalIncidentId = (string) ($incident['id'] ?? '');
+    if ($modalIncidentId === '') continue;
+    ?>
+    <div class="modal fade" id="studentIncidentView-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Incident Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Title</dt>
+                        <dd class="col-sm-8"><?= e($incident['title'] ?? $incident['type'] ?? 'Incident') ?></dd>
+                        <dt class="col-sm-4">Category</dt>
+                        <dd class="col-sm-8"><?= e(ucfirst((string) ($incident['type'] ?? 'other'))) ?></dd>
+                        <dt class="col-sm-4">Priority</dt>
+                        <dd class="col-sm-8"><span class="badge bg-<?= (($incident['priority'] ?? $incident['severity'] ?? 'medium') === 'high' ? 'danger' : (($incident['priority'] ?? $incident['severity'] ?? 'medium') === 'medium' ? 'warning text-dark' : 'secondary')) ?>"><?= e(ucfirst((string) ($incident['priority'] ?? $incident['severity'] ?? 'medium'))) ?></span></dd>
+                        <dt class="col-sm-4">Status</dt>
+                        <dd class="col-sm-8"><span class="badge bg-<?= (($incident['status'] ?? 'open') === 'resolved' ? 'success' : (($incident['status'] ?? '') === 'investigating' ? 'warning text-dark' : 'danger')) ?>"><?= e(ucfirst((string) ($incident['status'] ?? 'open'))) ?></span></dd>
+                        <dt class="col-sm-4">Description</dt>
+                        <dd class="col-sm-8"><?= nl2br(e($incident['description'] ?? $incident['notes'] ?? '—')) ?></dd>
+                        <dt class="col-sm-4">Reported</dt>
+                        <dd class="col-sm-8"><?= e(substr((string) ($incident['reportedAt'] ?? $incident['createdAt'] ?? ''), 0, 19)) ?></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="studentIncidentEdit-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Incident</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">Open the full edit form to update this incident.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="studentIncidentDelete-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Delete Incident</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="<?= url('views/student/incidents/delete/delete.php') ?>">
+                    <div class="modal-body">
+                        <input type="hidden" name="id" value="<?= e($modalIncidentId) ?>">
+                        <p class="mb-0">Delete <strong><?= e($incident['title'] ?? $incident['type'] ?? 'this incident') ?></strong>?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">Delete Incident</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

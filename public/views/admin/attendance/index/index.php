@@ -333,9 +333,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <td><span class="badge <?= $badge ?>"><?= ucfirst(e($st)) ?></span></td>
                                         <td><?= e($record['date'] ?? '-') ?></td>
                                         <td class="text-end">
-                                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/attendance/view/view.php?id=' . urlencode($rId)) ?>" title="View"><i class="bi bi-eye"></i></a>
-                                            <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/attendance/edit/edit.php?id=' . urlencode($rId)) ?>" title="Edit"><i class="bi bi-pencil"></i></a>
-                                            <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/attendance/delete/delete.php?id=' . urlencode($rId)) ?>" title="Delete"><i class="bi bi-trash"></i></a>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" title="View" data-bs-toggle="modal" data-bs-target="#attendanceViewModal-<?= e($rId) ?>"><i class="bi bi-eye"></i></button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Edit" data-bs-toggle="modal" data-bs-target="#attendanceEditModal-<?= e($rId) ?>"><i class="bi bi-pencil"></i></button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" data-bs-toggle="modal" data-bs-target="#attendanceDeleteModal-<?= e($rId) ?>"><i class="bi bi-trash"></i></button>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -348,4 +348,92 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
     </div>
 </div>
+
+<?php foreach ($todayRecords as $record): ?>
+    <?php
+    $rId = (string) ($record['id'] ?? '');
+    $student = null;
+    foreach ($students as $candidate) {
+        if (($candidate['id'] ?? '') === ($record['studentId'] ?? '')) {
+            $student = $candidate;
+            break;
+        }
+    }
+    $studentName = e(trim((($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')))) ?: e($record['studentId'] ?? 'Student');
+    $status = (string) ($record['status'] ?? 'present');
+    ?>
+    <div class="modal fade" id="attendanceViewModal-<?= e($rId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Attendance Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Student</dt><dd class="col-sm-8"><?= e(trim((($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')))) ?: e($record['studentId'] ?? 'Student') ?></dd>
+                        <dt class="col-sm-4">Date</dt><dd class="col-sm-8"><?= e($record['date'] ?? '-') ?></dd>
+                        <dt class="col-sm-4">Status</dt><dd class="col-sm-8"><?= e(ucfirst($status)) ?></dd>
+                        <dt class="col-sm-4">Bed</dt><dd class="col-sm-8"><?= e($bedMap[(string) ($record['studentId'] ?? '')] ?? '—') ?></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="attendanceEditModal-<?= e($rId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST" action="<?= url('views/admin/attendance/edit/edit.php?id=' . urlencode($rId)) ?>">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Attendance</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Date</label>
+                            <input type="date" name="date" class="form-control" value="<?= e($record['date'] ?? date('Y-m-d')) ?>">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="present" <?= $status === 'present' ? 'selected' : '' ?>>Present</option>
+                                <option value="absent" <?= $status === 'absent' ? 'selected' : '' ?>>Absent</option>
+                                <option value="late" <?= $status === 'late' ? 'selected' : '' ?>>Late</option>
+                                <option value="excused" <?= $status === 'excused' ? 'selected' : '' ?>>Excused</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="attendanceDeleteModal-<?= e($rId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title text-danger">Delete Attendance</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">Are you sure you want to delete this attendance record for <strong><?= e(trim((($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')))) ?: e($record['studentId'] ?? 'Student') ?></strong>?</p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form method="POST" action="<?= url('views/admin/attendance/delete/delete.php?id=' . urlencode($rId)) ?>">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

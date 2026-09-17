@@ -21,9 +21,12 @@ use App\Services\StudentService;
 use App\Services\FirebaseService;
 
 $pageTitle = 'Incidents';
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 $incidentService = new IncidentService();
-$incidents = $incidentService->all();
-$totalIncidents = count($incidents);
+$incidents = $incidentService->all($limit);
+$totalIncidents = $incidentService->count();
+$totalPages = max(1, (int) ceil($totalIncidents / $limit));
 $openIncidents = count(array_filter($incidents, fn($i) => ($i['status'] ?? 'open') === 'open'));
 $resolvedIncidents = count(array_filter($incidents, fn($i) => ($i['status'] ?? '') === 'resolved' || ($i['status'] ?? '') === 'closed'));
 $urgentIncidents = count(array_filter($incidents, fn($i) => in_array(strtolower((string)($i['priority'] ?? '')), ['high', 'critical', 'urgent'], true)));
@@ -273,7 +276,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     </td>
                                     <td class="text-end text-nowrap">
                                         <?php if ($fileName !== ''): ?>
-                                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/incidents/external-view/external-view.php?file=' . urlencode($fileName)) ?>" title="View form"><i class="bi bi-eye"></i></a>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#externalIncidentViewModal-<?= e(md5($fileName)) ?>" title="View form"><i class="bi bi-eye"></i></button>
                                             <a class="btn btn-sm btn-outline-success" href="<?= url('uploads/external-incidents/' . rawurlencode($fileName)) ?>" target="_blank" rel="noopener" title="Open file"><i class="bi bi-download"></i></a>
                                         <?php else: ?>
                                             <span class="text-muted">—</span>
@@ -346,9 +349,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td><span class="badge <?= $sBadge ?>"><?= ucfirst(e($iSt)) ?></span></td>
                                     <td><small class="text-muted"><i class="bi bi-person me-1"></i><?= e($reporterDisplayName) ?></small></td>
                                     <td class="text-end text-nowrap">
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/incidents/view/view.php?id=' . urlencode($incId)) ?>" title="View"><i class="bi bi-eye"></i></a>
-                                        <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/incidents/edit/edit.php?id=' . urlencode($incId)) ?>" title="Edit"><i class="bi bi-pencil"></i></a>
-                                        <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/incidents/delete/delete.php?id=' . urlencode($incId)) ?>" title="Delete"><i class="bi bi-trash"></i></a>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" title="View" data-bs-toggle="modal" data-bs-target="#incidentViewModal-<?= e($incId) ?>"><i class="bi bi-eye"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" title="Edit" data-bs-toggle="modal" data-bs-target="#incidentEditModal-<?= e($incId) ?>"><i class="bi bi-pencil"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" data-bs-toggle="modal" data-bs-target="#incidentDeleteModal-<?= e($incId) ?>"><i class="bi bi-trash"></i></button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -357,8 +360,90 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </table>
                 </div>
             </div>
+            <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
         </div>
 
     </div>
 </div>
+
+<?php foreach ($incidents as $incident): ?>
+    <?php
+    $incId = (string) ($incident['id'] ?? '');
+    $incidentTitle = (string) ($incident['title'] ?? 'Untitled Incident');
+    $incidentStatus = (string) ($incident['status'] ?? 'open');
+    $incidentPriority = (string) ($incident['priority'] ?? 'medium');
+    $incidentDescription = (string) ($incident['description'] ?? '');
+    ?>
+    <div class="modal fade" id="incidentViewModal-<?= e($incId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Incident Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Title</dt><dd class="col-sm-8"><?= e($incidentTitle) ?></dd>
+                        <dt class="col-sm-4">Priority</dt><dd class="col-sm-8"><?= e(ucfirst($incidentPriority)) ?></dd>
+                        <dt class="col-sm-4">Status</dt><dd class="col-sm-8"><?= e(ucfirst($incidentStatus)) ?></dd>
+                        <dt class="col-sm-4">Details</dt><dd class="col-sm-8"><?= e($incidentDescription ?: '—') ?></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="incidentEditModal-<?= e($incId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="<?= url('views/admin/incidents/edit/edit.php?id=' . urlencode($incId)) ?>">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Incident</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-12"><label class="form-label">Title</label><input name="title" class="form-control" value="<?= e($incidentTitle) ?>" required></div>
+                            <div class="col-md-6"><label class="form-label">Priority</label><select name="priority" class="form-select"><option value="low" <?= strtolower($incidentPriority) === 'low' ? 'selected' : '' ?>>Low</option><option value="medium" <?= strtolower($incidentPriority) === 'medium' ? 'selected' : '' ?>>Medium</option><option value="high" <?= strtolower($incidentPriority) === 'high' ? 'selected' : '' ?>>High</option></select></div>
+                            <div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><option value="open" <?= strtolower($incidentStatus) === 'open' ? 'selected' : '' ?>>Open</option><option value="investigating" <?= strtolower($incidentStatus) === 'investigating' ? 'selected' : '' ?>>Investigating</option><option value="resolved" <?= strtolower($incidentStatus) === 'resolved' ? 'selected' : '' ?>>Resolved</option></select></div>
+                            <div class="col-12"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="4"><?= e($incidentDescription) ?></textarea></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="incidentDeleteModal-<?= e($incId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title text-danger">Delete Incident</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">Are you sure you want to delete <strong><?= e($incidentTitle) ?></strong>?</p>
+                    <p class="text-muted mb-0">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form method="POST" action="<?= url('views/admin/incidents/delete/delete.php?id=' . urlencode($incId)) ?>">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
+<?php foreach ($externalIncidents as $external): ?>
+    <?php $externalFileName = (string) ($external['fileName'] ?? ''); if ($externalFileName === '') continue; ?>
+    <div class="modal fade" id="externalIncidentViewModal-<?= e(md5($externalFileName)) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">External Incident Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e($external['studentName'] ?? 'Unknown Student') ?></dd><dt class="col-sm-5">Incident Type</dt><dd class="col-sm-7"><?= e($external['incidentType'] ?? 'External Incident') ?></dd><dt class="col-sm-5">Incident Date</dt><dd class="col-sm-7"><?= e($external['incidentDate'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst((string) ($external['status'] ?? 'submitted'))) ?></dd></dl></div><div class="modal-footer"><a class="btn btn-outline-success" href="<?= url('uploads/external-incidents/' . rawurlencode($externalFileName)) ?>" target="_blank" rel="noopener"><i class="bi bi-download me-1"></i>Open file</a><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

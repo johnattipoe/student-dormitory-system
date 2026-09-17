@@ -13,10 +13,10 @@ class EmergencyContactService
         $this->firebase = FirebaseService::getInstance();
     }
 
-    public function all(): array
+    public function all(int $limit = 150): array
     {
         try {
-            $contacts = $this->firebase->getCollection($this->collection, [], 500);
+            $contacts = $this->firebase->getCollection($this->collection, [], $limit);
             usort($contacts, static fn(array $first, array $second): int => strcmp(
                 (string) ($second['createdAt'] ?? ''),
                 (string) ($first['createdAt'] ?? '')

@@ -1,3 +1,5 @@
 """FastAPI service package for the student dormitory system."""
 
-__all__ = ["config"]
+from .config import settings
+
+__all__ = ["settings"]

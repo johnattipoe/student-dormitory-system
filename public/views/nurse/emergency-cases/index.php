@@ -174,9 +174,27 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <?php if ($filteredRecords): foreach ($filteredRecords as $record): ?>
                     <?php $severity = strtolower((string) ($record['severity'] ?? 'emergency')); $caseStatus = strtolower((string) ($record['caseStatus'] ?? 'open')); $recordId = (string) ($record['id'] ?? ''); ?>
                     <tr>
-                        <td class="fw-semibold"><?= e($studentLabel($record)) ?></td><td><?= e($record['diagnosis'] ?? 'Not recorded') ?></td><td class="small text-muted"><?= e(trim(($record['treatment'] ?? '') . ' ' . ($record['notes'] ?? '')) ?: 'No treatment notes') ?></td>
-                        <td><span class="badge bg-<?= $severity === 'critical' ? 'warning text-dark' : 'danger' ?>"><?= e(ucfirst($severity)) ?></span></td><td><span class="badge <?= $caseStatus === 'reviewed' ? 'bg-success' : 'bg-danger' ?>"><?= $caseStatus === 'reviewed' ? 'Reviewed' : 'Open' ?></span></td><td class="small text-muted"><?= e(substr((string) ($record['responseDueAt'] ?? 'Not set'), 0, 16)) ?></td><td class="small text-muted"><?= e(substr((string) ($record['createdAt'] ?? 'Not recorded'), 0, 16)) ?></td>
-                        <td class="text-end text-nowrap"><?php if ($recordId !== ''): ?><a class="btn btn-sm btn-outline-primary" href="<?= url('views/nurse/edit-record/edit-record.php?id=' . urlencode($recordId)) ?>" title="Edit medical record"><i class="bi bi-pencil"></i></a><form class="d-inline" method="POST"><input type="hidden" name="recordId" value="<?= e($recordId) ?>"><input type="hidden" name="caseStatus" value="<?= $caseStatus === 'reviewed' ? 'open' : 'reviewed' ?>"><button class="btn btn-sm btn-outline-<?= $caseStatus === 'reviewed' ? 'secondary' : 'success' ?>" type="submit" title="<?= $caseStatus === 'reviewed' ? 'Reopen case' : 'Mark as reviewed' ?>"><i class="bi bi-<?= $caseStatus === 'reviewed' ? 'arrow-counterclockwise' : 'check2' ?>"></i></button></form><?php else: ?><span class="text-muted">—</span><?php endif; ?></td>
+                        <td class="fw-semibold"><?= e($studentLabel($record)) ?></td>
+                        <td><?= e($record['diagnosis'] ?? 'Not recorded') ?></td>
+                        <td class="small text-muted"><?= e(trim(($record['treatment'] ?? '') . ' ' . ($record['notes'] ?? '')) ?: 'No treatment notes') ?></td>
+                        <td><span class="badge bg-<?= $severity === 'critical' ? 'warning text-dark' : 'danger' ?>"><?= e(ucfirst($severity)) ?></span></td>
+                        <td><span class="badge <?= $caseStatus === 'reviewed' ? 'bg-success' : 'bg-danger' ?>"><?= $caseStatus === 'reviewed' ? 'Reviewed' : 'Open' ?></span></td>
+                        <td class="small text-muted"><?= e(substr((string) ($record['responseDueAt'] ?? 'Not set'), 0, 16)) ?></td>
+                        <td class="small text-muted"><?= e(substr((string) ($record['createdAt'] ?? 'Not recorded'), 0, 16)) ?></td>
+                        <td class="text-end text-nowrap">
+                            <?php if ($recordId !== ''): ?>
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#nurseEmergencyEdit-<?= e($recordId) ?>" title="Edit medical record"><i class="bi bi-pencil"></i></button>
+                                <form class="d-inline" method="POST">
+                                    <input type="hidden" name="recordId" value="<?= e($recordId) ?>">
+                                    <input type="hidden" name="caseStatus" value="<?= $caseStatus === 'reviewed' ? 'open' : 'reviewed' ?>">
+                                    <button class="btn btn-sm btn-outline-<?= $caseStatus === 'reviewed' ? 'secondary' : 'success' ?>" type="submit" title="<?= $caseStatus === 'reviewed' ? 'Reopen case' : 'Mark as reviewed' ?>">
+                                        <i class="bi bi-<?= $caseStatus === 'reviewed' ? 'arrow-counterclockwise' : 'check2' ?>"></i>
+                                    </button>
+                                </form>
+                            <?php else: ?>
+                                <span class="text-muted">—</span>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                 <?php endforeach; else: ?>
                     <tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-shield-check fs-3 d-block mb-2 text-success"></i>No emergency cases match the selected filters.</td></tr>
@@ -186,4 +204,50 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($filteredRecords as $record): ?>
+    <?php
+    $modalRecordId = (string) ($record['id'] ?? '');
+    if ($modalRecordId === '') continue;
+    ?>
+    <div class="modal fade" id="nurseEmergencyEdit-<?= e($modalRecordId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="<?= url('views/nurse/edit-record/edit-record.php?id=' . urlencode($modalRecordId)) ?>">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Emergency Record</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Diagnosis</label>
+                                <input type="text" name="diagnosis" class="form-control" value="<?= e($record['diagnosis'] ?? '') ?>" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Treatment</label>
+                                <input type="text" name="treatment" class="form-control" value="<?= e($record['treatment'] ?? '') ?>" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Severity</label>
+                                <select name="severity" class="form-select">
+                                    <?php foreach (['normal', 'moderate', 'critical'] as $severityOption): ?>
+                                        <option value="<?= e($severityOption) ?>" <?= strtolower((string) ($record['severity'] ?? 'normal')) === $severityOption ? 'selected' : '' ?>><?= e(ucfirst($severityOption)) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Notes</label>
+                                <textarea name="notes" class="form-control" rows="5"><?= e($record['notes'] ?? '') ?></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

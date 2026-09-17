@@ -39,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'course' => sanitize($_POST['course'] ?? ''),
         'phone' => sanitize($_POST['phone'] ?? ''),
         'houseId' => $houseId,
+        'residenceType' => sanitize($_POST['residenceType'] ?? 'boarding'),
         'guardianName' => sanitize($_POST['guardianName'] ?? ''),
         'guardianPhone' => sanitize($_POST['guardianPhone'] ?? ''),
         'guardianEmail' => sanitize($_POST['guardianEmail'] ?? ''),
@@ -237,6 +238,13 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <option value="active" <?= ($old['status'] ?? 'active') === 'active' ? 'selected' : '' ?>>Active (Resident)</option>
                                     <option value="inactive" <?= ($old['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Inactive</option>
                                     <option value="suspended" <?= ($old['status'] ?? '') === 'suspended' ? 'selected' : '' ?>>Suspended</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Residence Type</label>
+                                <select name="residenceType" class="form-select">
+                                    <option value="boarding" <?= ($old['residenceType'] ?? 'boarding') === 'boarding' ? 'selected' : '' ?>>Boarding</option>
+                                    <option value="day" <?= ($old['residenceType'] ?? '') === 'day' ? 'selected' : '' ?>>Day</option>
                                 </select>
                             </div>
                         </div>

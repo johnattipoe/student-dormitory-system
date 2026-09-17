@@ -4,10 +4,10 @@ namespace App\Services;
 
 class ParentMessageService
 {
-    public function all(): array
+    public function all(int $limit = 150): array
     {
         try {
-            return FirebaseService::getInstance()->getCollection(\COL_PARENT_MESSAGES);
+            return FirebaseService::getInstance()->getCollection(\COL_PARENT_MESSAGES, [], $limit);
         } catch (\Throwable $e) {
             return [];
         }

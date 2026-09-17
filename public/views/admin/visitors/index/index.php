@@ -51,8 +51,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $pageTitle = 'Visitors';
-$allVisitors = $visitorService->all();
-$totalVisitors = count($allVisitors);
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$allVisitors = $visitorService->all($limit);
+$totalVisitors = $visitorService->count();
+$totalPages = max(1, (int) ceil($totalVisitors / $limit));
 $insideVisitors = count(array_filter($allVisitors, fn($v) => ($v['status'] ?? '') === 'inside'));
 $todayVisitors = count(array_filter($allVisitors, fn($v) => str_starts_with((string)($v['checkInTime'] ?? $v['visitDate'] ?? $v['createdAt'] ?? ''), date('Y-m-d'))));
 
@@ -253,9 +256,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td><small class="text-muted"><?= e($visitor['purpose'] ?? '—') ?></small></td>
                                     <td><span class="badge <?= $vBadge ?>"><?= ucfirst(str_replace('_', ' ', e($vStatus))) ?></span></td>
                                     <td class="text-end text-nowrap">
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/visitors/view/view.php?id=' . urlencode($vId)) ?>" title="View"><i class="bi bi-eye"></i></a>
-                                        <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/visitors/edit/edit.php?id=' . urlencode($vId)) ?>" title="Edit"><i class="bi bi-pencil"></i></a>
-                                        <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/visitors/delete/delete.php?id=' . urlencode($vId)) ?>" title="Delete"><i class="bi bi-trash"></i></a>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" title="View" data-bs-toggle="modal" data-bs-target="#visitorViewModal-<?= e($vId) ?>"><i class="bi bi-eye"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" title="Edit" data-bs-toggle="modal" data-bs-target="#visitorEditModal-<?= e($vId) ?>"><i class="bi bi-pencil"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" data-bs-toggle="modal" data-bs-target="#visitorDeleteModal-<?= e($vId) ?>"><i class="bi bi-trash"></i></button>
                                         <?php if ($vStatus === 'inside'): ?>
                                             <form method="POST" action="<?= url('views/admin/visitors/index/index.php') ?>" class="d-inline">
                                                 <input type="hidden" name="action" value="check_out">
@@ -277,8 +280,93 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </table>
                 </div>
             </div>
+            <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
         </div>
 
     </div>
 </div>
+
+<?php foreach ($visitors as $visitor): ?>
+    <?php
+    $vId = (string) ($visitor['id'] ?? '');
+    $visitorName = (string) ($visitor['visitorName'] ?? 'Visitor');
+    $vStatus = strtolower((string) ($visitor['status'] ?? 'registered'));
+    $visitorPurpose = (string) ($visitor['purpose'] ?? '—');
+    $visitorPhone = (string) ($visitor['phone'] ?? '—');
+    $studentName = '-';
+    foreach ($students as $student) {
+        if (($student['id'] ?? '') === ($visitor['studentId'] ?? '')) {
+            $studentName = (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: ($visitor['studentId'] ?? '-');
+            break;
+        }
+    }
+    ?>
+    <div class="modal fade" id="visitorViewModal-<?= e($vId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Visitor Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Name</dt><dd class="col-sm-7"><?= e($visitorName) ?></dd>
+                        <dt class="col-sm-5">Phone</dt><dd class="col-sm-7"><?= e($visitorPhone) ?></dd>
+                        <dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e($studentName) ?></dd>
+                        <dt class="col-sm-5">Purpose</dt><dd class="col-sm-7"><?= e($visitorPurpose) ?></dd>
+                        <dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst(str_replace('_', ' ', $vStatus))) ?></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="visitorEditModal-<?= e($vId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="<?= url('views/admin/visitors/edit/edit.php?id=' . urlencode($vId)) ?>">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Visitor</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6"><label class="form-label">Visitor Name</label><input name="visitorName" class="form-control" value="<?= e($visitorName) ?>" required></div>
+                            <div class="col-md-6"><label class="form-label">Phone</label><input name="phone" class="form-control" value="<?= e($visitorPhone) ?>"></div>
+                            <div class="col-12"><label class="form-label">Purpose</label><textarea name="purpose" class="form-control" rows="4"><?= e($visitorPurpose) ?></textarea></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="visitorDeleteModal-<?= e($vId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title text-danger">Delete Visitor</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">Are you sure you want to delete <strong><?= e($visitorName) ?></strong>?</p>
+                    <p class="text-muted mb-0">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form method="POST" action="<?= url('views/admin/visitors/delete/delete.php?id=' . urlencode($vId)) ?>">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

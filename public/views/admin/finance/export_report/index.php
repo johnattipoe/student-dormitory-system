@@ -20,6 +20,22 @@ use App\Services\StudentService;
 
 require_once APP_ROOT . '/fpdf19/fpdf.php';
 
+$feeCategories = [];
+try {
+    $feeCategories = FirebaseService::getInstance()->getCollection(COL_FINANCE_FEES, [], 200);
+} catch (Throwable $e) {
+    $feeCategories = [];
+}
+
+$baseAmountPerStudent = 0.0;
+foreach ($feeCategories as $fee) {
+    $feeStatus = strtolower((string) ($fee['status'] ?? 'active'));
+    if ($feeStatus !== 'active') {
+        continue;
+    }
+    $baseAmountPerStudent += (float) ($fee['amount'] ?? 0);
+}
+
 $students = StudentService::all();
 $houses = HouseService::all();
 $houseMap = [];
@@ -77,7 +93,7 @@ foreach ($months as $monthKey) {
             $studentIds[] = (string) ($student['id'] ?? $student['uid'] ?? '');
         }
 
-        $expected = count($studentIds) * 650.0;
+        $expected = count($studentIds) * $baseAmountPerStudent;
         $collected = 0.0;
         $paymentCount = 0;
 

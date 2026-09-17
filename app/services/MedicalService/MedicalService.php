@@ -13,11 +13,13 @@ class MedicalService
         $this->firebase = FirebaseService::getInstance();
     }
 
-    public function all(): array
+    public function all(int $limit = 150): array
     {
         try {
             $records = $this->firebase->getCollection(
-                $this->collection
+                $this->collection,
+                [],
+                $limit
             );
 
             usort($records, static fn(array $first, array $second): int => strcmp(
@@ -49,45 +51,45 @@ class MedicalService
 
     public function count(): int
     {
-        return count($this->all());
+        try {
+            return $this->firebase->count($this->collection);
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 
     public function todayCases(): int
     {
-        $records = $this->all();
-        $today = date('Y-m-d');
+        try {
+            $today = new \DateTimeImmutable('today');
+            $tomorrow = $today->modify('+1 day');
 
-        $count = 0;
-
-        foreach ($records as $record) {
-
-            $created = $record['createdAt'] ?? '';
-
-            if ($created && str_starts_with($created, $today)) {
-                $count++;
-            }
+            return $this->firebase->count(
+                $this->collection,
+                [
+                    ['createdAt', '>=', $today->format(DATE_ATOM)],
+                    ['createdAt', '<', $tomorrow->format(DATE_ATOM)],
+                ]
+            );
+        } catch (\Throwable $e) {
+            return 0;
         }
-
-        return $count;
     }
 
     public function emergencyCases(): int
     {
-        $records = $this->all();
-
         $count = 0;
 
-        foreach ($records as $record) {
-
-            $severity = strtolower(
-                $record['severity'] ?? ''
-            );
-
-            if (in_array($severity, ['severe', 'emergency', 'critical'], true)) {
-                $count++;
+        foreach (['severe', 'emergency', 'critical'] as $severity) {
+            try {
+                $count += $this->firebase->count(
+                    $this->collection,
+                    [['severity', '=', $severity]]
+                );
+            } catch (\Throwable $e) {
+                // Ignore and continue; caller can still use partial totals.
             }
         }
-
 
         return $count;
     }
@@ -152,24 +154,40 @@ class MedicalService
             if (!empty($houseId)) {
                 try {
                     $notificationService = new NotificationService();
-                    $users = (new UserService())->all();
-                    foreach ($users as $u) {
-                        $uRole = $u['role'] ?? '';
-                        $uHouse = $u['houseId'] ?? $u['house_id'] ?? null;
-                        if ((in_array($uRole, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true) && $uHouse === $houseId) || $uRole === ROLE_SENIOR_HOUSEPARENT) {
-                            $targetUid = $u['uid'] ?? $u['id'] ?? null;
-                            if ($targetUid) {
-                                $severityLabel = ucfirst($severity);
-                                $notificationService->create([
-                                    'userId' => $targetUid,
-                                    'title' => "Clinic Health Report: " . ($studentName ?: 'Student'),
-                                    'message' => "Health record logged for " . ($studentName ?: 'Student') . " [{$severityLabel}]. Diagnosis: {$diagnosis}.",
-                                    'type' => in_array($severity, ['severe', 'emergency', 'critical']) ? 'danger' : 'info',
-                                    'link' => 'views/house-master/health-reports/index.php',
-                                    'from' => $data['recordedBy'] ?? null,
-                                    'createdAt' => date('Y-m-d H:i:s'),
-                                ]);
-                            }
+                    $userService = new UserService();
+                    $houseUsers = $userService->byHouse((string) $houseId);
+                    $seniorHouseparents = $userService->byRole(ROLE_SENIOR_HOUSEPARENT);
+
+                    $targetUsers = [];
+                    foreach (array_merge($houseUsers, $seniorHouseparents) as $user) {
+                        $role = (string) ($user['role'] ?? '');
+                        $house = $user['houseId'] ?? $user['house_id'] ?? null;
+
+                        if (in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true) && $house === $houseId) {
+                            $targetUsers[] = $user;
+                            continue;
+                        }
+
+                        if ($role === ROLE_SENIOR_HOUSEPARENT) {
+                            $targetUsers[] = $user;
+                        }
+                    }
+
+                    $targetUsers = array_values(array_unique($targetUsers, SORT_REGULAR));
+
+                    foreach ($targetUsers as $user) {
+                        $targetUid = $user['uid'] ?? $user['id'] ?? null;
+                        if ($targetUid) {
+                            $severityLabel = ucfirst($severity);
+                            $notificationService->create([
+                                'userId' => $targetUid,
+                                'title' => "Clinic Health Report: " . ($studentName ?: 'Student'),
+                                'message' => "Health record logged for " . ($studentName ?: 'Student') . " [{$severityLabel}]. Diagnosis: {$diagnosis}.",
+                                'type' => in_array($severity, ['severe', 'emergency', 'critical']) ? 'danger' : 'info',
+                                'link' => 'views/house-master/health-reports/index.php',
+                                'from' => $data['recordedBy'] ?? null,
+                                'createdAt' => date('Y-m-d H:i:s'),
+                            ]);
                         }
                     }
                 } catch (\Throwable $e) {}
@@ -239,23 +257,47 @@ class MedicalService
 
     public function incidents(): array
     {
-        return array_values(
-            array_filter(
-                $this->all(),
-                function ($record) {
-                    $severity = strtolower((string) ($record['severity'] ?? ''));
-                    return !empty($record['incident']) || in_array($severity, ['severe', 'emergency', 'critical'], true);
+        try {
+            $records = [];
+            $seen = [];
+
+            foreach (
+                [
+                    ['severity', 'in', ['severe', 'emergency', 'critical']],
+                    ['incident', '!=', ''],
+                ]
+                as [$field, $op, $value]
+            ) {
+                $batch = $this->firebase->getCollection(
+                    $this->collection,
+                    [[$field, $op, $value]],
+                    150
+                );
+
+                foreach ($batch as $record) {
+                    $recordId = (string) ($record['id'] ?? '');
+                    if ($recordId !== '' && !isset($seen[$recordId])) {
+                        $seen[$recordId] = true;
+                        $records[] = $record;
+                    }
                 }
-            )
-        );
+            }
+
+            usort($records, static fn(array $first, array $second): int => strcmp(
+                (string) ($second['createdAt'] ?? ''),
+                (string) ($first['createdAt'] ?? '')
+            ));
+
+            return $records;
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     public function reports(): array
     {
-        $records = $this->all();
-
         $result = [
-            'total' => count($records),
+            'total' => $this->count(),
             'normal' => 0,
             'moderate' => 0,
             'severe' => 0,
@@ -263,14 +305,14 @@ class MedicalService
             'critical' => 0
         ];
 
-        foreach ($records as $record) {
-
-            $severity = strtolower(
-                $record['severity'] ?? 'normal'
-            );
-
-            if (isset($result[$severity])) {
-                $result[$severity]++;
+        foreach (['normal', 'moderate', 'severe', 'emergency', 'critical'] as $severity) {
+            try {
+                $result[$severity] = $this->firebase->count(
+                    $this->collection,
+                    [['severity', '=', $severity]]
+                );
+            } catch (\Throwable $e) {
+                $result[$severity] = 0;
             }
         }
 

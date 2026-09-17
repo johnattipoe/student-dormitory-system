@@ -29,27 +29,34 @@ $firebase = FirebaseService::getInstance();
 $user = current_user() ?? [];
 $adminName = trim(($user['name'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))) ?: 'Administrator';
 
-// Live counts
-$studentCount       = count($firebase->getCollection(COL_STUDENTS, [], 1000));
-$houseCount         = count($firebase->getCollection(COL_HOUSES, [], 100));
-$roomCount          = count($firebase->getCollection(COL_ROOMS, [], 500));
-$incidentCount      = count($firebase->getCollection(COL_INCIDENTS, [], 500));
-$attendanceCount    = count($firebase->getCollection(COL_ATTENDANCE, [], 500));
-$allocationCount    = count($firebase->getCollection(COL_ROOM_ALLOCATIONS, [], 500));
-$activityLogCount   = count($firebase->getCollection(COL_ACTIVITY_LOGS, [], 500));
-$allNotifications   = (new NotificationService())->all();
-$notificationCount  = count($allNotifications);
-$allIncidents       = $firebase->getCollection(COL_INCIDENTS, [], 500);
-$openIncidentCount  = count(array_filter($allIncidents, static fn($i) => ($i['status'] ?? 'open') === 'open'));
-$unreadNotificationCount = count(array_filter($allNotifications, static fn($n) => empty($n['read'])));
+// Use aggregate counts for dashboard totals; only feeds need document data.
+$safeCount = static function (string $collection, array $wheres = []) use ($firebase): int {
+    try {
+        return $firebase->count($collection, $wheres);
+    } catch (\Throwable $e) {
+        return 0;
+    }
+};
+
+$studentCount       = $safeCount(COL_STUDENTS);
+$houseCount         = $safeCount(COL_HOUSES);
+$roomCount          = $safeCount(COL_ROOMS);
+$incidentCount      = $safeCount(COL_INCIDENTS);
+$attendanceCount    = $safeCount(COL_ATTENDANCE);
+$allocationCount    = $safeCount(COL_ROOM_ALLOCATIONS);
+$activityLogCount   = $safeCount(COL_ACTIVITY_LOGS);
+$notificationService = new NotificationService();
+$notificationCount  = $notificationService->count();
+$openIncidentCount  = $safeCount(COL_INCIDENTS, [['status', '=', 'open']]);
+$unreadNotificationCount = $safeCount('notifications', [['read', '=', false]]);
 
 // Recent activity logs
-$recentLogs = $firebase->getCollection(COL_ACTIVITY_LOGS, [], 50);
+$recentLogs = $firebase->getCollection(COL_ACTIVITY_LOGS, [], 8);
 usort($recentLogs, static fn($a, $b) => strcmp((string)($b['createdAt'] ?? ''), (string)($a['createdAt'] ?? '')));
 $recentLogs = array_slice($recentLogs, 0, 8);
 
 // Recent incidents
-$recentIncidents = array_slice($allIncidents, 0, 6);
+$recentIncidents = $firebase->getCollection(COL_INCIDENTS, [], 6);
 usort($recentIncidents, static fn($a, $b) => strcmp((string)($b['reportedAt'] ?? $b['createdAt'] ?? ''), (string)($a['reportedAt'] ?? $a['createdAt'] ?? '')));
 $recentIncidents = array_slice($recentIncidents, 0, 5);
 

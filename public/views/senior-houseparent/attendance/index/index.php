@@ -241,7 +241,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td class="small"><?= e($markedByMap[(string) ($record['markedBy'] ?? '')] ?? ($record['markedBy'] ?? '—')) ?></td>
                                     <td>
                                         <?php if (!empty($record['id'])): ?>
-                                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/senior-houseparent/attendance/view/view.php?id=' . urlencode((string) $record['id'])) ?>"><i class="bi bi-eye me-1"></i>View</a>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#seniorAttendanceView-<?= e((string) $record['id']) ?>"><i class="bi bi-eye me-1"></i>View</button>
                                         <?php else: ?>
                                             <span class="text-muted">—</span>
                                         <?php endif; ?>
@@ -255,4 +255,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($attendance as $record): ?>
+    <?php $modalAttendanceId = (string) ($record['id'] ?? ''); $modalAttendanceStudent = $studentMap[(string) ($record['studentId'] ?? '')] ?? []; ?>
+    <div class="modal fade" id="seniorAttendanceView-<?= e($modalAttendanceId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Attendance Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e(trim(($modalAttendanceStudent['firstName'] ?? '') . ' ' . ($modalAttendanceStudent['lastName'] ?? '')) ?: ($record['studentId'] ?? '—')) ?></dd><dt class="col-sm-5">Date</dt><dd class="col-sm-7"><?= e($record['date'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst((string) ($record['status'] ?? 'present'))) ?></dd><dt class="col-sm-5">Marked By</dt><dd class="col-sm-7"><?= e($markedByMap[(string) ($record['markedBy'] ?? '')] ?? ($record['markedBy'] ?? '—')) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

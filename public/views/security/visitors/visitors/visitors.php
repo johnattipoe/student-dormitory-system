@@ -33,10 +33,16 @@ foreach (StudentService::all() as $student) {
 
 $search = strtolower(sanitize($_GET['search'] ?? ''));
 $statusFilter = sanitize($_GET['status'] ?? '');
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 $visitors = array_values(array_filter($allVisitors, function ($visitor) use ($search, $statusFilter) {
     return ($search === '' || str_contains(strtolower((string) ($visitor['visitorName'] ?? '')), $search) || str_contains(strtolower((string) ($visitor['studentId'] ?? '')), $search))
         && ($statusFilter === '' || ($visitor['status'] ?? '') === $statusFilter);
 }));
+$totalVisitorsFiltered = count($visitors);
+$totalPages = max(1, (int) ceil($totalVisitorsFiltered / $limit));
+$page = min($page, $totalPages);
+$visitors = array_slice($visitors, ($page - 1) * $limit, $limit);
 
 $pageTitle = 'Security Visitors';
 $navItems = [
@@ -146,7 +152,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-shield-check me-2 text-dark"></i>Gate Access Records</h6>
-                <small class="text-muted">Showing <?= count($visitors) ?> records</small>
+                <small class="text-muted">Showing <?= e((string) $totalVisitorsFiltered) ?> records</small>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -183,9 +189,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <td><small class="text-muted"><?= e($visitor['purpose'] ?? '—') ?></small></td>
                                         <td><span class="badge <?= $vBadge ?>"><?= ucfirst(str_replace('_', ' ', e($vStatus))) ?></span></td>
                                         <td class="text-end text-nowrap">
-                                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/security/visitors/view/view.php?id=' . urlencode($vId)) ?>" title="View"><i class="bi bi-eye"></i></a> 
-                                            <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/security/visitors/edit/edit.php?id=' . urlencode($vId)) ?>" title="Edit"><i class="bi bi-pencil"></i></a> 
-                                            <a class="btn btn-sm btn-outline-danger" href="<?= url('views/security/visitors/delete/delete.php?id=' . urlencode($vId)) ?>" title="Delete"><i class="bi bi-trash"></i></a>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#securityVisitorView-<?= e($vId) ?>" title="View"><i class="bi bi-eye"></i></button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#securityVisitorEdit-<?= e($vId) ?>" title="Edit"><i class="bi bi-pencil"></i></button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#securityVisitorDelete-<?= e($vId) ?>" title="Delete"><i class="bi bi-trash"></i></button>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -197,9 +203,16 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </tbody>
                     </table>
                 </div>
+                <?php $paginationQuery = []; if ($search !== '') { $paginationQuery[] = 'search=' . urlencode($search); } if ($statusFilter !== '') { $paginationQuery[] = 'status=' . urlencode($statusFilter); } $paginationBaseUrl = url('views/security/visitors/visitors/visitors.php' . (!empty($paginationQuery) ? '?' . implode('&', $paginationQuery) : '')); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
             </div>
         </div>
 
     </div>
 </div>
+<?php foreach ($visitors as $visitor): ?>
+    <?php $modalVisitorId = (string) ($visitor['id'] ?? ''); $modalVisitorStatus = (string) ($visitor['status'] ?? 'registered'); ?>
+    <div class="modal fade" id="securityVisitorView-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Visitor Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Name</dt><dd class="col-sm-7"><?= e($visitor['visitorName'] ?? 'Visitor') ?></dd><dt class="col-sm-5">Phone</dt><dd class="col-sm-7"><?= e($visitor['phone'] ?? '—') ?></dd><dt class="col-sm-5">Purpose</dt><dd class="col-sm-7"><?= e($visitor['purpose'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucwords(str_replace('_', ' ', $modalVisitorStatus))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+    <div class="modal fade" id="securityVisitorEdit-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="<?= url('views/security/visitors/edit/edit.php?id=' . urlencode($modalVisitorId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalVisitorId) ?>"><label class="form-label">Visitor Name</label><input name="visitorName" class="form-control mb-3" value="<?= e($visitor['visitorName'] ?? '') ?>" required><label class="form-label">Phone</label><input name="phone" class="form-control mb-3" value="<?= e($visitor['phone'] ?? '') ?>"><label class="form-label">Purpose</label><textarea name="purpose" class="form-control" rows="3"><?= e($visitor['purpose'] ?? '') ?></textarea></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
+    <div class="modal fade" id="securityVisitorDelete-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">Delete visitor <strong><?= e($visitor['visitorName'] ?? 'this visitor') ?></strong>?</div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/security/visitors/delete/delete.php?id=' . urlencode($modalVisitorId)) ?>"><input type="hidden" name="id" value="<?= e($modalVisitorId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

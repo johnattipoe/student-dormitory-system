@@ -73,6 +73,12 @@ $getReporterName = function (array $incident) use (&$reporterMap, $studentMap): 
 };
 
 $incidents = (new IncidentService())->byHouse($houseId);
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$totalIncidents = count($incidents);
+$totalPages = max(1, (int) ceil($totalIncidents / $limit));
+$page = min($page, $totalPages);
+$incidents = array_slice($incidents, ($page - 1) * $limit, $limit);
 $externalIncidents = [];
 $externalDir = APP_ROOT . '/public/uploads/external-incidents';
 if (is_dir($externalDir)) {
@@ -198,7 +204,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td class="text-nowrap">
                                         <?php if ($fileName !== ''): ?>
                                             <div class="d-flex gap-2">
-                                                <a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/incidents/external-view/external-view.php?file=' . urlencode($fileName)) ?>"><i class="bi bi-eye me-1"></i>View</a>
+                                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#seniorExternalIncidentView-<?= e(md5($fileName)) ?>"><i class="bi bi-eye me-1"></i>View</button>
                                                 <a class="btn btn-sm btn-outline-success" href="<?= url('uploads/external-incidents/' . rawurlencode($fileName)) ?>" target="_blank" rel="noopener"><i class="bi bi-download me-1"></i>Open</a>
                                             </div>
                                         <?php else: ?>
@@ -216,6 +222,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </table>
             </div>
         </div>
+
+        <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
 
         <!-- Incidents Table -->
         <div class="card stat-card shadow-sm border-0">
@@ -261,7 +269,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td class="small"><?= e($reporterName) ?></td>
                                     <td><span class="small text-muted"><?= e(substr((string) ($incident['createdAt'] ?? $incident['reportedAt'] ?? ''), 0, 10)) ?></span></td>
                                     <td class="text-nowrap">
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/senior-houseparent/incidents/view/view.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>" title="View report"><i class="bi bi-eye"></i></a>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#seniorIncidentView-<?= e((string) ($incident['id'] ?? '')) ?>" title="View report"><i class="bi bi-eye"></i></button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -276,4 +284,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($incidents as $incident): ?>
+    <?php $modalIncidentId = (string) ($incident['id'] ?? ''); $modalIncidentStudent = $studentMap[(string) ($incident['studentId'] ?? '')] ?? []; ?>
+    <div class="modal fade" id="seniorIncidentView-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Incident Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-4">Title</dt><dd class="col-sm-8"><?= e($incident['title'] ?? $incident['type'] ?? 'Incident') ?></dd><dt class="col-sm-4">Student</dt><dd class="col-sm-8"><?= e(trim(($modalIncidentStudent['firstName'] ?? '') . ' ' . ($modalIncidentStudent['lastName'] ?? '')) ?: ($incident['studentId'] ?? '—')) ?></dd><dt class="col-sm-4">Priority</dt><dd class="col-sm-8"><?= e(ucfirst((string) ($incident['priority'] ?? $incident['severity'] ?? 'medium'))) ?></dd><dt class="col-sm-4">Status</dt><dd class="col-sm-8"><?= e(ucwords(str_replace('_', ' ', (string) ($incident['status'] ?? 'open')))) ?></dd><dt class="col-sm-4">Details</dt><dd class="col-sm-8"><?= e($incident['description'] ?? $incident['notes'] ?? '—') ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+<?php endforeach; ?>
+<?php foreach ($externalIncidents as $external): ?>
+    <?php $modalExternalFile = (string) ($external['fileName'] ?? ''); if ($modalExternalFile === '') continue; ?>
+    <div class="modal fade" id="seniorExternalIncidentView-<?= e(md5($modalExternalFile)) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">External Incident Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e($external['studentName'] ?? 'Unknown Student') ?></dd><dt class="col-sm-5">Type</dt><dd class="col-sm-7"><?= e($external['incidentType'] ?? 'External Incident') ?></dd><dt class="col-sm-5">Date</dt><dd class="col-sm-7"><?= e($external['incidentDate'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e($external['status'] ?? 'submitted') ?></dd></dl></div><div class="modal-footer"><a class="btn btn-outline-success" href="<?= url('uploads/external-incidents/' . rawurlencode($modalExternalFile)) ?>" target="_blank" rel="noopener">Open file</a><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

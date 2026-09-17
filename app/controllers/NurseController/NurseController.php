@@ -34,7 +34,8 @@ class NurseController
     {
         require_role(ROLE_NURSE);
 
-        $students = $this->studentService->all();
+        $limit = max(1, min(150, (int) ($_GET['limit'] ?? 150)));
+        $students = $this->studentService->all(null, $limit);
 
         include __DIR__ . '/../../../public/views/nurse/students/students.php';
     }
@@ -43,7 +44,8 @@ class NurseController
     {
         require_role(ROLE_NURSE);
 
-        $records = $this->medicalService->all();
+        $limit = max(1, min(150, (int) ($_GET['limit'] ?? 150)));
+        $records = $this->medicalService->all($limit);
 
         include __DIR__ . '/../../../public/views/nurse/medical-records/medical-records.php';
     }

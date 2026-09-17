@@ -13,10 +13,10 @@ class EmergencyReferralService
         $this->firebase = FirebaseService::getInstance();
     }
 
-    public function all(): array
+    public function all(int $limit = 150): array
     {
         try {
-            $referrals = $this->firebase->getCollection($this->collection, [], 500);
+            $referrals = $this->firebase->getCollection($this->collection, [], $limit);
             usort($referrals, static fn(array $first, array $second): int => strcmp(
                 (string) ($second['createdAt'] ?? ''),
                 (string) ($first['createdAt'] ?? '')

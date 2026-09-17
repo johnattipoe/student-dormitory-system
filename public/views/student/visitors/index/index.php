@@ -47,10 +47,17 @@ if (!empty($status)) {
     $visitors = array_values(array_filter($visitors, fn($v) => ($v['status'] ?? '') === $status));
 }
 
-$approved = count(array_filter($visitors, fn($v) => ($v['status'] ?? '') === 'approved'));
-$pending = count(array_filter($visitors, fn($v) => ($v['status'] ?? '') === 'pending'));
-$rejected = count(array_filter($visitors, fn($v) => ($v['status'] ?? '') === 'rejected'));
-$total = count($visitors);
+$filteredVisitors = $visitors;
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$totalVisitors = count($filteredVisitors);
+$totalPages = max(1, (int) ceil($totalVisitors / $limit));
+$visitors = array_slice($filteredVisitors, ($page - 1) * $limit, $limit);
+
+$approved = count(array_filter($filteredVisitors, fn($v) => ($v['status'] ?? '') === 'approved'));
+$pending = count(array_filter($filteredVisitors, fn($v) => ($v['status'] ?? '') === 'pending'));
+$rejected = count(array_filter($filteredVisitors, fn($v) => ($v['status'] ?? '') === 'rejected'));
+$total = count($filteredVisitors);
 
 $pageTitle = 'Student Visitors';
 $navItems = [
@@ -179,13 +186,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-person-lines-fill me-2"></i>Visitor Records</h6>
                 <small class="text-muted">
-                    Showing <strong><?= count($visitors) ?></strong> record(s)
+                    Showing <strong><?= $totalVisitors ?></strong> record(s)
                     <?php if (!empty($search) || !empty($dateFrom) || !empty($dateTo) || !empty($status)): ?>
                         (filtered)
                     <?php endif; ?>
                 </small>
             </div>
             <div class="card-body p-0">
+                <?php $paginationBaseUrl = url('views/student/visitors/index/index.php'); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
                 <table class="table table-hover align-middle mb-0 data-table w-100">
                     <thead class="table-light">
                         <tr>
@@ -216,13 +224,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         </span>
                                     </td>
                                     <td class="text-nowrap">
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/student/visitors/view/view.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>"><i class="bi bi-eye me-1"></i>View</a>
-                                        <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/student/visitors/edit/edit.php?id=' . urlencode((string) ($visitor['id'] ?? ''))) ?>"><i class="bi bi-pencil me-1"></i>Edit</a>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#studentVisitorView-<?= e((string) ($visitor['id'] ?? '')) ?>"><i class="bi bi-eye me-1"></i>View</button>
                                         <?php if (($visitor['status'] ?? 'pending') === 'pending'): ?>
-                                            <form method="POST" action="<?= url('views/student/visitors/delete/delete.php') ?>" class="d-inline">
-                                                <input type="hidden" name="id" value="<?= e((string) ($visitor['id'] ?? '')) ?>">
-                                                <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Delete this pending visitor request?')"><i class="bi bi-trash me-1"></i>Delete</button>
-                                            </form>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#studentVisitorEdit-<?= e((string) ($visitor['id'] ?? '')) ?>"><i class="bi bi-pencil me-1"></i>Edit</button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#studentVisitorDelete-<?= e((string) ($visitor['id'] ?? '')) ?>"><i class="bi bi-trash me-1"></i>Delete</button>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -238,4 +243,75 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($visitors as $visitor): ?>
+    <?php
+    $modalVisitorId = (string) ($visitor['id'] ?? '');
+    if ($modalVisitorId === '') continue;
+    ?>
+    <div class="modal fade" id="studentVisitorView-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Visitor Request Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Visitor</dt>
+                        <dd class="col-sm-8"><?= e($visitor['visitorName'] ?? 'Visitor') ?></dd>
+                        <dt class="col-sm-4">Relationship</dt>
+                        <dd class="col-sm-8"><?= e($visitor['relationship'] ?? '—') ?></dd>
+                        <dt class="col-sm-4">Visit Date</dt>
+                        <dd class="col-sm-8"><?= e($visitor['visitDate'] ?? '—') ?></dd>
+                        <dt class="col-sm-4">Purpose</dt>
+                        <dd class="col-sm-8"><?= e($visitor['purpose'] ?? '—') ?></dd>
+                        <dt class="col-sm-4">Status</dt>
+                        <dd class="col-sm-8"><span class="badge bg-<?= (($visitor['status'] ?? '') === 'approved' ? 'success' : (($visitor['status'] ?? '') === 'rejected' ? 'danger' : 'warning')) ?>"><?= e(ucfirst($visitor['status'] ?? 'pending')) ?></span></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="studentVisitorEdit-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Visitor Request</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">Open the full edit form to modify this visitor request.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="studentVisitorDelete-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Delete Visitor Request</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="<?= url('views/student/visitors/delete/delete.php') ?>">
+                    <div class="modal-body">
+                        <input type="hidden" name="id" value="<?= e($modalVisitorId) ?>">
+                        <p class="mb-0">Delete the pending visitor request for <strong><?= e($visitor['visitorName'] ?? 'this visitor') ?></strong>?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">Delete Request</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

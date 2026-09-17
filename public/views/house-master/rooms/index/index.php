@@ -19,16 +19,23 @@ use App\Services\RoomService;
 use App\Services\StudentService;
 
 $houseId = current_user()['houseId'] ?? null;
-$rooms = RoomService::all($houseId);
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$allRooms = RoomService::all($houseId);
 $students = StudentService::all($houseId);
 $roomSearch = strtolower(sanitize($_GET['search'] ?? ''));
 $roomStatus = sanitize($_GET['status'] ?? '');
+$filteredRooms = $allRooms;
 if ($roomSearch !== '' || $roomStatus !== '') {
-    $rooms = array_values(array_filter($rooms, function ($room) use ($roomSearch, $roomStatus) {
+    $filteredRooms = array_values(array_filter($filteredRooms, function ($room) use ($roomSearch, $roomStatus) {
         return ($roomSearch === '' || str_contains(strtolower((string) ($room['roomNumber'] ?? '')), $roomSearch))
             && ($roomStatus === '' || ($room['status'] ?? '') === $roomStatus);
     }));
 }
+$totalRooms = count($filteredRooms);
+$totalPages = max(1, (int) ceil($totalRooms / $limit));
+$page = min($page, $totalPages);
+$rooms = array_slice($filteredRooms, ($page - 1) * $limit, $limit);
 $roomStats = RoomService::occupancyStats($houseId);
 
 $pageTitle = 'House Rooms';
@@ -153,7 +160,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-door-closed me-2 text-info"></i>House Room Registry</h6>
-                <small class="text-muted">Showing <?= count($rooms) ?> rooms</small>
+                <small class="text-muted">Showing <?= count($rooms) ?> of <?= e((string) $totalRooms) ?> rooms</small>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -199,9 +206,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                             </span>
                                         </td>
                                         <td class="text-end text-nowrap">
-                                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/rooms/view/view.php?id=' . urlencode($rId)) ?>" title="View"><i class="bi bi-eye"></i></a>
-                                            <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/house-master/rooms/edit/edit.php?id=' . urlencode($rId)) ?>" title="Edit"><i class="bi bi-pencil"></i></a>
-                                            <a class="btn btn-sm btn-outline-danger" href="<?= url('views/house-master/rooms/delete/delete.php?id=' . urlencode($rId)) ?>" title="Delete"><i class="bi bi-trash"></i></a>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#houseRoomViewModal-<?= e($rId) ?>" title="View"><i class="bi bi-eye"></i></button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#houseRoomEditModal-<?= e($rId) ?>" title="Edit"><i class="bi bi-pencil"></i></button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#houseRoomDeleteModal-<?= e($rId) ?>" title="Delete"><i class="bi bi-trash"></i></button>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -212,6 +219,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
+        <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
+
     </div>
 </div>
+<?php foreach ($rooms as $room): ?>
+    <?php $modalRoomId = (string) ($room['id'] ?? ''); $modalRoomStatus = (string) ($room['status'] ?? 'available'); ?>
+    <div class="modal fade" id="houseRoomViewModal-<?= e($modalRoomId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Room Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Room</dt><dd class="col-sm-7"><?= e($room['roomNumber'] ?? '—') ?></dd><dt class="col-sm-5">Capacity</dt><dd class="col-sm-7"><?= e((string) ($room['capacity'] ?? 0)) ?> beds</dd><dt class="col-sm-5">Occupied</dt><dd class="col-sm-7"><?= e((string) ($room['occupied'] ?? 0)) ?> residents</dd><dt class="col-sm-5">Type</dt><dd class="col-sm-7"><?= e($room['type'] ?? 'standard') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst($modalRoomStatus)) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+    <div class="modal fade" id="houseRoomEditModal-<?= e($modalRoomId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="<?= url('views/house-master/rooms/edit/edit.php?id=' . urlencode($modalRoomId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Room</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalRoomId) ?>"><label class="form-label">Room Number</label><input name="roomNumber" class="form-control mb-3" value="<?= e($room['roomNumber'] ?? '') ?>" required><label class="form-label">Capacity</label><input type="number" min="1" name="capacity" class="form-control mb-3" value="<?= e((string) ($room['capacity'] ?? 1)) ?>" required><label class="form-label">Type</label><input name="type" class="form-control mb-3" value="<?= e($room['type'] ?? 'standard') ?>"><label class="form-label">Status</label><select name="status" class="form-select"><option value="available" <?= $modalRoomStatus === 'available' ? 'selected' : '' ?>>Available</option><option value="occupied" <?= $modalRoomStatus === 'occupied' ? 'selected' : '' ?>>Occupied</option><option value="maintenance" <?= $modalRoomStatus === 'maintenance' ? 'selected' : '' ?>>Maintenance</option></select></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
+    <div class="modal fade" id="houseRoomDeleteModal-<?= e($modalRoomId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Room</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete room <strong><?= e($room['roomNumber'] ?? 'this room') ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/rooms/delete/delete.php?id=' . urlencode($modalRoomId)) ?>"><input type="hidden" name="id" value="<?= e($modalRoomId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -117,6 +117,8 @@ $search = strtolower(sanitize($_GET['search'] ?? ''));
 $categoryFilter = sanitize($_GET['category'] ?? '');
 $fromDate = sanitize($_GET['from_date'] ?? '');
 $toDate = sanitize($_GET['to_date'] ?? '');
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 
 $logs = array_values(array_filter($allLogs, function ($log) use ($search, $categoryFilter, $fromDate, $toDate, $resolveLogUser) {
     $event = strtolower((string) ($log['event'] ?? $log['action'] ?? $log['type'] ?? ''));
@@ -140,6 +142,10 @@ $logs = array_values(array_filter($allLogs, function ($log) use ($search, $categ
     }
     return true;
 }));
+$totalLogs = count($logs);
+$totalPages = max(1, (int) ceil($totalLogs / $limit));
+$page = min($page, $totalPages);
+$logs = array_slice($logs, ($page - 1) * $limit, $limit);
 
 // Statistics
 $totalCount = count($allLogs);
@@ -280,9 +286,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td class="small text-muted font-monospace"><?= e($ip) ?></td>
                                     <td class="text-end">
                                         <?php if ($logId !== ''): ?>
-                                            <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/activity-logs/view/view.php?id=' . urlencode($logId)) ?>">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#logViewModal-<?= e($logId) ?>">
                                                 <i class="bi bi-eye"></i> View
-                                            </a>
+                                            </button>
                                         <?php else: ?>
                                             <span class="text-muted small">—</span>
                                         <?php endif; ?>
@@ -297,7 +303,48 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </tbody>
                 </table>
             </div>
+            <?php
+            $paginationQuery = [];
+            foreach (['search' => $search, 'category' => $categoryFilter, 'from_date' => $fromDate, 'to_date' => $toDate] as $key => $value) {
+                if ($value !== '') $paginationQuery[] = $key . '=' . urlencode($value);
+            }
+            $paginationBaseUrl = url('views/admin/activity-logs/index.php' . (!empty($paginationQuery) ? '?' . implode('&', $paginationQuery) : ''));
+            require APP_ROOT . '/app/views/components/pagination/pagination.php';
+            ?>
         </div>
     </div>
 </div>
+
+<?php foreach ($logs as $log): ?>
+    <?php
+    $logId = (string) ($log['id'] ?? '');
+    $logEvent = (string) ($log['event'] ?? $log['action'] ?? $log['type'] ?? 'system_activity');
+    $logDetails = (string) ($log['details'] ?? $log['description'] ?? $log['message'] ?? '—');
+    $logUser = $resolveLogUser($log);
+    $logIP = (string) ($log['ip'] ?? $log['ipAddress'] ?? '—');
+    $logTimestamp = (string) ($log['timestamp'] ?? $log['createdAt'] ?? $log['time'] ?? '');
+    ?>
+    <div class="modal fade" id="logViewModal-<?= e($logId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Activity Log Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Timestamp</dt><dd class="col-sm-8"><?= e($logTimestamp !== '' ? date('M d, Y H:i:s', strtotime($logTimestamp)) : '—') ?></dd>
+                        <dt class="col-sm-4">Actor</dt><dd class="col-sm-8"><?= e($logUser) ?></dd>
+                        <dt class="col-sm-4">Event</dt><dd class="col-sm-8"><?= e(ucwords(str_replace(['_', '-'], ' ', $logEvent))) ?></dd>
+                        <dt class="col-sm-4">IP Address</dt><dd class="col-sm-8"><?= e($logIP) ?></dd>
+                        <dt class="col-sm-4">Description</dt><dd class="col-sm-8"><?= e($logDetails) ?></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -138,6 +138,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <span class="badge bg-success me-1"><i class="bi bi-building me-1"></i><?= e($houseName) ?></span>
                         <span class="badge bg-info me-1">Room <?= e($roomNumber) ?></span>
                         <span class="badge bg-secondary">Bed <?= e($bedNumber) ?></span>
+                        <span class="badge bg-warning text-dark"><?= e(strtolower((string) ($student['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></span>
                     </p>
                 </div>
             </div>
@@ -261,7 +262,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                                 <td><span class="badge <?= $bc ?>"><?= ucfirst(e($st)) ?></span></td>
                                                 <td><small class="text-muted"><?= e(mb_strimwidth((string)($rec['reason'] ?? $rec['notes'] ?? ''), 0, 40, '…')) ?: '—' ?></small></td>
                                                 <td class="text-end">
-                                                    <a class="btn btn-sm btn-outline-primary" href="<?= url('views/student/attendance/view/view.php?id=' . urlencode((string)($rec['id'] ?? ''))) ?>">View</a>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#studentDashboardAttendanceView-<?= e((string)($rec['id'] ?? '')) ?>">View</button>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -422,4 +423,35 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
     </div>
 </div>
+<?php foreach (array_slice($attendance, 0, 6) as $rec): ?>
+    <?php
+    $modalRecId = (string) ($rec['id'] ?? '');
+    if ($modalRecId === '') continue;
+    $modalSt = strtolower((string)($rec['status'] ?? 'present'));
+    $modalBc = match($modalSt) { 'present' => 'bg-success', 'absent' => 'bg-danger', 'late' => 'bg-warning text-dark', 'excused' => 'bg-info', default => 'bg-secondary' };
+    ?>
+    <div class="modal fade" id="studentDashboardAttendanceView-<?= e($modalRecId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Attendance Detail</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Date</dt>
+                        <dd class="col-sm-8"><?= e($rec['date'] ?? '—') ?></dd>
+                        <dt class="col-sm-4">Status</dt>
+                        <dd class="col-sm-8"><span class="badge <?= $modalBc ?>"><?= ucfirst(e($modalSt)) ?></span></dd>
+                        <dt class="col-sm-4">Notes</dt>
+                        <dd class="col-sm-8"><?= e($rec['reason'] ?? $rec['notes'] ?? '—') ?></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

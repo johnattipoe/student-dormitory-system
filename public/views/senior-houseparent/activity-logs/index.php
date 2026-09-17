@@ -341,9 +341,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td class="small text-muted font-monospace"><?= e($ip) ?></td>
                                     <td class="text-end">
                                         <?php if ($logId !== ''): ?>
-                                            <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/senior-houseparent/activity-logs/view/view.php?id=' . urlencode($logId)) ?>" title="View Complete Log">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#seniorActivityLogView-<?= e($logId) ?>" title="View Complete Log">
                                                 <i class="bi bi-eye"></i> View
-                                            </a>
+                                            </button>
                                         <?php else: ?>
                                             <span class="text-muted small">—</span>
                                         <?php endif; ?>
@@ -361,4 +361,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($logs as $log): ?>
+    <?php $modalLogId = (string) ($log['id'] ?? ''); ?>
+    <div class="modal fade" id="seniorActivityLogView-<?= e($modalLogId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Activity Log Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-4">Time</dt><dd class="col-sm-8"><?= e($log['timestamp'] ?? $log['createdAt'] ?? $log['time'] ?? '—') ?></dd><dt class="col-sm-4">Actor</dt><dd class="col-sm-8"><?= e($getUserDisplayName($log)) ?></dd><dt class="col-sm-4">Action</dt><dd class="col-sm-8"><?= e($log['event'] ?? $log['action'] ?? $log['type'] ?? 'Activity') ?></dd><dt class="col-sm-4">IP Address</dt><dd class="col-sm-8"><?= e($log['ip'] ?? $log['ipAddress'] ?? '—') ?></dd><dt class="col-sm-4">Details</dt><dd class="col-sm-8"><?= e($log['details'] ?? $log['description'] ?? $log['message'] ?? '—') ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

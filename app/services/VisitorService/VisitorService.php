@@ -13,11 +13,13 @@ class VisitorService
         $this->firebase = FirebaseService::getInstance();
     }
 
-    public function all(): array
+    public function all(int $limit = 150): array
     {
         try {
             return $this->firebase->getCollection(
-                $this->collection
+                $this->collection,
+                [],
+                $limit
             );
         } catch (\Throwable $e) {
             return [];
@@ -219,7 +221,6 @@ class VisitorService
         }
 
         try {
-
             $students = $this->firebase->getCollection(
                 'students',
                 [
@@ -227,10 +228,10 @@ class VisitorService
                 ]
             );
 
-            $result = [];
+            $studentIds = [];
+            $studentNames = [];
 
             foreach ($students as $student) {
-
                 $studentId = $student['studentId']
                     ?? $student['id']
                     ?? null;
@@ -239,13 +240,28 @@ class VisitorService
                     continue;
                 }
 
-                $visitors = $this->studentVisitors($studentId);
+                $studentIds[] = (string) $studentId;
+                $studentNames[(string) $studentId] = trim(
+                    ($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')
+                );
+            }
+
+            $studentIds = array_values(array_unique($studentIds));
+            if ($studentIds === []) {
+                return [];
+            }
+
+            $result = [];
+            foreach (array_chunk($studentIds, 10) as $studentIdBatch) {
+                $visitors = $this->firebase->getCollection(
+                    $this->collection,
+                    [['studentId', 'in', $studentIdBatch]],
+                    150
+                );
 
                 foreach ($visitors as $visitor) {
-                    $visitor['studentName'] =
-                        ($student['firstName'] ?? '') . ' ' .
-                        ($student['lastName'] ?? '');
-
+                    $studentId = (string) ($visitor['studentId'] ?? '');
+                    $visitor['studentName'] = $studentNames[$studentId] ?? '';
                     $result[] = $visitor;
                 }
             }
@@ -262,52 +278,55 @@ class VisitorService
         return $this->all();
     }
 
+    public function count(): int
+    {
+        try {
+            return $this->firebase->count($this->collection);
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
     public function todayCount(): int
     {
-        $visitors = $this->all();
+        try {
+            $today = new \DateTimeImmutable('today');
+            $tomorrow = $today->modify('+1 day');
 
-        $count = 0;
-        $today = date('Y-m-d');
-
-        foreach ($visitors as $visitor) {
-            $time = $visitor['checkInTime'] ?? '';
-
-            if ($time && str_starts_with($time, $today)) {
-                $count++;
-            }
+            return $this->firebase->count(
+                $this->collection,
+                [
+                    ['checkInTime', '>=', $today->format(DATE_ATOM)],
+                    ['checkInTime', '<', $tomorrow->format(DATE_ATOM)],
+                ]
+            );
+        } catch (\Throwable $e) {
+            return 0;
         }
-
-        return $count;
     }
 
     public function currentlyInside(): int
     {
-        $visitors = $this->all();
-
-        $count = 0;
-
-        foreach ($visitors as $visitor) {
-            if (($visitor['status'] ?? '') === 'inside') {
-                $count++;
-            }
+        try {
+            return $this->firebase->count(
+                $this->collection,
+                [['status', '=', 'inside']]
+            );
+        } catch (\Throwable $e) {
+            return 0;
         }
-
-        return $count;
     }
 
     public function pendingCount(): int
     {
-        $visitors = $this->all();
-
-        $count = 0;
-
-        foreach ($visitors as $visitor) {
-            if (($visitor['status'] ?? '') === 'pending') {
-                $count++;
-            }
+        try {
+            return $this->firebase->count(
+                $this->collection,
+                [['status', '=', 'pending']]
+            );
+        } catch (\Throwable $e) {
+            return 0;
         }
-
-        return $count;
     }
 
     public function todayByHouse(?string $houseId): array

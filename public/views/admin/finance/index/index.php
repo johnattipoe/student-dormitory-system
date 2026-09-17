@@ -19,19 +19,11 @@ use App\Services\StudentService;
 
 $pageTitle = 'Finance Dashboard';
 
-$defaultFeeCategories = [
-    ['id' => 'boarding-fee', 'name' => 'Boarding Fee', 'amount' => 650.00, 'period' => 'Monthly', 'status' => 'active'],
-    ['id' => 'utility-fee', 'name' => 'Utility Fee', 'amount' => 120.00, 'period' => 'Monthly', 'status' => 'active'],
-];
-
-$feeCategories = $defaultFeeCategories;
+$feeCategories = [];
 try {
     $feeCategories = FirebaseService::getInstance()->getCollection(COL_FINANCE_FEES, [], 200);
-    if (empty($feeCategories)) {
-        $feeCategories = $defaultFeeCategories;
-    }
 } catch (Throwable $e) {
-    $feeCategories = $defaultFeeCategories;
+    $feeCategories = [];
 }
 
 $students = StudentService::all();
@@ -51,10 +43,11 @@ $currentMonthPayments = 0;
 
 $baseAmount = 0.0;
 foreach ($feeCategories as $fee) {
+    $feeStatus = strtolower((string) ($fee['status'] ?? 'active'));
+    if ($feeStatus !== 'active') {
+        continue;
+    }
     $baseAmount += (float) ($fee['amount'] ?? 0);
-}
-if ($baseAmount <= 0) {
-    $baseAmount = 650.0;
 }
 
 $currentMonth = date('Y-m');

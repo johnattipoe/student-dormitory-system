@@ -274,7 +274,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                                 </td>
                                                 <td class="text-end">
                                                     <?php if ($attId !== ''): ?>
-                                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/attendance/view/view.php?id=' . urlencode($attId)) ?>">View</a>
+                                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#houseDashboardAttendanceModal-<?= e($attId) ?>">View</button>
                                                     <?php endif; ?>
                                                 </td>
                                             </tr>
@@ -440,4 +440,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
     </div>
 </div>
+<?php foreach (array_slice($todayAttendance, 0, 6) as $attendance): ?>
+    <?php $modalDashboardAttendanceId = (string) ($attendance['id'] ?? ''); $modalDashboardStudent = $studentMap[(string) ($attendance['studentId'] ?? '')] ?? []; ?>
+    <?php if ($modalDashboardAttendanceId !== ''): ?><div class="modal fade" id="houseDashboardAttendanceModal-<?= e($modalDashboardAttendanceId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Attendance Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e(trim(($modalDashboardStudent['firstName'] ?? '') . ' ' . ($modalDashboardStudent['lastName'] ?? '')) ?: ($attendance['studentId'] ?? '—')) ?></dd><dt class="col-sm-5">Room</dt><dd class="col-sm-7"><?= e($attendance['roomNumber'] ?? $attendance['roomId'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst((string) ($attendance['status'] ?? 'present'))) ?></dd><dt class="col-sm-5">Date</dt><dd class="col-sm-7"><?= e($attendance['date'] ?? date('Y-m-d')) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div><?php endif; ?>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

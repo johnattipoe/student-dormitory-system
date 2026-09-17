@@ -24,7 +24,8 @@ class IncidentController
             ROLE_NURSE
         );
 
-        $incidents = $this->incidentService->all();
+        $limit = max(1, min(150, (int) ($_GET['limit'] ?? 150)));
+        $incidents = $this->incidentService->all($limit);
 
         include __DIR__ . '/../../../public/views/incidents/index/index.php';
     }

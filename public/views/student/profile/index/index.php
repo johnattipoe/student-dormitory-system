@@ -59,6 +59,8 @@ $initials = strtoupper(substr((string) ($student['firstName'] ?? 'S'), 0, 1) . s
 $formLevel = $student['form'] ?? $student['level'] ?? null;
 $status = strtolower((string) ($student['status'] ?? 'active'));
 $statusClass = $status === 'active' ? 'success' : ($status === 'suspended' ? 'danger' : 'secondary');
+$residenceType = strtolower((string) ($student['residenceType'] ?? 'boarding'));
+$residenceLabel = $residenceType === 'day' ? 'Day' : 'Boarding';
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/student/dashboard/index.php')],
@@ -182,6 +184,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <div class="col-sm-6">
                                 <span class="text-muted small d-block">House Assignment</span>
                                 <strong><?= e($houseLabel) ?></strong>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="text-muted small d-block">Residence Type</span>
+                                <strong><?= e($residenceLabel) ?></strong>
                             </div>
                             <div class="col-sm-6">
                                 <span class="text-muted small d-block">Room & Bed</span>

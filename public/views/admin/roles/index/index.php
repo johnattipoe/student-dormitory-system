@@ -172,8 +172,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <strong><?= e($role['name']) ?> overview</strong>
                                     <?php if (!in_array($role['key'], ALL_ROLES, true)): ?>
                                         <div class="d-flex gap-2">
-                                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/roles/edit/edit.php?id=' . urlencode($role['key'])) ?>">Edit</a>
-                                            <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/roles/delete/delete.php?id=' . urlencode($role['key'])) ?>">Delete</a>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#roleEditModal-<?= e($role['key']) ?>">Edit</button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#roleDeleteModal-<?= e($role['key']) ?>">Delete</button>
                                         </div>
                                     <?php else: ?>
                                         <span class="text-muted small">Built-in role</span>
@@ -202,4 +202,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($displayRoles as $role): ?>
+    <?php if (!in_array($role['key'], ALL_ROLES, true)): ?>
+        <div class="modal fade" id="roleEditModal-<?= e($role['key']) ?>" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="<?= url('views/admin/roles/edit/edit.php?id=' . urlencode($role['key'])) ?>"><div class="modal-header"><h5 class="modal-title">Edit <?= e($role['name']) ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($role['key']) ?>"><label class="form-label">Role name</label><input name="name" class="form-control mb-3" value="<?= e($role['name']) ?>" required><label class="form-label">Dashboard</label><input name="dashboard" class="form-control mb-3" value="<?= e($role['dashboard']) ?>"><label class="form-label">House access</label><input name="house_access" class="form-control mb-3" value="<?= e($role['house_access']) ?>"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="4"><?= e($role['description']) ?></textarea></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Save changes</button></div></form></div></div>
+        </div>
+        <div class="modal fade" id="roleDeleteModal-<?= e($role['key']) ?>" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Role</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete custom role <strong><?= e($role['name']) ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/admin/roles/delete/delete.php?id=' . urlencode($role['key'])) ?>"><input type="hidden" name="id" value="<?= e($role['key']) ?>"><button class="btn btn-danger" type="submit">Delete</button></form></div></div></div>
+        </div>
+    <?php endif; ?>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

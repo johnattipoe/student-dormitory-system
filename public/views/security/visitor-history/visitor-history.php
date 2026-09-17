@@ -27,6 +27,8 @@ $search = strtolower(sanitize($_GET['search'] ?? ''));
 $statusFilter = strtolower(sanitize($_GET['status'] ?? 'all'));
 $dateFrom = sanitize($_GET['dateFrom'] ?? '');
 $dateTo = sanitize($_GET['dateTo'] ?? '');
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 $visitors = array_values(array_filter($allVisitors, static function (array $visitor) use ($search, $statusFilter, $dateFrom, $dateTo): bool {
     $status = strtolower((string) ($visitor['status'] ?? 'checked_out'));
     $visitDate = substr((string) ($visitor['checkInTime'] ?? $visitor['visitDate'] ?? $visitor['createdAt'] ?? ''), 0, 10);
@@ -37,6 +39,10 @@ $visitors = array_values(array_filter($allVisitors, static function (array $visi
         && ($dateTo === '' || $visitDate <= $dateTo);
 }));
 usort($visitors, static fn(array $first, array $second): int => strcmp((string) ($second['checkOutTime'] ?? $second['checkInTime'] ?? $second['createdAt'] ?? ''), (string) ($first['checkOutTime'] ?? $first['checkInTime'] ?? $first['createdAt'] ?? '')));
+$totalFilteredVisitors = count($visitors);
+$totalPages = max(1, (int) ceil($totalFilteredVisitors / $limit));
+$page = min($page, $totalPages);
+$visitors = array_slice($visitors, ($page - 1) * $limit, $limit);
 $checkedOutCount = count(array_filter($allVisitors, static fn(array $visitor): bool => strtolower((string) ($visitor['status'] ?? '')) === 'checked_out'));
 $insideCount = count(array_filter($allVisitors, static fn(array $visitor): bool => strtolower((string) ($visitor['status'] ?? '')) === 'inside'));
 $todayCount = count(array_filter($allVisitors, static fn(array $visitor): bool => str_starts_with((string) ($visitor['checkInTime'] ?? $visitor['visitDate'] ?? ''), date('Y-m-d'))));
@@ -164,7 +170,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2"></i>Movement Records</h6>
-                <small class="text-muted">Showing <strong><?= count($visitors) ?></strong> record(s)</small>
+                <small class="text-muted">Showing <strong><?= e((string) $totalFilteredVisitors) ?></strong> record(s)</small>
             </div>
             <div class="card-body p-0">
                 <table class="table table-hover align-middle mb-0 data-table w-100">
@@ -209,9 +215,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     </td>
                                     <td class="text-end text-nowrap">
                                         <?php if (!empty($visitor['id'])): ?>
-                                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/security/visitors/view/view.php?id=' . urlencode((string) $visitor['id'])) ?>">
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#securityVisitorHistoryView-<?= e((string) $visitor['id']) ?>">
                                                 <i class="bi bi-eye me-1"></i>View
-                                            </a>
+                                            </button>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -224,7 +230,47 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </tbody>
                 </table>
             </div>
+            <?php
+            $paginationQuery = [];
+            foreach (['search' => $search, 'status' => $statusFilter, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo] as $key => $value) {
+                if ($value !== '' && !($key === 'status' && $value === 'all')) $paginationQuery[] = $key . '=' . urlencode($value);
+            }
+            $paginationBaseUrl = url('views/security/visitor-history/visitor-history.php' . (!empty($paginationQuery) ? '?' . implode('&', $paginationQuery) : ''));
+            require APP_ROOT . '/app/views/components/pagination/pagination.php';
+            ?>
         </div>
     </div>
 </div>
+<?php foreach ($visitors as $visitor): ?>
+    <?php $modalVisitorId = (string) ($visitor['id'] ?? ''); if ($modalVisitorId === '') continue; ?>
+    <div class="modal fade" id="securityVisitorHistoryView-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Visitor History Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Visitor</dt>
+                        <dd class="col-sm-8"><?= e($visitor['visitorName'] ?? 'Visitor') ?></dd>
+                        <dt class="col-sm-4">Host Student</dt>
+                        <dd class="col-sm-8"><?= e($students[(string) ($visitor['studentId'] ?? '')] ?? 'Student ' . ($visitor['studentId'] ?? '—')) ?></dd>
+                        <dt class="col-sm-4">Purpose</dt>
+                        <dd class="col-sm-8"><?= e($visitor['purpose'] ?? '—') ?></dd>
+                        <dt class="col-sm-4">Check-in</dt>
+                        <dd class="col-sm-8"><?= e($visitor['checkInTime'] ?? $visitor['visitDate'] ?? '—') ?></dd>
+                        <dt class="col-sm-4">Check-out</dt>
+                        <dd class="col-sm-8"><?= e($visitor['checkOutTime'] ?? '—') ?></dd>
+                        <dt class="col-sm-4">Status</dt>
+                        <dd class="col-sm-8"><span class="badge bg-<?= strtolower((string) ($visitor['status'] ?? 'checked_out')) === 'inside' ? 'success' : (strtolower((string) ($visitor['status'] ?? 'checked_out')) === 'checked_out' ? 'secondary' : 'warning text-dark') ?> text-capitalize"><?= e(str_replace('_', ' ', strtolower((string) ($visitor['status'] ?? 'checked_out')))) ?></span></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

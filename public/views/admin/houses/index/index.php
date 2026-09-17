@@ -25,9 +25,15 @@ $activeHouses = count(array_filter($houses, fn($h) => ($h['status'] ?? 'active')
 $totalCapacity = array_sum(array_map(fn($h) => (int) ($h['capacity'] ?? 0), $houses));
 
 $search = strtolower(sanitize($_GET['search'] ?? ''));
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 if ($search !== '') {
     $houses = array_values(array_filter($houses, fn($house) => str_contains(strtolower((string) ($house['name'] ?? '')), $search) || str_contains(strtolower((string) ($house['location'] ?? '')), $search)));
 }
+$totalFilteredHouses = count($houses);
+$totalPages = max(1, (int) ceil($totalFilteredHouses / $limit));
+$page = min($page, $totalPages);
+$houses = array_slice($houses, ($page - 1) * $limit, $limit);
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-building', 'label' => 'Houses', 'href' => url('views/admin/houses/index/index.php'), 'active' => true],
@@ -123,7 +129,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
                     <h6 class="mb-0 fw-bold"><i class="bi bi-building me-2 text-success"></i>House Directory</h6>
-                    <small class="text-muted">Showing <?= count($houses) ?> registered dormitory facilities</small>
+                    <small class="text-muted">Showing <?= e((string) $totalFilteredHouses) ?> registered dormitory facilities</small>
                 </div>
             </div>
             <div class="card-body p-0">
@@ -173,9 +179,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <span class="badge <?= $hBadge ?>"><?= ucfirst(e($hStatus)) ?></span>
                                     </td>
                                     <td class="text-end">
-                                        <a href="<?= url('views/admin/houses/view/view.php?id=' . urlencode($hId)) ?>" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye"></i></a>
-                                        <a href="<?= url('views/admin/houses/edit/edit.php?id=' . urlencode($hId)) ?>" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
-                                        <a href="<?= url('views/admin/houses/delete/delete.php?id=' . urlencode($hId)) ?>" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" title="View" data-bs-toggle="modal" data-bs-target="#houseViewModal-<?= e($hId) ?>"><i class="bi bi-eye"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" title="Edit" data-bs-toggle="modal" data-bs-target="#houseEditModal-<?= e($hId) ?>"><i class="bi bi-pencil"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" data-bs-toggle="modal" data-bs-target="#houseDeleteModal-<?= e($hId) ?>"><i class="bi bi-trash"></i></button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -183,9 +189,90 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </tbody>
                     </table>
                 </div>
+                <?php $paginationBaseUrl = url('views/admin/houses/index/index.php' . ($search !== '' ? '?search=' . urlencode($search) : '')); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
             </div>
         </div>
 
     </div>
 </div>
+
+<?php foreach ($houses as $house): ?>
+    <?php
+    $hId = (string) ($house['id'] ?? '');
+    $hName = (string) ($house['name'] ?? 'House');
+    $hGender = (string) ($house['gender'] ?? 'Mixed');
+    $hCapacity = (string) ($house['capacity'] ?? '0');
+    $hLocation = (string) ($house['location'] ?? 'Main Campus');
+    $hStatus = (string) ($house['status'] ?? 'active');
+    ?>
+    <div class="modal fade" id="houseViewModal-<?= e($hId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">House Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Name</dt><dd class="col-sm-7"><?= e($hName) ?></dd>
+                        <dt class="col-sm-5">Gender</dt><dd class="col-sm-7"><?= e(ucfirst($hGender)) ?></dd>
+                        <dt class="col-sm-5">Capacity</dt><dd class="col-sm-7"><?= e($hCapacity) ?> beds</dd>
+                        <dt class="col-sm-5">Location</dt><dd class="col-sm-7"><?= e($hLocation) ?></dd>
+                        <dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst($hStatus)) ?></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="houseEditModal-<?= e($hId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="<?= url('views/admin/houses/edit/edit.php?id=' . urlencode($hId)) ?>">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit House</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6"><label class="form-label">House Name</label><input name="name" class="form-control" value="<?= e($hName) ?>" required></div>
+                            <div class="col-md-6"><label class="form-label">Gender</label><select name="gender" class="form-select"><option value="male" <?= strtolower($hGender) === 'male' ? 'selected' : '' ?>>Male</option><option value="female" <?= strtolower($hGender) === 'female' ? 'selected' : '' ?>>Female</option><option value="mixed" <?= strtolower($hGender) === 'mixed' ? 'selected' : '' ?>>Mixed</option></select></div>
+                            <div class="col-md-6"><label class="form-label">Capacity</label><input name="capacity" type="number" class="form-control" value="<?= e($hCapacity) ?>" required></div>
+                            <div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><option value="active" <?= strtolower($hStatus) === 'active' ? 'selected' : '' ?>>Active</option><option value="inactive" <?= strtolower($hStatus) === 'inactive' ? 'selected' : '' ?>>Inactive</option></select></div>
+                            <div class="col-md-12"><label class="form-label">Location</label><input name="location" class="form-control" value="<?= e($hLocation) ?>"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="houseDeleteModal-<?= e($hId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title text-danger">Delete House</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">Are you sure you want to delete <strong><?= e($hName) ?></strong>?</p>
+                    <p class="text-muted mb-0">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form method="POST" action="<?= url('views/admin/houses/delete/delete.php?id=' . urlencode($hId)) ?>">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -23,7 +23,7 @@ app.add_middleware(
 
 @app.middleware("http")
 async def enforce_api_token(request: Request, call_next):
-    if not settings.api_token:
+    if not settings.require_auth or not settings.api_token:
         return await call_next(request)
 
     auth_header = request.headers.get("authorization", "")

@@ -286,9 +286,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                                 <td class="text-nowrap small text-muted"><?= e($displayDate($announcement['createdAt'] ?? null)) ?></td>
                                                 <td class="text-end text-nowrap">
                                                     <?php if ($annId !== ''): ?>
-                                                        <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/admin/announcements/view/view.php?id=' . urlencode($annId)) ?>" title="View"><i class="bi bi-eye"></i></a>
-                                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/admin/announcements/edit/edit.php?id=' . urlencode($annId)) ?>" title="Edit"><i class="bi bi-pencil"></i></a>
-                                                        <a class="btn btn-sm btn-outline-danger" href="<?= url('views/admin/announcements/delete/delete.php?id=' . urlencode($annId)) ?>" title="Delete"><i class="bi bi-trash"></i></a>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" title="View" data-bs-toggle="modal" data-bs-target="#announcementViewModal-<?= e($annId) ?>"><i class="bi bi-eye"></i></button>
+                                                        <button type="button" class="btn btn-sm btn-outline-primary" title="Edit" data-bs-toggle="modal" data-bs-target="#announcementEditModal-<?= e($annId) ?>"><i class="bi bi-pencil"></i></button>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" data-bs-toggle="modal" data-bs-target="#announcementDeleteModal-<?= e($annId) ?>"><i class="bi bi-trash"></i></button>
                                                     <?php endif; ?>
                                                 </td>
                                             </tr>
@@ -304,4 +304,78 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
     </div>
 </div>
+
+<?php foreach ($announcements as $announcement): ?>
+    <?php
+    $annId = (string) ($announcement['id'] ?? '');
+    $announcementTitle = (string) ($announcement['title'] ?? 'Untitled');
+    $announcementMessage = (string) ($announcement['message'] ?? '');
+    $announcementAudience = (string) ($announcement['audience'] ?? 'all');
+    $announcementTargetRole = (string) ($announcement['targetRole'] ?? '');
+    $announcementStatus = (string) ($announcement['status'] ?? 'published');
+    ?>
+    <div class="modal fade" id="announcementViewModal-<?= e($annId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Announcement</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <h6><?= e($announcementTitle) ?></h6>
+                    <p class="text-muted mb-3"><?= e($announcementAudience === 'role' ? ('Targeted: ' . ucwords(str_replace('_', ' ', $announcementTargetRole))) : 'All users') ?></p>
+                    <p class="mb-0"><?= e($announcementMessage) ?></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="announcementEditModal-<?= e($annId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="<?= url('views/admin/announcements/edit/edit.php?id=' . urlencode($annId)) ?>">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Announcement</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-12"><label class="form-label">Title</label><input name="title" class="form-control" value="<?= e($announcementTitle) ?>" required></div>
+                            <div class="col-12"><label class="form-label">Message</label><textarea name="message" class="form-control" rows="5" required><?= e($announcementMessage) ?></textarea></div>
+                            <div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><option value="published" <?= $announcementStatus === 'published' ? 'selected' : '' ?>>Published</option><option value="draft" <?= $announcementStatus === 'draft' ? 'selected' : '' ?>>Draft</option></select></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="announcementDeleteModal-<?= e($annId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title text-danger">Delete Announcement</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">Are you sure you want to delete <strong><?= e($announcementTitle) ?></strong>?</p>
+                    <p class="text-muted mb-0">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form method="POST" action="<?= url('views/admin/announcements/delete/delete.php?id=' . urlencode($annId)) ?>">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

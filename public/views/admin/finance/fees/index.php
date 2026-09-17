@@ -17,11 +17,6 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\FirebaseService;
 
 $pageTitle = 'Fee Categories';
-$defaultFees = [
-    ['id' => 'boarding-fee', 'name' => 'Boarding Fee', 'amount' => 650.00, 'period' => 'Monthly', 'status' => 'active'],
-    ['id' => 'utility-fee', 'name' => 'Utility Fee', 'amount' => 120.00, 'period' => 'Monthly', 'status' => 'active'],
-];
-
 $editFeeId = trim((string) ($_GET['edit'] ?? ''));
 $editingFee = null;
 
@@ -73,14 +68,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$feeCategories = $defaultFees;
+$feeCategories = [];
 try {
     $feeCategories = FirebaseService::getInstance()->getCollection(COL_FINANCE_FEES, [], 200);
-    if (empty($feeCategories)) {
-        $feeCategories = $defaultFees;
-    }
 } catch (Throwable $e) {
-    $feeCategories = $defaultFees;
+    $feeCategories = [];
 }
 
 if ($editFeeId !== '') {
@@ -108,41 +100,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
         <div class="card shadow-sm border-0">
             <div class="card-body p-4">
-                <?php if ($editingFee !== null): ?>
-                    <div class="alert alert-info d-flex justify-content-between align-items-center mb-3">
-                        <div>Editing fee: <strong><?= e((string) ($editingFee['name'] ?? '')) ?></strong></div>
-                        <a href="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php'))) ?>" class="btn btn-sm btn-outline-secondary">Cancel</a>
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <div>
+                        <h5 class="fw-bold mb-0">Fee list</h5>
                     </div>
-                <?php endif; ?>
-
-                <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php'))) ?>" class="row g-3 align-items-end">
-                    <?php if ($editingFee !== null): ?>
-                        <input type="hidden" name="action" value="update_fee">
-                        <input type="hidden" name="id" value="<?= e((string) ($editingFee['id'] ?? '')) ?>">
-                    <?php else: ?>
-                        <input type="hidden" name="action" value="add_fee">
-                    <?php endif; ?>
-                    <div class="col-md-4">
-                        <label class="form-label">Fee Name</label>
-                        <input type="text" name="name" class="form-control" placeholder="Boarding Fee" value="<?= e((string) ($editingFee['name'] ?? '')) ?>" required>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Amount</label>
-                        <input type="number" name="amount" step="0.01" class="form-control" placeholder="650" value="<?= e((string) ($editingFee['amount'] ?? '')) ?>" required>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Period</label>
-                        <select name="period" class="form-select">
-                            <?php $selectedPeriod = (string) ($editingFee['period'] ?? 'Monthly'); ?>
-                            <option value="Monthly" <?= $selectedPeriod === 'Monthly' ? 'selected' : '' ?>>Monthly</option>
-                            <option value="Termly" <?= $selectedPeriod === 'Termly' ? 'selected' : '' ?>>Termly</option>
-                            <option value="Yearly" <?= $selectedPeriod === 'Yearly' ? 'selected' : '' ?>>Yearly</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <button class="btn btn-primary w-100" type="submit"><?= $editingFee !== null ? 'Save' : 'Add' ?></button>
-                    </div>
-                </form>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFeeModal">
+                        <i class="bi bi-plus-circle me-1"></i>Add Fee
+                    </button>
+                </div>
 
                 <div class="table-responsive mt-4">
                     <table class="table table-bordered table-hover align-middle">
@@ -170,9 +135,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-center text-nowrap">
-                                        <a href="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/view/view.php') . '&id=' . urlencode($feeId))) ?>" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye"></i></a>
-                                        <a href="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/edit/edit.php') . '&id=' . urlencode($feeId))) ?>" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
-                                        <a href="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/delete/delete.php') . '&id=' . urlencode($feeId))) ?>" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#viewFeeModal<?= e($feeId) ?>" title="View"><i class="bi bi-eye"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editFeeModal<?= e($feeId) ?>" title="Edit"><i class="bi bi-pencil"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteFeeModal<?= e($feeId) ?>" title="Delete"><i class="bi bi-trash"></i></button>
                                     </td>
                                 </tr>
 
@@ -194,9 +159,102 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         </div>
                                     </div>
                                 </div>
+
+                                <div class="modal fade" id="editFeeModal<?= e($feeId) ?>" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php'))) ?>">
+                                                <input type="hidden" name="action" value="update_fee">
+                                                <input type="hidden" name="id" value="<?= e($feeId) ?>">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Edit fee</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body row g-3">
+                                                    <div class="col-12">
+                                                        <label class="form-label">Fee Name</label>
+                                                        <input type="text" name="name" class="form-control" value="<?= e((string) ($fee['name'] ?? '')) ?>" required>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Amount</label>
+                                                        <input type="number" name="amount" step="0.01" class="form-control" value="<?= e((string) ($fee['amount'] ?? '0')) ?>" required>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Period</label>
+                                                        <select name="period" class="form-select">
+                                                            <option value="Monthly" <?= strtolower((string) ($fee['period'] ?? 'Monthly')) === 'monthly' ? 'selected' : '' ?>>Monthly</option>
+                                                            <option value="Termly" <?= strtolower((string) ($fee['period'] ?? 'Monthly')) === 'termly' ? 'selected' : '' ?>>Termly</option>
+                                                            <option value="Yearly" <?= strtolower((string) ($fee['period'] ?? 'Monthly')) === 'yearly' ? 'selected' : '' ?>>Yearly</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <button type="submit" class="btn btn-primary">Save changes</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="modal fade" id="deleteFeeModal<?= e($feeId) ?>" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-sm modal-dialog-centered">
+                                        <div class="modal-content">
+                                            <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php'))) ?>">
+                                                <input type="hidden" name="action" value="delete_fee">
+                                                <input type="hidden" name="id" value="<?= e($feeId) ?>">
+                                                <div class="modal-body text-center">
+                                                    <i class="bi bi-trash fs-1 text-danger d-block mb-3"></i>
+                                                    <h5 class="fw-bold">Delete fee?</h5>
+                                                    <p class="mb-0">This will remove <strong><?= e((string) ($fee['name'] ?? 'this fee')) ?></strong> from the live finance collection.</p>
+                                                </div>
+                                                <div class="modal-footer justify-content-center">
+                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <button type="submit" class="btn btn-danger">Delete</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="addFeeModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php'))) ?>">
+                        <input type="hidden" name="action" value="add_fee">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Add fee category</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body row g-3">
+                            <div class="col-12">
+                                <label class="form-label">Fee Name</label>
+                                <input type="text" name="name" class="form-control" placeholder="Boarding Fee" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Amount</label>
+                                <input type="number" name="amount" step="0.01" class="form-control" placeholder="650" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Period</label>
+                                <select name="period" class="form-select">
+                                    <option value="Monthly">Monthly</option>
+                                    <option value="Termly">Termly</option>
+                                    <option value="Yearly">Yearly</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save fee</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

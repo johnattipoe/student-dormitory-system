@@ -26,6 +26,8 @@ foreach ($rooms as $room) {
 }
 
 $studentSearch = strtolower(sanitize($_GET['search'] ?? ''));
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 if ($studentSearch !== '') {
     $students = array_values(array_filter($students, function ($student) use ($studentSearch) {
         $haystack = strtolower(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' ' . ($student['admissionNo'] ?? '') . ' ' . ($student['class'] ?? '') . ' ' . ($student['course'] ?? '')));
@@ -37,6 +39,9 @@ $totalStudents = count($students);
 $activeStudents = count(array_filter($students, fn($s) => ($s['status'] ?? '') === 'active'));
 $assignedRooms = count(array_filter($students, fn($s) => !empty($s['roomId'])));
 $unassignedRooms = max(0, $totalStudents - $assignedRooms);
+$totalPages = max(1, (int) ceil($totalStudents / $limit));
+$page = min($page, $totalPages);
+$students = array_slice($students, ($page - 1) * $limit, $limit);
 
 $pageTitle = 'Senior Houseparent Students';
 $navItems = [
@@ -145,7 +150,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-mortarboard me-2 text-primary"></i>Resident Students</h6>
-                <small class="text-muted">Showing <?= count($students) ?> records</small>
+                <small class="text-muted">Showing <?= e((string) $totalStudents) ?> records</small>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -158,6 +163,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 <th>Form</th>
                                 <th>Class Code</th>
                                 <th>Room Block</th>
+                                <th>Residence</th>
                                 <th>Status</th>
                                 <th class="text-end">Action</th>
                             </tr>
@@ -173,20 +179,21 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <tr>
                                         <td><span class="font-monospace text-muted"><?= e($student['admissionNo'] ?? '—') ?></span></td>
                                         <td>
-                                            <a href="<?= url('views/senior-houseparent/students/profile/profile.php?studentId=' . urlencode($sId)) ?>" class="text-decoration-none fw-bold text-dark">
+                                            <button type="button" class="btn btn-link p-0 text-decoration-none fw-bold text-dark" data-bs-toggle="modal" data-bs-target="#seniorStudentDetails-<?= e($sId) ?>">
                                                 <?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?>
-                                            </a>
+                                            </button>
                                         </td>
                                         <td><?= e($student['class'] ?? '—') ?></td>
                                         <td><?= e($student['form'] ?? $student['level'] ?? '—') ?></td>
                                         <td><small class="text-muted"><?= e($student['course'] ?? '—') ?></small></td>
                                         <td><span class="badge bg-light text-dark border">Room <?= e($roomMap[(string) ($student['roomId'] ?? '')] ?? ($student['roomId'] ?? '—')) ?></span></td>
+                                        <td><span class="badge bg-warning text-dark"><?= e(strtolower((string) ($student['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></span></td>
                                         <td><span class="badge <?= $stBadge ?>"><?= ucfirst(e($st)) ?></span></td>
                                         <td class="text-end">
                                             <?php if ($sId !== ''): ?>
-                                                <a class="btn btn-sm btn-outline-primary" href="<?= url('views/senior-houseparent/students/profile/profile.php?studentId=' . urlencode($sId)) ?>" title="View Profile">
+                                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#seniorStudentDetails-<?= e($sId) ?>" title="View Profile">
                                                     <i class="bi bi-eye me-1"></i> Profile
-                                                </a>
+                                                </button>
                                             <?php else: ?>
                                                 <span class="text-muted">—</span>
                                             <?php endif; ?>
@@ -195,15 +202,20 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">No student records found matching your query.</td>
+                                    <td colspan="9" class="text-center text-muted py-4">No student records found matching your query.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
+                <?php $paginationBaseUrl = url('views/senior-houseparent/students/index/index.php' . ($studentSearch !== '' ? '?search=' . urlencode($studentSearch) : '')); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
             </div>
         </div>
 
     </div>
 </div>
+<?php foreach ($students as $student): ?>
+    <?php $modalStudentId = (string) ($student['id'] ?? $student['uid'] ?? ''); ?>
+    <div class="modal fade" id="seniorStudentDetails-<?= e($modalStudentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Student Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Name</dt><dd class="col-sm-7"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: 'Student') ?></dd><dt class="col-sm-5">Admission No.</dt><dd class="col-sm-7"><?= e($student['admissionNo'] ?? '—') ?></dd><dt class="col-sm-5">Class</dt><dd class="col-sm-7"><?= e($student['class'] ?? '—') ?></dd><dt class="col-sm-5">Form</dt><dd class="col-sm-7"><?= e($student['form'] ?? $student['level'] ?? '—') ?></dd><dt class="col-sm-5">Room</dt><dd class="col-sm-7"><?= e($roomMap[(string) ($student['roomId'] ?? '')] ?? ($student['roomId'] ?? '—')) ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst((string) ($student['status'] ?? 'active'))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

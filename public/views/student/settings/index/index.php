@@ -190,6 +190,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <ul class="student-settings-list">
                                 <li><span>Room</span><strong><?= e($student['roomId'] ?? 'Not assigned') ?></strong></li>
                                 <li><span>House</span><strong><?= e($student['houseId'] ?? 'Not specified') ?></strong></li>
+                                <li><span>Residence type</span><strong><?= e(strtolower((string) ($student['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></strong></li>
                                 <li><span>Status</span><strong><?= e(ucfirst((string) ($student['status'] ?? 'Active'))) ?></strong></li>
                             </ul>
                             <a href="<?= url('views/student/room/index.php') ?>" class="btn btn-outline-success mt-auto"><i class="bi bi-door-open me-1"></i>View room</a>

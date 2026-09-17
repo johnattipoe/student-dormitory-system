@@ -185,6 +185,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <p class="mb-1"><strong>NHIS Number:</strong> <span><?= e($student['nhisNumber'] ?? '—') ?></span></p>
                             <p class="mb-1"><strong>House:</strong> <span><?= e($houseName) ?></span></p>
                             <p class="mb-1"><strong>Room:</strong> <span><?= e($roomName) ?></span></p>
+                            <p class="mb-1"><strong>Residence Type:</strong> <span><?= e(strtolower((string) ($student['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></span></p>
                             <p class="mb-1"><strong>Status:</strong> <span class="badge bg-<?= ($student['status'] ?? '') === 'active' ? 'success' : 'secondary' ?>"><?= e(ucfirst($student['status'] ?? 'active')) ?></span></p>
                         </div>
                     </div>

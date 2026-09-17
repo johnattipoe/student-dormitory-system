@@ -13,9 +13,17 @@ class NotificationService
         $this->firebase = FirebaseService::getInstance();
     }
 
-    public function all(): array
+    public function all(int $limit = 0): array
     {
         try {
+            if ($limit > 0) {
+                return $this->firebase->getCollection(
+                    $this->collection,
+                    [],
+                    $limit
+                );
+            }
+
             return $this->firebase->getCollection(
                 $this->collection
             );
@@ -24,23 +32,43 @@ class NotificationService
         }
     }
 
-    public function forUser(?string $uid): array
+    public function count(): int
+    {
+        try {
+            return $this->firebase->count($this->collection);
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    public function forUser(?string $uid, int $limit = 0): array
     {
         if (!$uid) {
             return [];
         }
 
         try {
-            $identifiers = $this->userIdentifiers($uid);
+            $identifiers = array_values(array_unique($this->userIdentifiers($uid)));
+            if ($identifiers === []) {
+                return [];
+            }
+
             $notifications = [];
-            foreach ($identifiers as $identifier) {
-                foreach ($this->firebase->getCollection($this->collection, [['userId', '=', $identifier]]) as $notification) {
+            foreach (array_chunk($identifiers, 10) as $identifierBatch) {
+                $batchLimit = $limit > 0 ? $limit : 150;
+                foreach ($this->firebase->getCollection($this->collection, [['userId', 'in', $identifierBatch]], $batchLimit) as $notification) {
                     $notificationId = (string) ($notification['id'] ?? '');
                     if ($notificationId !== '') {
                         $notifications[$notificationId] = $notification;
                     }
                 }
             }
+
+            usort($notifications, static fn(array $first, array $second): int => strcmp(
+                (string) ($second['createdAt'] ?? ''),
+                (string) ($first['createdAt'] ?? '')
+            ));
+
             return array_values($notifications);
         } catch (\Throwable $e) {
             return [];
@@ -51,14 +79,12 @@ class NotificationService
     {
         $identifiers = [trim($identifier)];
         try {
-            foreach ((new UserService())->all() as $user) {
-                if ((string) ($user['id'] ?? '') === $identifier || (string) ($user['uid'] ?? '') === $identifier) {
-                    foreach ([$user['id'] ?? '', $user['uid'] ?? ''] as $userIdentifier) {
-                        if ($userIdentifier !== '' && !in_array((string) $userIdentifier, $identifiers, true)) {
-                            $identifiers[] = (string) $userIdentifier;
-                        }
+            $user = (new UserService())->find($identifier);
+            if ($user) {
+                foreach ([$user['id'] ?? '', $user['uid'] ?? ''] as $userIdentifier) {
+                    if ($userIdentifier !== '' && !in_array((string) $userIdentifier, $identifiers, true)) {
+                        $identifiers[] = (string) $userIdentifier;
                     }
-                    break;
                 }
             }
         } catch (\Throwable $e) {
@@ -364,15 +390,24 @@ class NotificationService
 
     public function unreadCount(?string $uid = null): int
     {
-        $notifications = $uid ? $this->forUser($uid) : $this->all();
-        $count = 0;
-        foreach ($notifications as $notification) {
-            if (empty($notification['read'])) {
-                $count++;
+        try {
+            if ($uid) {
+                return $this->firebase->count(
+                    $this->collection,
+                    [
+                        ['userId', '=', $uid],
+                        ['read', '=', false],
+                    ]
+                );
             }
-        }
 
-        return $count;
+            return $this->firebase->count(
+                $this->collection,
+                [['read', '=', false]]
+            );
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 
     public function markAsRead(

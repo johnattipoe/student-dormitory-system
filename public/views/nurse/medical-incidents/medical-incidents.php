@@ -205,7 +205,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td class="small text-muted"><?= e(substr((string) ($record['createdAt'] ?? '-'), 0, 10)) ?></td>
                                     <td class="text-end text-nowrap">
                                         <?php if (!empty($record['id'])): ?>
-                                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/nurse/edit-record/edit-record.php?id=' . urlencode((string) $record['id'])) ?>"><i class="bi bi-pencil me-1"></i>Edit</a>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#nurseIncidentEdit-<?= e((string) $record['id']) ?>"><i class="bi bi-pencil me-1"></i>Edit</button>
                                         <?php else: ?>
                                             <span class="text-muted small">—</span>
                                         <?php endif; ?>
@@ -223,4 +223,50 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($filteredRecords as $record): ?>
+    <?php
+    $modalRecordId = (string) ($record['id'] ?? '');
+    if ($modalRecordId === '') continue;
+    ?>
+    <div class="modal fade" id="nurseIncidentEdit-<?= e($modalRecordId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="<?= url('views/nurse/edit-record/edit-record.php?id=' . urlencode($modalRecordId)) ?>">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Incident Record</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Diagnosis</label>
+                                <input type="text" name="diagnosis" class="form-control" value="<?= e($record['diagnosis'] ?? '') ?>" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Treatment</label>
+                                <input type="text" name="treatment" class="form-control" value="<?= e($record['treatment'] ?? '') ?>" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Severity</label>
+                                <select name="severity" class="form-select">
+                                    <?php foreach (['normal', 'moderate', 'critical'] as $severityOption): ?>
+                                        <option value="<?= e($severityOption) ?>" <?= strtolower((string) ($record['severity'] ?? 'normal')) === $severityOption ? 'selected' : '' ?>><?= e(ucfirst($severityOption)) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Notes</label>
+                                <textarea name="notes" class="form-control" rows="5"><?= e($record['notes'] ?? '') ?></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

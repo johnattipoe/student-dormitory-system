@@ -838,9 +838,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 </div>
                             </div>
                             <div class="modal-footer bg-light">
-                                <a href="<?= url('views/exeat/view/view.php?id=' . urlencode($recId)) ?>" class="btn btn-sm btn-outline-secondary me-auto">
-                                    <i class="bi bi-printer me-1"></i>Print Pass / Full Page
-                                </a>
                                 <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
                             </div>
                         </div>
@@ -882,9 +879,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
                                 </div>
                                 <div class="modal-footer bg-light">
-                                    <a href="<?= url('views/exeat/edit/edit.php?id=' . urlencode($recId)) ?>" class="btn btn-warning">
-                                        <i class="bi bi-pencil me-1"></i>Open edit page
-                                    </a>
                                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                                 </div>
                             </form>

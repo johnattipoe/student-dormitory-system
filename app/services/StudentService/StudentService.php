@@ -9,12 +9,12 @@ namespace App\Services;
  */
 class StudentService
 {
-    public static function all(?string $houseId = null): array
+    public static function all(?string $houseId = null, int $limit = 150): array
     {
         if ($houseId) {
-            return FirebaseService::getInstance()->where(\COL_STUDENTS, 'houseId', '=', $houseId);
+            return FirebaseService::getInstance()->where(\COL_STUDENTS, 'houseId', '=', $houseId, $limit);
         }
-        return FirebaseService::getInstance()->getCollection(\COL_STUDENTS, [], 500);
+        return FirebaseService::getInstance()->getCollection(\COL_STUDENTS, [], $limit);
     }
 
     public static function find(string $id): ?array
@@ -38,6 +38,9 @@ class StudentService
             'course'      => $data['course'] ?? '',
             'houseId'     => $data['houseId'] ?? null,
             'roomId'      => $data['roomId'] ?? null,
+                'residenceType' => in_array(strtolower((string) ($data['residenceType'] ?? 'boarding')), ['boarding', 'day'], true)
+                    ? strtolower((string) $data['residenceType'])
+                    : 'boarding',
             'guardianName'  => $data['guardianName'] ?? '',
             'guardianPhone' => $data['guardianPhone'] ?? '',
             'guardianEmail' => $data['guardianEmail'] ?? '',
@@ -57,7 +60,32 @@ class StudentService
 
     public static function count(?string $houseId = null): int
     {
-        return count(self::all($houseId));
+        $wheres = [];
+        if ($houseId) {
+            $wheres[] = ['houseId', '=', $houseId];
+        }
+
+        return FirebaseService::getInstance()->count(\COL_STUDENTS, $wheres);
+    }
+
+    public static function stats(?string $houseId = null): array
+    {
+        $wheres = [];
+        if ($houseId) {
+            $wheres[] = ['houseId', '=', $houseId];
+        }
+
+        $result = [
+            'total' => self::count($houseId),
+            'active' => FirebaseService::getInstance()->count(\COL_STUDENTS, array_merge($wheres, [['status', '=', 'active']])),
+            'inactive' => 0,
+            'male' => FirebaseService::getInstance()->count(\COL_STUDENTS, array_merge($wheres, [['gender', '=', 'male']])),
+            'female' => FirebaseService::getInstance()->count(\COL_STUDENTS, array_merge($wheres, [['gender', '=', 'female']])),
+        ];
+
+        $result['inactive'] = max(0, $result['total'] - $result['active']);
+
+        return $result;
     }
 
     public static function byHouse(?string $houseId): array
@@ -69,9 +97,35 @@ class StudentService
         return self::all($houseId);
     }
 
+    public static function findByEmail(string $email): ?array
+    {
+        $email = trim((string) $email);
+        if ($email === '') {
+            return null;
+        }
+
+        try {
+            $records = FirebaseService::getInstance()->getCollection(
+                \COL_STUDENTS,
+                [['email', '=', $email]],
+                50
+            );
+
+            foreach ($records as $student) {
+                if (strtolower(trim((string) ($student['email'] ?? ''))) === strtolower($email)) {
+                    return $student;
+                }
+            }
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        return null;
+    }
+
     public static function countByHouse(?string $houseId): int
     {
-        return count(self::byHouse($houseId));
+        return self::count($houseId);
     }
 
     public static function search(array $all, string $term): array

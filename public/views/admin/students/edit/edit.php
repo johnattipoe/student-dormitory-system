@@ -40,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'nhisNumber'    => sanitize($_POST['nhisNumber'] ?? ''),
         'course'        => sanitize($_POST['course'] ?? ''),
         'houseId'       => sanitize($_POST['houseId'] ?? ''),
+        'residenceType' => sanitize($_POST['residenceType'] ?? 'boarding'),
         'status'        => sanitize($_POST['status'] ?? 'active'),
         'guardianName'  => sanitize($_POST['guardianName'] ?? ''),
         'guardianPhone' => sanitize($_POST['guardianPhone'] ?? ''),
@@ -207,6 +208,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 <?php foreach ($houses as $h): ?>
                                     <option value="<?= e($h['id']) ?>" <?= (($old['houseId'] ?? $student['houseId'] ?? '') === $h['id']) ? 'selected' : '' ?>><?= e($h['name'] ?? $h['id']) ?></option>
                                 <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Residence Type</label>
+                            <?php $currentResidenceType = strtolower((string) ($old['residenceType'] ?? $student['residenceType'] ?? 'boarding')); ?>
+                            <select name="residenceType" class="form-select">
+                                <option value="boarding" <?= $currentResidenceType === 'boarding' ? 'selected' : '' ?>>Boarding</option>
+                                <option value="day" <?= $currentResidenceType === 'day' ? 'selected' : '' ?>>Day</option>
                             </select>
                         </div>
                         <div class="col-md-6">

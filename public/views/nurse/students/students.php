@@ -47,6 +47,12 @@ usort($filteredStudents, static fn(array $first, array $second): int => strcasec
     trim(($first['lastName'] ?? '') . ' ' . ($first['firstName'] ?? '')),
     trim(($second['lastName'] ?? '') . ' ' . ($second['firstName'] ?? ''))
 ));
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$totalFilteredStudents = count($filteredStudents);
+$totalPages = max(1, (int) ceil($totalFilteredStudents / $limit));
+$page = min($page, $totalPages);
+$filteredStudents = array_slice($filteredStudents, ($page - 1) * $limit, $limit);
 $activeCount = count(array_filter($students, static fn(array $student): bool => strtolower((string) ($student['status'] ?? 'active')) === 'active'));
 $assignedCount = count(array_filter($students, static fn(array $student): bool => !empty($student['roomId'])));
 $courseCount = count(array_unique(array_filter(array_map(static fn(array $student): string => trim((string) ($student['course'] ?? '')), $students))));
@@ -165,7 +171,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-people me-2"></i>Student Records</h6>
-                <small class="text-muted">Showing <strong><?= count($filteredStudents) ?></strong> student(s)</small>
+                <small class="text-muted">Showing <strong><?= e((string) $totalFilteredStudents) ?></strong> student(s)</small>
             </div>
             <div class="card-body p-0">
                 <table class="table table-hover align-middle mb-0 data-table w-100">
@@ -175,6 +181,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <th>Contact</th>
                             <th>Academic Profile</th>
                             <th>Room</th>
+                            <th>Residence</th>
                             <th>Status</th>
                             <th class="text-end">Action</th>
                         </tr>
@@ -206,13 +213,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td>
                                         <span class="badge bg-light text-dark border"><?= e($student['roomId'] ?? 'Unassigned') ?></span>
                                     </td>
+                                    <td><span class="badge bg-warning text-dark"><?= e(strtolower((string) ($student['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></span></td>
                                     <td>
                                         <span class="badge bg-<?= e($statusClass) ?> text-capitalize"><?= e($studentStatus) ?></span>
                                     </td>
                                     <td class="text-end text-nowrap">
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/nurse/student-profile/student-profile.php?id=' . urlencode($studentId)) ?>">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#nurseStudentView-<?= e($studentId) ?>">
                                             <i class="bi bi-person-vcard me-1"></i>Profile
-                                        </a>
+                                        </button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -223,8 +231,55 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <?php endif; ?>
                     </tbody>
                 </table>
+                <?php $paginationQuery = []; if ($search !== '') { $paginationQuery[] = 'search=' . urlencode($search); } if ($statusFilter !== 'all') { $paginationQuery[] = 'status=' . urlencode($statusFilter); } $paginationBaseUrl = url('views/nurse/students/students.php' . (!empty($paginationQuery) ? '?' . implode('&', $paginationQuery) : '')); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
             </div>
         </div>
     </div>
 </div>
+<?php foreach ($filteredStudents as $student): ?>
+    <?php
+    $modalStudentId = (string) ($student['id'] ?? $student['studentId'] ?? '');
+    if ($modalStudentId === '') continue;
+    ?>
+    <div class="modal fade" id="nurseStudentView-<?= e($modalStudentId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Student Profile</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Student</dt>
+                        <dd class="col-sm-8"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?></dd>
+                        <dt class="col-sm-4">Admission No</dt>
+                        <dd class="col-sm-8"><?= e($student['admissionNo'] ?? $student['studentId'] ?? '—') ?></dd>
+                        <dt class="col-sm-4">Email</dt>
+                        <dd class="col-sm-8"><?= e($student['email'] ?? 'No email') ?></dd>
+                        <dt class="col-sm-4">Phone</dt>
+                        <dd class="col-sm-8"><?= e($student['phone'] ?? 'No phone') ?></dd>
+                        <dt class="col-sm-4">Course</dt>
+                        <dd class="col-sm-8"><?= e($student['course'] ?? 'Class code not specified') ?></dd>
+                        <dt class="col-sm-4">Level</dt>
+                        <dd class="col-sm-8"><?= e($student['level'] ?? '—') ?></dd>
+                        <dt class="col-sm-4">Room</dt>
+                        <dd class="col-sm-8"><?= e($student['roomId'] ?? 'Unassigned') ?></dd>
+                        <dt class="col-sm-4">Status</dt>
+                        <dd class="col-sm-8"><span class="badge bg-<?= strtolower((string) ($student['status'] ?? 'active')) === 'active' ? 'success' : (strtolower((string) ($student['status'] ?? 'active')) === 'suspended' ? 'danger' : 'secondary') ?> text-capitalize"><?= e(strtolower((string) ($student['status'] ?? 'active'))) ?></span></dd>
+                        <dt class="col-sm-4">Guardian</dt>
+                        <dd class="col-sm-8"><?= e($student['guardianName'] ?? $student['parentName'] ?? 'Guardian not recorded') ?></dd>
+                        <dt class="col-sm-4">Guardian Phone</dt>
+                        <dd class="col-sm-8"><?= e($student['guardianPhone'] ?? $student['parentPhone'] ?? 'No guardian phone') ?></dd>
+                        <dt class="col-sm-4">Medical Records</dt>
+                        <dd class="col-sm-8"><?= e((string) ($medicalRecordCounts[$modalStudentId] ?? 0)) ?></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a href="<?= url('views/nurse/student-profile/student-profile.php?id=' . urlencode($modalStudentId)) ?>" class="btn btn-primary">Open full profile</a>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

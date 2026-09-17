@@ -19,6 +19,13 @@ use App\Services\HouseService;
 use App\Services\StudentService;
 
 $pageTitle = 'Monthly Finance Reports';
+$feeCategories = [];
+try {
+    $feeCategories = FirebaseService::getInstance()->getCollection(COL_FINANCE_FEES, [], 200);
+} catch (Throwable $e) {
+    $feeCategories = [];
+}
+
 $students = StudentService::all();
 $houses = HouseService::all();
 $houseMap = [];
@@ -42,6 +49,15 @@ foreach (range(0, 5) as $offset) {
 }
 $months = array_values(array_reverse(array_unique($months)));
 
+$baseAmountPerStudent = 0.0;
+foreach ($feeCategories as $fee) {
+    $feeStatus = strtolower((string) ($fee['status'] ?? 'active'));
+    if ($feeStatus !== 'active') {
+        continue;
+    }
+    $baseAmountPerStudent += (float) ($fee['amount'] ?? 0);
+}
+
 $houseReportRows = [];
 $houseOrder = [];
 foreach ($students as $student) {
@@ -62,7 +78,7 @@ foreach ($months as $monthKey) {
             $studentIds[] = (string) ($student['id'] ?? $student['uid'] ?? '');
         }
 
-        $expected = count($studentIds) * 650.0;
+        $expected = count($studentIds) * $baseAmountPerStudent;
         $collected = 0.0;
         $paymentCount = 0;
 

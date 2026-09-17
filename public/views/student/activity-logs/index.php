@@ -173,9 +173,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td class="small text-muted"><?= e($recorder) ?></td>
                                     <td class="text-end">
                                         <?php if ($logId !== ''): ?>
-                                            <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/student/activity-logs/view/view.php?id=' . urlencode($logId)) ?>">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#studentActivityLogView-<?= e($logId) ?>">
                                                 <i class="bi bi-eye"></i> View
-                                            </a>
+                                            </button>
                                         <?php else: ?>
                                             <span class="text-muted small">—</span>
                                         <?php endif; ?>
@@ -193,5 +193,41 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($logs as $log): ?>
+    <?php
+    $modalLogId = (string) ($log['id'] ?? '');
+    if ($modalLogId === '') continue;
+    $modalRawTime = (string) ($log['timestamp'] ?? $log['createdAt'] ?? '');
+    $modalFormattedTime = $modalRawTime !== '' ? (date('M d, Y H:i', strtotime($modalRawTime)) ?: $modalRawTime) : '—';
+    $modalEvent = (string) ($log['event'] ?? $log['action'] ?? 'Activity');
+    $modalDetails = (string) ($log['details'] ?? $log['description'] ?? '—');
+    $modalRecorder = (string) ($log['performedByName'] ?? 'Staff');
+    ?>
+    <div class="modal fade" id="studentActivityLogView-<?= e($modalLogId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Activity Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Timestamp</dt>
+                        <dd class="col-sm-8"><?= e($modalFormattedTime) ?></dd>
+                        <dt class="col-sm-4">Event</dt>
+                        <dd class="col-sm-8"><span class="badge bg-primary-subtle text-primary border"><?= e(ucwords(str_replace(['_', '-'], ' ', $modalEvent))) ?></span></dd>
+                        <dt class="col-sm-4">Recorded By</dt>
+                        <dd class="col-sm-8"><?= e($modalRecorder) ?></dd>
+                        <dt class="col-sm-4">Details</dt>
+                        <dd class="col-sm-8"><?= e($modalDetails) ?></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>
 

@@ -110,7 +110,7 @@ require APP_ROOT . '/app/views/components/header/header.php'; require APP_ROOT .
                             <td><?=$student?e(trim(($student['firstName']??'').' '.($student['lastName']??''))):'<span class="text-muted">Unassigned</span>'?></td>
                             <td><span class="badge bg-<?=$status==='occupied'?'warning':($status==='maintenance'?'secondary':'success')?>"><?=e($status)?></span></td>
                             <td class="text-nowrap">
-                                <a class="btn btn-sm btn-outline-primary" href="<?=url('views/senior-houseparent/beds/view/view.php?id='.urlencode($bedId))?>">View</a>
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#seniorBedDetails-<?= e($bedId) ?>">View</button>
                             </td>
                         </tr>
                         <?php endforeach;endif;?>
@@ -120,4 +120,8 @@ require APP_ROOT . '/app/views/components/header/header.php'; require APP_ROOT .
         </div>
     </div>
 </div>
+<?php foreach ($beds as $bed): ?>
+    <?php $modalBedId = (string) ($bed['id'] ?? ''); $modalBedRoom = $roomMap[(string) ($bed['roomId'] ?? '')] ?? []; $modalBedStudent = $studentMap[(string) ($bed['studentId'] ?? '')] ?? []; ?>
+    <div class="modal fade" id="seniorBedDetails-<?= e($modalBedId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Bed Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Bed</dt><dd class="col-sm-7"><?= e($bed['bedNumber'] ?? '—') ?></dd><dt class="col-sm-5">Room</dt><dd class="col-sm-7"><?= e($modalBedRoom['roomNumber'] ?? '—') ?></dd><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e(trim(($modalBedStudent['firstName'] ?? '') . ' ' . ($modalBedStudent['lastName'] ?? '')) ?: 'Unassigned') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst((string) ($bed['status'] ?? 'available'))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

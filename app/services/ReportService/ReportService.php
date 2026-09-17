@@ -30,13 +30,13 @@ class ReportService
             'attendance' => $attendanceService->report(),
 
             'visitors' => [
-                'total' => count($visitorService->all()),
+                'total' => $visitorService->count(),
                 'today' => $visitorService->todayCount(),
                 'inside' => $visitorService->currentlyInside()
             ],
 
             'incidents' => [
-                'total' => count($incidentService->all()),
+                'total' => $incidentService->count(),
                 'open' => $incidentService->openCount()
             ],
 
@@ -62,48 +62,15 @@ class ReportService
     {
         $service = new StudentService();
 
-        $students = $service->all();
-
-        $result = [
-            'total' => count($students),
-            'active' => 0,
-            'inactive' => 0,
-            'male' => 0,
-            'female' => 0
-        ];
-
-        foreach ($students as $student) {
-
-            if (($student['status'] ?? '') === 'active') {
-                $result['active']++;
-            } else {
-                $result['inactive']++;
-            }
-
-            $gender = strtolower(
-                $student['gender'] ?? ''
-            );
-
-            if ($gender === 'male') {
-                $result['male']++;
-            }
-
-            if ($gender === 'female') {
-                $result['female']++;
-            }
-        }
-
-        return $result;
+        return $service->stats();
     }
 
     public function visitors(): array
     {
         $service = new VisitorService();
 
-        $visitors = $service->all();
-
         return [
-            'total' => count($visitors),
+            'total' => $service->count(),
             'today' => $service->todayCount(),
             'inside' => $service->currentlyInside(),
             'pending' => $service->pendingCount()
@@ -114,41 +81,7 @@ class ReportService
     {
         $service = new IncidentService();
 
-        $incidents = $service->all();
-
-        $result = [
-            'total' => count($incidents),
-            'open' => 0,
-            'resolved' => 0,
-            'high' => 0,
-            'medium' => 0,
-            'low' => 0
-        ];
-
-        foreach ($incidents as $incident) {
-
-            $status = strtolower(
-                $incident['status'] ?? ''
-            );
-
-            if ($status === 'open') {
-                $result['open']++;
-            }
-
-            if ($status === 'resolved') {
-                $result['resolved']++;
-            }
-
-            $priority = strtolower(
-                $incident['priority'] ?? ''
-            );
-
-            if (isset($result[$priority])) {
-                $result[$priority]++;
-            }
-        }
-
-        return $result;
+        return $service->countSummary();
     }
 
     public function medical(): array

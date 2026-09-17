@@ -16,9 +16,9 @@ class UserService
     /**
      * Get all users.
      */
-    public function all(): array
+    public function all(int $limit = 150): array
     {
-        return $this->firebase->getCollection($this->collection);
+        return $this->firebase->getCollection($this->collection, [], $limit);
     }
 
     /**
@@ -45,9 +45,18 @@ class UserService
         }
 
         try {
-            foreach ($this->all() as $user) {
-                if ((string) ($user['id'] ?? '') === $target || (string) ($user['uid'] ?? '') === $target) {
-                    return $user;
+            foreach ([
+                ['uid', '=', $target],
+                ['id', '=', $target],
+            ] as [$field, $op, $value]) {
+                $matches = $this->firebase->getCollection(
+                    $this->collection,
+                    [[$field, $op, $value]],
+                    1
+                );
+
+                if (!empty($matches[0])) {
+                    return $matches[0];
                 }
             }
         } catch (\Throwable $e) {
@@ -62,7 +71,11 @@ class UserService
      */
     public function count(): int
     {
-        return count($this->all());
+        try {
+            return $this->firebase->count($this->collection);
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 
     /**

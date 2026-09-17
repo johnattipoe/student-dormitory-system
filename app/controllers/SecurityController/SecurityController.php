@@ -34,7 +34,8 @@ class SecurityController
     {
         require_role(ROLE_SECURITY);
 
-        $visitors = $this->visitorService->all();
+        $limit = max(1, min(150, (int) ($_GET['limit'] ?? 150)));
+        $visitors = $this->visitorService->all($limit);
 
         include __DIR__ . '/../../../public/views/security/visitors/visitors/visitors.php';
     }
@@ -128,7 +129,8 @@ class SecurityController
     {
         require_role(ROLE_SECURITY);
 
-        $incidents = $this->incidentService->all();
+        $limit = max(1, min(150, (int) ($_GET['limit'] ?? 150)));
+        $incidents = $this->incidentService->all($limit);
 
         include __DIR__ . '/../../../public/views/security/incidents/incidents/incidents.php';
     }

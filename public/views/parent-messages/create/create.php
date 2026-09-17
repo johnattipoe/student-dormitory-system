@@ -181,9 +181,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 									<td><?= e($message['sentByName'] ?? '-') ?></td>
 									<td class="text-nowrap"><span class="small text-muted"><?= e(substr((string)($message['createdAt'] ?? '-'), 0, 16)) ?></span></td>
 									<td class="text-nowrap">
-										<a class="btn btn-sm btn-outline-secondary" href="<?= url('views/parent-messages/view/view.php?id=' . urlencode((string) ($message['id'] ?? ''))) ?>" title="View Details"><i class="bi bi-eye"></i></a> 
-										<a class="btn btn-sm btn-outline-primary" href="<?= url('views/parent-messages/edit/edit.php?id=' . urlencode((string) ($message['id'] ?? ''))) ?>" title="Edit Record"><i class="bi bi-pencil"></i></a> 
-										<a class="btn btn-sm btn-outline-danger" href="<?= url('views/parent-messages/delete/delete.php?id=' . urlencode((string) ($message['id'] ?? ''))) ?>" title="Delete Record"><i class="bi bi-trash"></i></a>
+												<button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#parentMessageViewModal-<?= e((string) ($message['id'] ?? '')) ?>" title="View Details"><i class="bi bi-eye"></i></button>
+												<button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#parentMessageEditModal-<?= e((string) ($message['id'] ?? '')) ?>" title="Edit Record"><i class="bi bi-pencil"></i></button>
+												<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#parentMessageDeleteModal-<?= e((string) ($message['id'] ?? '')) ?>" title="Delete Record"><i class="bi bi-trash"></i></button>
 									</td>
 								</tr>
 							<?php endforeach; ?>
@@ -194,4 +194,85 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 		</div>
 	</div>
 </div>
+<?php foreach ($filteredMessages as $message): ?>
+    <?php
+        $messageId = (string) ($message['id'] ?? '');
+        if ($messageId === '') continue;
+        $messageChannel = $message['channel'] ?? 'mail';
+        $messageStatus = $message['deliveryStatus'] ?? $message['emailStatus'] ?? 'not configured';
+        $messageStudent = $message['studentName'] ?? $message['studentId'] ?? '-';
+        $messageGuardian = $message['guardianName'] ?? '-';
+    ?>
+    <div class="modal fade" id="parentMessageViewModal-<?= e($messageId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Parent Message Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Student</dt>
+                        <dd class="col-sm-8"><?= e($messageStudent) ?></dd>
+                        <dt class="col-sm-4">Parent / Guardian</dt>
+                        <dd class="col-sm-8"><?= e($messageGuardian) ?></dd>
+                        <dt class="col-sm-4">Channel</dt>
+                        <dd class="col-sm-8"><span class="badge bg-<?= $messageChannel === 'sms' ? 'success' : 'primary' ?>"><?= e(strtoupper((string) $messageChannel)) ?></span></dd>
+                        <dt class="col-sm-4">Delivery Status</dt>
+                        <dd class="col-sm-8"><span class="badge bg-<?= $messageStatus === 'sent' ? 'success' : ($messageStatus === 'failed' ? 'danger' : 'secondary') ?>"><?= e(ucfirst(str_replace('_', ' ', (string) $messageStatus))) ?></span></dd>
+                        <dt class="col-sm-4">Subject</dt>
+                        <dd class="col-sm-8"><?= e($message['subject'] ?? '-') ?></dd>
+                        <dt class="col-sm-4">Message</dt>
+                        <dd class="col-sm-8" style="white-space:pre-line"><?= e($message['message'] ?? '') ?></dd>
+                        <dt class="col-sm-4">Sent By</dt>
+                        <dd class="col-sm-8"><?= e($message['sentByName'] ?? '-') ?></dd>
+                        <dt class="col-sm-4">Date</dt>
+                        <dd class="col-sm-8"><?= e(substr((string)($message['createdAt'] ?? '-'), 0, 16)) ?></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="parentMessageEditModal-<?= e($messageId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Message</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">Open the full edit form to update this parent message.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="parentMessageDeleteModal-<?= e($messageId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title text-danger">Delete Parent Message</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST" action="<?= url('views/parent-messages/delete/delete.php') ?>">
+                    <div class="modal-body">
+                        <input type="hidden" name="id" value="<?= e($messageId) ?>">
+                        <p class="mb-0">Delete the message for <strong><?= e($messageGuardian ?: 'this parent') ?></strong> regarding <strong><?= e($messageStudent ?: 'this student') ?></strong>?</p>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

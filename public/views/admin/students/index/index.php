@@ -19,9 +19,14 @@ use App\Services\HouseService;
 use App\Services\StudentService;
 
 $pageTitle = 'Students';
-$students = StudentService::all(current_role() === ROLE_ADMIN ? null : current_user()['houseId']);
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$houseId = current_role() === ROLE_ADMIN ? null : current_user()['houseId'] ?? null;
+$students = StudentService::all($houseId, $limit);
+$totalStudents = StudentService::count($houseId);
+$totalPages = max(1, (int) ceil($totalStudents / $limit));
 $studentSummary = [
-    'total' => count($students),
+    'total' => $totalStudents,
     'active' => 0,
     'inactive' => 0,
     'suspended' => 0,
@@ -150,6 +155,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <th>Class</th>
                     <th>Class Code</th>
                     <th>House</th>
+                    <th>Residence</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
@@ -162,25 +168,101 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <td><?= e($s['class'] ?? ($s['form'] ?? $s['level'] ?? '—')) ?></td>
                         <td><?= e($s['course'] ?? '') ?></td>
                         <td><?= e($houses[(string) ($s['houseId'] ?? '')] ?? ($s['houseId'] ?? '—')) ?></td>
+                        <td><span class="badge bg-warning text-dark"><?= e(strtolower((string) ($s['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></span></td>
                         <td><span class="badge bg-<?= ($s['status'] ?? '') === 'active' ? 'success' : 'secondary' ?>"><?= e($s['status'] ?? '') ?></span></td>
                         <td>
-                            <a href="<?= url('views/admin/students/view/view.php?id=' . urlencode($s['id'])) ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i></a>
-                            <a href="<?= url('views/admin/students/edit/edit.php?id=' . urlencode($s['id'])) ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#studentViewModal-<?= e((string) ($s['id'] ?? '')) ?>"><i class="bi bi-eye"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#studentEditModal-<?= e((string) ($s['id'] ?? '')) ?>"><i class="bi bi-pencil"></i></button>
                             <?php if (current_role() === ROLE_ADMIN || current_role() === ROLE_HOUSE_MASTER): ?>
-                            <button class="btn btn-sm btn-outline-danger" data-confirm
-                                    data-action="<?= url('views/admin/students/delete/delete.php?id=' . urlencode($s['id'])) ?>"
-                                    data-message="Delete <?= e(trim(($s['firstName'] ?? '') . ' ' . ($s['lastName'] ?? ''))) ?>? This cannot be undone.">
-                                <i class="bi bi-trash"></i>
-                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#studentDeleteModal-<?= e((string) ($s['id'] ?? '')) ?>"><i class="bi bi-trash"></i></button>
                             <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
+            <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
         </div>
     </div>
 </div>
+
+<?php foreach ($students as $s): ?>
+    <?php
+    $studentId = (string) ($s['id'] ?? '');
+    $studentName = trim((string) (($s['firstName'] ?? '') . ' ' . ($s['lastName'] ?? '')));
+    $studentHouse = $houses[(string) ($s['houseId'] ?? '')] ?? ($s['houseId'] ?? '—');
+    ?>
+    <div class="modal fade" id="studentViewModal-<?= e($studentId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Student Profile</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Name</dt><dd class="col-sm-7"><?= e($studentName ?: '—') ?></dd>
+                        <dt class="col-sm-5">Admission No.</dt><dd class="col-sm-7"><?= e($s['admissionNo'] ?? '—') ?></dd>
+                        <dt class="col-sm-5">Class</dt><dd class="col-sm-7"><?= e($s['class'] ?? ($s['form'] ?? $s['level'] ?? '—')) ?></dd>
+                        <dt class="col-sm-5">House</dt><dd class="col-sm-7"><?= e($studentHouse) ?></dd>
+                        <dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e($s['status'] ?? 'active') ?></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="studentEditModal-<?= e($studentId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="<?= url('views/admin/students/edit/edit.php?id=' . urlencode($studentId)) ?>">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Student</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6"><label class="form-label">First Name</label><input name="firstName" class="form-control" value="<?= e($s['firstName'] ?? '') ?>" required></div>
+                            <div class="col-md-6"><label class="form-label">Last Name</label><input name="lastName" class="form-control" value="<?= e($s['lastName'] ?? '') ?>" required></div>
+                            <div class="col-md-6"><label class="form-label">Admission No.</label><input name="admissionNo" class="form-control" value="<?= e($s['admissionNo'] ?? '') ?>"></div>
+                            <div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><option value="active" <?= ($s['status'] ?? '') === 'active' ? 'selected' : '' ?>>Active</option><option value="inactive" <?= ($s['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Inactive</option><option value="suspended" <?= ($s['status'] ?? '') === 'suspended' ? 'selected' : '' ?>>Suspended</option></select></div>
+                            <div class="col-md-6"><label class="form-label">Class</label><input name="class" class="form-control" value="<?= e($s['class'] ?? ($s['form'] ?? $s['level'] ?? '')) ?>"></div>
+                            <div class="col-md-6"><label class="form-label">House</label><select name="houseId" class="form-select"><option value="">— Unassigned —</option><?php foreach ($houses as $houseId => $houseName): ?><option value="<?= e($houseId) ?>" <?= ($s['houseId'] ?? '') === $houseId ? 'selected' : '' ?>><?= e($houseName) ?></option><?php endforeach; ?></select></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="studentDeleteModal-<?= e($studentId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title text-danger">Delete Student</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">Are you sure you want to delete <strong><?= e($studentName ?: 'this student') ?></strong>?</p>
+                    <p class="text-muted mb-0">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form method="POST" action="<?= url('views/admin/students/delete/delete.php?id=' . urlencode($studentId)) ?>">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 
 <?php require APP_ROOT . '/app/views/components/modal/modal.php'; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

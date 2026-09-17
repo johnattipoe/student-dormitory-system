@@ -21,7 +21,7 @@ This service runs alongside the existing PHP application and exposes lightweight
 4. Install dependencies:
    ```bash
    python -m pip install --upgrade pip
-   python -m pip install -r requirements.txt
+   python -m pip install -r requirements-dev.txt
    ```
 
 ## Run
@@ -37,6 +37,8 @@ uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 - `GET /analytics/summary` — Firestore-backed dashboard summary
 - `GET /analytics/students` — Firestore-backed student distribution stats
 - `GET /analytics/attendance` — Firestore-backed attendance stats
+- `GET /analytics/rooms` — Firestore-backed room occupancy stats
+- `GET /analytics/incidents` — Firestore-backed incident breakdown stats
 
 ## Notes
 

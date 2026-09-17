@@ -11,13 +11,23 @@ if (!defined('APP_ROOT')) {
         $dir = $parent;
     }
 }
-$allowedRoles = [ROLE_ADMIN];
+$allowedRoles = [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\FirebaseService;
 use App\Services\StudentService;
 
 $pageTitle = 'Student Payments';
+$currentRole = current_role();
+$isHouseScoped = in_array($currentRole, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true);
+$assignedHouseId = current_house_id();
+if ($isHouseScoped && !finance_access_allowed()) {
+    http_response_code(403);
+    include APP_ROOT . '/public/views/errors/403.php';
+    exit;
+}
+$paymentRoute = '/views/admin/finance/payments/index.php';
+$paymentPageUrl = url('index.php?route=' . urlencode($paymentRoute));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = strtolower(trim((string) ($_POST['action'] ?? '')));
@@ -26,13 +36,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $paymentId = trim((string) ($_POST['paymentId'] ?? ''));
         if ($paymentId !== '') {
             try {
+                $payment = FirebaseService::getInstance()->getDocument(COL_FINANCE_PAYMENTS, $paymentId);
+                if ($isHouseScoped && (!$payment || (string) ($payment['houseId'] ?? '') !== (string) $assignedHouseId)) {
+                    throw new RuntimeException('You can only manage payments for your assigned house.');
+                }
                 FirebaseService::getInstance()->deleteDocument(COL_FINANCE_PAYMENTS, $paymentId);
                 flash('success', 'Payment deleted successfully.');
             } catch (Throwable $e) {
                 flash('error', 'Unable to delete payment: ' . $e->getMessage());
             }
         }
-        redirect(url('index.php?route=' . urlencode('/views/admin/finance/payments/index.php')));
+        redirect($paymentPageUrl);
     }
 
     if ($action === 'update') {
@@ -47,6 +61,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($paymentId !== '' && $studentId !== '' && $amount > 0) {
             $student = StudentService::find($studentId);
+            if ($isHouseScoped && (!$student || (string) ($student['houseId'] ?? '') !== (string) $assignedHouseId)) {
+                flash('error', 'You can only manage students in your assigned house.');
+                redirect($paymentPageUrl);
+            }
             $payload = [
                 'studentId' => $studentId,
                 'studentName' => trim((string) (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))),
@@ -67,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } catch (Throwable $e) {
                 flash('error', 'Unable to update payment: ' . $e->getMessage());
             }
-            redirect(url('index.php?route=' . urlencode('/views/admin/finance/payments/index.php')));
+            redirect($paymentPageUrl);
         }
     }
 
@@ -81,6 +99,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($studentId !== '' && $amount > 0) {
         $student = StudentService::find($studentId);
+        if ($isHouseScoped && (!$student || (string) ($student['houseId'] ?? '') !== (string) $assignedHouseId)) {
+            flash('error', 'You can only collect payments for students in your assigned house.');
+            redirect($paymentPageUrl);
+        }
         $payload = [
             'studentId' => $studentId,
             'studentName' => trim((string) (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))),
@@ -101,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Throwable $e) {
             flash('error', 'Unable to record payment: ' . $e->getMessage());
         }
-        redirect(url('index.php?route=' . urlencode('/views/admin/finance/payments/index.php')));
+        redirect($paymentPageUrl);
     } else {
         flash('error', 'Please select a student and enter a valid amount.');
     }
@@ -128,6 +150,9 @@ try {
 $paymentRecords = [];
 try {
     $paymentRecords = FirebaseService::getInstance()->getCollection(COL_FINANCE_PAYMENTS, [], 1000);
+    if ($isHouseScoped) {
+        $paymentRecords = array_values(array_filter($paymentRecords, static fn(array $payment): bool => (string) ($payment['houseId'] ?? '') === (string) $assignedHouseId));
+    }
 } catch (Throwable $e) {
     $paymentRecords = [];
 }
@@ -171,7 +196,7 @@ if ($baseFee <= 0) {
 }
 
 $rows = [];
-foreach (StudentService::all() as $student) {
+foreach (StudentService::all($isHouseScoped ? $assignedHouseId : null) as $student) {
     $studentId = (string) ($student['id'] ?? $student['uid'] ?? '');
     $name = trim((string) (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')));
     $houseName = $houseMap[(string) ($student['houseId'] ?? '')] ?? 'Unassigned';
@@ -205,7 +230,7 @@ if ($statusFilter !== 'all') {
     $rows = array_values(array_filter($rows, static fn (array $row): bool => $row['status'] === $statusFilter));
 }
 
-$students = StudentService::all();
+$students = StudentService::all($isHouseScoped ? $assignedHouseId : null);
 $editPaymentId = trim((string) ($_GET['editPaymentId'] ?? ''));
 $editPayment = null;
 if ($editPaymentId !== '') {
@@ -231,118 +256,77 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <a href="<?= url('index.php?route=' . urlencode('/views/admin/finance/index/index.php')) ?>" class="btn btn-outline-secondary">Back to Finance</a>
         </div>
 
-        <?php if ($editPayment): ?>
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-body p-4">
-                    <h5 class="fw-bold mb-3">Edit payment</h5>
-                    <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/payments/index.php'))) ?>" class="row g-3">
-                        <input type="hidden" name="action" value="update">
-                        <input type="hidden" name="paymentId" value="<?= e((string) ($editPayment['id'] ?? '')) ?>">
-                        <div class="col-md-3">
+<div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <h5 class="fw-bold mb-0">Payment ledger</h5>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPaymentModal">
+                        <i class="bi bi-plus-circle me-1"></i>Record Payment
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="addPaymentModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/payments/index.php'))) ?>" class="row g-3 p-3">
+                        <input type="hidden" name="action" value="add">
+                        <div class="modal-header px-0 pt-0 border-0">
+                            <h5 class="modal-title">Record a payment</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label">Student</label>
                             <select name="studentId" class="form-select" required>
+                                <option value="">Select student</option>
                                 <?php foreach ($students as $student): ?>
                                     <?php $studentId = (string) ($student['id'] ?? $student['uid'] ?? ''); ?>
                                     <?php $studentName = trim((string) (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))); ?>
                                     <?php if ($studentId === '') continue; ?>
-                                    <option value="<?= e($studentId) ?>" <?= (string) ($editPayment['studentId'] ?? '') === $studentId ? 'selected' : '' ?>><?= e($studentName !== '' ? $studentName : $studentId) ?></option>
+                                    <option value="<?= e($studentId) ?>"><?= e($studentName !== '' ? $studentName : $studentId) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Fee</label>
-                            <input type="text" name="feeName" class="form-control" value="<?= e((string) ($editPayment['feeName'] ?? 'Boarding Fee')) ?>" required>
+                            <input type="text" name="feeName" class="form-control" value="Boarding Fee" required>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Amount</label>
-                            <input type="number" name="amount" step="0.01" class="form-control" value="<?= e((string) ($editPayment['amount'] ?? '0')) ?>" required>
+                            <input type="number" name="amount" step="0.01" class="form-control" placeholder="650.00" required>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Method</label>
                             <select name="paymentMethod" class="form-select">
-                                <option value="Cash" <?= strtolower((string) ($editPayment['paymentMethod'] ?? 'Cash')) === 'cash' ? 'selected' : '' ?>>Cash</option>
-                                <option value="Mobile Money" <?= strtolower((string) ($editPayment['paymentMethod'] ?? 'Cash')) === 'mobile money' ? 'selected' : '' ?>>Mobile Money</option>
-                                <option value="Bank Transfer" <?= strtolower((string) ($editPayment['paymentMethod'] ?? 'Cash')) === 'bank transfer' ? 'selected' : '' ?>>Bank Transfer</option>
-                                <option value="POS" <?= strtolower((string) ($editPayment['paymentMethod'] ?? 'Cash')) === 'pos' ? 'selected' : '' ?>>POS</option>
+                                <option value="Cash">Cash</option>
+                                <option value="Mobile Money">Mobile Money</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="POS">POS</option>
                             </select>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Status</label>
                             <select name="status" class="form-select">
-                                <option value="paid" <?= strtolower((string) ($editPayment['status'] ?? 'paid')) === 'paid' ? 'selected' : '' ?>>Paid</option>
-                                <option value="pending" <?= strtolower((string) ($editPayment['status'] ?? 'paid')) === 'pending' ? 'selected' : '' ?>>Pending</option>
-                                <option value="partial" <?= strtolower((string) ($editPayment['status'] ?? 'paid')) === 'partial' ? 'selected' : '' ?>>Partial</option>
+                                <option value="paid">Paid</option>
+                                <option value="pending">Pending</option>
+                                <option value="partial">Partial</option>
                             </select>
-                        </div>
-                        <div class="col-md-1 d-flex align-items-end">
-                            <button type="submit" class="btn btn-success w-100">Update</button>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Reference</label>
-                            <input type="text" name="reference" class="form-control" value="<?= e((string) ($editPayment['reference'] ?? '')) ?>">
+                            <input type="text" name="reference" class="form-control" placeholder="Receipt / transaction no.">
                         </div>
                         <div class="col-md-8">
                             <label class="form-label">Notes</label>
-                            <input type="text" name="notes" class="form-control" value="<?= e((string) ($editPayment['notes'] ?? '')) ?>">
+                            <input type="text" name="notes" class="form-control" placeholder="Optional note about the payment">
+                        </div>
+                        <div class="col-12 modal-footer px-0 pb-0 border-0 justify-content-end">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-primary">Save payment</button>
                         </div>
                     </form>
                 </div>
-            </div>
-        <?php endif; ?>
-
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-body p-4">
-                <h5 class="fw-bold mb-3">Record a payment</h5>
-                <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/payments/index.php'))) ?>" class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label">Student</label>
-                        <select name="studentId" class="form-select" required>
-                            <option value="">Select student</option>
-                            <?php foreach ($students as $student): ?>
-                                <?php $studentId = (string) ($student['id'] ?? $student['uid'] ?? ''); ?>
-                                <?php $studentName = trim((string) (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))); ?>
-                                <?php if ($studentId === '') continue; ?>
-                                <option value="<?= e($studentId) ?>"><?= e($studentName !== '' ? $studentName : $studentId) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Fee</label>
-                        <input type="text" name="feeName" class="form-control" value="Boarding Fee" required>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Amount</label>
-                        <input type="number" name="amount" step="0.01" class="form-control" placeholder="650.00" required>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Method</label>
-                        <select name="paymentMethod" class="form-select">
-                            <option value="Cash">Cash</option>
-                            <option value="Mobile Money">Mobile Money</option>
-                            <option value="Bank Transfer">Bank Transfer</option>
-                            <option value="POS">POS</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Status</label>
-                        <select name="status" class="form-select">
-                            <option value="paid">Paid</option>
-                            <option value="pending">Pending</option>
-                            <option value="partial">Partial</option>
-                        </select>
-                    </div>
-                    <div class="col-md-1 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary w-100">Save</button>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Reference</label>
-                        <input type="text" name="reference" class="form-control" placeholder="Receipt / transaction no.">
-                    </div>
-                    <div class="col-md-8">
-                        <label class="form-label">Notes</label>
-                        <input type="text" name="notes" class="form-control" placeholder="Optional note about the payment">
-                    </div>
-                </form>
             </div>
         </div>
 
@@ -397,7 +381,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <a href="<?= url('index.php?route=' . urlencode('/views/admin/finance/statement/index.php') . '&studentId=' . urlencode((string) $row['id'])) ?>" class="btn btn-sm btn-outline-primary">View</a>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#paymentStatementModal-<?= e((string) $row['id']) ?>">View</button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -436,16 +420,95 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <td><?= e(date('d M Y', strtotime($payment['date']))) ?></td>
                                         <td>
                                             <div class="d-flex gap-2 flex-wrap">
-                                                <a href="<?= url('index.php?route=' . urlencode('/views/admin/finance/receipt/index.php') . '&paymentId=' . urlencode($payment['id'])) ?>" class="btn btn-sm btn-outline-primary">View Receipt</a>
-                                                <a href="<?= url('index.php?route=' . urlencode('/views/admin/finance/payments/index.php') . '&editPaymentId=' . urlencode($payment['id'])) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
-                                                <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/payments/index.php'))) ?>" class="d-inline" onsubmit="return confirm('Delete this payment record?');">
-                                                    <input type="hidden" name="action" value="delete">
-                                                    <input type="hidden" name="paymentId" value="<?= e((string) $payment['id']) ?>">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                                                </form>
+                                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#paymentReceiptModal-<?= e((string) $payment['id']) ?>">View Receipt</button>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPaymentModal<?= e((string) $payment['id']) ?>">Edit</button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deletePaymentModal<?= e((string) $payment['id']) ?>">Delete</button>
                                             </div>
                                         </td>
                                     </tr>
+
+                                    <div class="modal fade" id="editPaymentModal<?= e((string) $payment['id']) ?>" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-lg">
+                                            <div class="modal-content">
+                                                <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/payments/index.php'))) ?>" class="row g-3 p-3">
+                                                    <input type="hidden" name="action" value="update">
+                                                    <input type="hidden" name="paymentId" value="<?= e((string) $payment['id']) ?>">
+                                                    <div class="modal-header px-0 pt-0 border-0">
+                                                        <h5 class="modal-title">Edit payment</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">Student</label>
+                                                        <select name="studentId" class="form-select" required>
+                                                            <?php foreach ($students as $student): ?>
+                                                                <?php $studentId = (string) ($student['id'] ?? $student['uid'] ?? ''); ?>
+                                                                <?php $studentName = trim((string) (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))); ?>
+                                                                <?php if ($studentId === '') continue; ?>
+                                                                <option value="<?= e($studentId) ?>" <?= (string) ($payment['studentId'] ?? '') === $studentId ? 'selected' : '' ?>><?= e($studentName !== '' ? $studentName : $studentId) ?></option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label">Fee</label>
+                                                        <input type="text" name="feeName" class="form-control" value="<?= e((string) ($payment['feeName'] ?? 'Boarding Fee')) ?>" required>
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label">Amount</label>
+                                                        <input type="number" name="amount" step="0.01" class="form-control" value="<?= e((string) ($payment['amount'] ?? '0')) ?>" required>
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label">Method</label>
+                                                        <select name="paymentMethod" class="form-select">
+                                                            <option value="Cash" <?= strtolower((string) ($payment['method'] ?? 'Cash')) === 'cash' ? 'selected' : '' ?>>Cash</option>
+                                                            <option value="Mobile Money" <?= strtolower((string) ($payment['method'] ?? 'Cash')) === 'mobile money' ? 'selected' : '' ?>>Mobile Money</option>
+                                                            <option value="Bank Transfer" <?= strtolower((string) ($payment['method'] ?? 'Cash')) === 'bank transfer' ? 'selected' : '' ?>>Bank Transfer</option>
+                                                            <option value="POS" <?= strtolower((string) ($payment['method'] ?? 'Cash')) === 'pos' ? 'selected' : '' ?>>POS</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label">Status</label>
+                                                        <select name="status" class="form-select">
+                                                            <option value="paid" <?= strtolower((string) ($payment['status'] ?? 'paid')) === 'paid' ? 'selected' : '' ?>>Paid</option>
+                                                            <option value="pending" <?= strtolower((string) ($payment['status'] ?? 'paid')) === 'pending' ? 'selected' : '' ?>>Pending</option>
+                                                            <option value="partial" <?= strtolower((string) ($payment['status'] ?? 'paid')) === 'partial' ? 'selected' : '' ?>>Partial</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">Reference</label>
+                                                        <input type="text" name="reference" class="form-control" value="<?= e((string) ($payment['reference'] ?? '')) ?>">
+                                                    </div>
+                                                    <div class="col-md-8">
+                                                        <label class="form-label">Notes</label>
+                                                        <input type="text" name="notes" class="form-control" value="<?= e((string) ($payment['notes'] ?? '')) ?>">
+                                                    </div>
+                                                    <div class="col-12 modal-footer px-0 pb-0 border-0 justify-content-end">
+                                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                                                        <button type="submit" class="btn btn-success">Update</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="modal fade" id="deletePaymentModal<?= e((string) $payment['id']) ?>" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-sm modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/payments/index.php'))) ?>">
+                                                    <input type="hidden" name="action" value="delete">
+                                                    <input type="hidden" name="paymentId" value="<?= e((string) $payment['id']) ?>">
+                                                    <div class="modal-body text-center">
+                                                        <i class="bi bi-trash fs-1 text-danger d-block mb-3"></i>
+                                                        <h5 class="fw-bold">Delete payment?</h5>
+                                                        <p class="mb-0">This will remove the payment for <strong><?= e($payment['studentName']) ?></strong>.</p>
+                                                    </div>
+                                                    <div class="modal-footer justify-content-center">
+                                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-danger">Delete</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
                                 <?php endforeach; ?>
                                 <?php if (empty($actualPaymentRows)): ?>
                                     <tr>
@@ -458,6 +521,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </div>
             </div>
         </div>
+
+        <?php foreach ($actualPaymentRows as $payment): ?>
+            <div class="modal fade" id="paymentReceiptModal-<?= e((string) $payment['id']) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Payment Receipt</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e($payment['studentName']) ?></dd><dt class="col-sm-5">Fee</dt><dd class="col-sm-7"><?= e($payment['feeName']) ?></dd><dt class="col-sm-5">Amount</dt><dd class="col-sm-7">GHS <?= number_format((float) $payment['amount'], 2) ?></dd><dt class="col-sm-5">Method</dt><dd class="col-sm-7"><?= e($payment['method']) ?></dd><dt class="col-sm-5">Reference</dt><dd class="col-sm-7"><?= e($payment['reference']) ?></dd><dt class="col-sm-5">Date</dt><dd class="col-sm-7"><?= e(date('d M Y', strtotime($payment['date']))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+        <?php endforeach; ?>
+
+        <?php foreach ($rows as $row): ?>
+            <div class="modal fade" id="paymentStatementModal-<?= e((string) $row['id']) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Student Payment Statement</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e($row['student']) ?></dd><dt class="col-sm-5">House</dt><dd class="col-sm-7"><?= e($row['house']) ?></dd><dt class="col-sm-5">Fee</dt><dd class="col-sm-7"><?= e($row['fee']) ?></dd><dt class="col-sm-5">Amount</dt><dd class="col-sm-7">GHS <?= number_format((float) $row['amount'], 2) ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst($row['status'])) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+        <?php endforeach; ?>
     </div>
 </div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -18,12 +18,19 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\RoomService;
 
 $houseId = current_user()['houseId'] ?? null;
-$rooms = RoomService::all($houseId);
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$allRooms = RoomService::all($houseId);
 $roomStats = RoomService::occupancyStats($houseId);
 $roomSearch = strtolower(sanitize($_GET['search'] ?? ''));
+$filteredRooms = $allRooms;
 if ($roomSearch !== '') {
-    $rooms = array_values(array_filter($rooms, fn($room) => str_contains(strtolower((string) ($room['roomNumber'] ?? '')), $roomSearch)));
+    $filteredRooms = array_values(array_filter($filteredRooms, fn($room) => str_contains(strtolower((string) ($room['roomNumber'] ?? '')), $roomSearch)));
 }
+$totalRooms = count($filteredRooms);
+$totalPages = max(1, (int) ceil($totalRooms / $limit));
+$page = min($page, $totalPages);
+$rooms = array_slice($filteredRooms, ($page - 1) * $limit, $limit);
 
 $pageTitle = 'Senior Houseparent Rooms';
 $navItems = [
@@ -132,7 +139,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-door-open me-2"></i>Room Directory</h6>
-                <small class="text-muted">Showing <?= e((string) count($rooms)) ?> rooms</small>
+                <small class="text-muted">Showing <?= e((string) count($rooms)) ?> of <?= e((string) $totalRooms) ?> rooms</small>
             </div>
             <div class="card-body p-0">
                 <table class="table table-hover align-middle mb-0 data-table w-100">
@@ -156,7 +163,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td><?= e((string) $occupied) ?></td>
                                     <td><?= e((string) $vacant) ?></td>
                                     <td><span class="badge bg-<?= ($occupied >= $capacity) ? 'secondary' : 'success' ?>"><?= e((string) ($room['status'] ?? ($occupied >= $capacity ? 'full' : 'available'))) ?></span></td>
-                                    <td class="text-nowrap"><a class="btn btn-sm btn-outline-primary" href="<?= url('views/senior-houseparent/rooms/view/view.php?id=' . urlencode((string) ($room['id'] ?? ''))) ?>"><i class="bi bi-eye me-1"></i>View</a></td>
+                                    <td class="text-nowrap"><button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#seniorRoomView-<?= e((string) ($room['id'] ?? '')) ?>"><i class="bi bi-eye me-1"></i>View</button></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php else: ?>
@@ -168,6 +175,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </table>
             </div>
         </div>
+
+        <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
     </div>
 </div>
+<?php foreach ($rooms as $room): ?>
+    <?php $modalRoomId = (string) ($room['id'] ?? ''); ?>
+    <div class="modal fade" id="seniorRoomView-<?= e($modalRoomId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Room Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Room</dt><dd class="col-sm-7"><?= e($room['roomNumber'] ?? '—') ?></dd><dt class="col-sm-5">Capacity</dt><dd class="col-sm-7"><?= e((string) ($room['capacity'] ?? 0)) ?></dd><dt class="col-sm-5">Occupied</dt><dd class="col-sm-7"><?= e((string) ($room['occupied'] ?? 0)) ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst((string) ($room['status'] ?? 'available'))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

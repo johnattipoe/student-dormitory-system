@@ -14,6 +14,7 @@ if (!defined('APP_ROOT')) {
 }
 
 $fastApiToken = getenv('FASTAPI_API_TOKEN') ?: '';
+$fastApiBaseUrl = rtrim(getenv('FASTAPI_BASE_URL') ?: 'https://student-dormitory-system.onrender.com', '/');
 
 $allowedRoles = [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_SENIOR_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
@@ -414,9 +415,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const apiToken = <?= json_encode($fastApiToken, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
-        const summaryUrl = 'http://localhost:8001/analytics/summary';
-        const roomsUrl = 'http://localhost:8001/analytics/rooms';
-        const incidentsUrl = 'http://localhost:8001/analytics/incidents';
+        const fastApiBaseUrl = <?= json_encode($fastApiBaseUrl, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+        const summaryUrl = fastApiBaseUrl + '/analytics/summary';
+        const roomsUrl = fastApiBaseUrl + '/analytics/rooms';
+        const incidentsUrl = fastApiBaseUrl + '/analytics/incidents';
 
         function buildHeaders() {
             const headers = { Accept: 'application/json' };

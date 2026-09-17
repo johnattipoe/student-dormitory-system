@@ -21,8 +21,11 @@ use App\Services\UserService;
 
 $pageTitle = 'Users';
 $userService = new UserService();
-$users = $userService->all();
 $search = strtolower(sanitize($_GET['search'] ?? ''));
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$allUsers = $userService->all();
+$users = $allUsers;
 if ($search !== '') {
     $users = array_values(array_filter($users, function ($user) use ($search) {
         return str_contains(strtolower(trim(($user['name'] ?? '') . ' ' . ($user['email'] ?? '') . ' ' . ($user['role'] ?? ''))), $search);
@@ -34,11 +37,14 @@ if (FirebaseAdminAuthService::credentialsAvailable()) {
     $authUsers = FirebaseAdminAuthService::listAuthUsers(500);
 }
 $totalUsers = count($users);
-$activeUsers = count(array_filter($users, static fn(array $user): bool => ($user['status'] ?? 'active') === 'active'));
-$staffUsers = count(array_filter($users, static fn(array $user): bool => ($user['role'] ?? '') !== 'student'));
-$roleCount = count(array_unique(array_filter(array_map(static fn(array $user): string => (string) ($user['role'] ?? ''), $users))));
+$totalPages = max(1, (int) ceil($totalUsers / $limit));
+$page = min($page, $totalPages);
+$users = array_slice($users, ($page - 1) * $limit, $limit);
+$activeUsers = count(array_filter($allUsers, static fn(array $user): bool => ($user['status'] ?? 'active') === 'active'));
+$staffUsers = count(array_filter($allUsers, static fn(array $user): bool => ($user['role'] ?? '') !== 'student'));
+$roleCount = count(array_unique(array_filter(array_map(static fn(array $user): string => (string) ($user['role'] ?? ''), $allUsers))));
 $roleCounts = [];
-foreach ($users as $userRecord) {
+foreach ($allUsers as $userRecord) {
     $roleKey = strtolower(trim((string) ($userRecord['role'] ?? '')));
     $roleCounts[$roleKey] = ($roleCounts[$roleKey] ?? 0) + 1;
 }
@@ -174,7 +180,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-people me-2 text-primary"></i>System User Accounts</h6>
-                <small class="text-muted">Showing <?= count($users) ?> accounts</small>
+                <small class="text-muted">Showing <?= e((string) $totalUsers) ?> accounts</small>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -211,9 +217,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td><?= e(in_array($userRole, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true) ? $userHouseName : '—') ?></td>
                                     <td><span class="badge bg-<?= ($user['status'] ?? '') === 'active' ? 'success' : 'secondary' ?>"><?= ucfirst(e($user['status'] ?? 'active')) ?></span></td>
                                     <td class="text-end text-nowrap">
-                                        <a href="<?= url('views/admin/users/view/view.php?id=' . urlencode($uId)) ?>" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye"></i></a>
-                                        <a href="<?= url('views/admin/users/edit/edit.php?id=' . urlencode($uId)) ?>" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
-                                        <a href="<?= url('views/admin/users/delete/delete.php?id=' . urlencode($uId)) ?>" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" title="View" data-bs-toggle="modal" data-bs-target="#userViewModal-<?= e($uId) ?>">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" title="Edit" data-bs-toggle="modal" data-bs-target="#userEditModal-<?= e($uId) ?>">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" data-bs-toggle="modal" data-bs-target="#userDeleteModal-<?= e($uId) ?>">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -221,10 +233,125 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </tbody>
                     </table>
                 </div>
+                <?php $paginationBaseUrl = url('views/admin/users/index/index.php' . ($search !== '' ? '?search=' . urlencode($search) : '')); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
             </div>
         </div>
 
     </div>
 </div>
+
+<?php foreach ($users as $user): ?>
+    <?php
+    $uId = (string) ($user['id'] ?? $user['uid'] ?? '');
+    $userRole = (string) ($user['role'] ?? '');
+    $userName = (string) ($user['name'] ?? 'User');
+    $userEmail = (string) ($user['email'] ?? '');
+    $userStatus = (string) ($user['status'] ?? 'active');
+    $userHouseId = $user['houseId'] ?? null;
+    $userHouseName = $userHouseId ? (HouseService::find($userHouseId)['name'] ?? 'Assigned') : '-';
+    ?>
+    <div class="modal fade" id="userViewModal-<?= e($uId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">User Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-3">
+                        <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-inline-flex align-items-center justify-content-center" style="width:56px;height:56px;">
+                            <i class="bi bi-person-fill fs-3"></i>
+                        </div>
+                    </div>
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Name</dt><dd class="col-sm-8"><?= e($userName) ?></dd>
+                        <dt class="col-sm-4">Email</dt><dd class="col-sm-8"><?= e($userEmail) ?></dd>
+                        <dt class="col-sm-4">Role</dt><dd class="col-sm-8"><?= e(str_replace(['_', '-'], ' ', ucfirst($userRole))) ?></dd>
+                        <dt class="col-sm-4">House</dt><dd class="col-sm-8"><?= e($userHouseName) ?></dd>
+                        <dt class="col-sm-4">Status</dt><dd class="col-sm-8"><?= e(ucfirst($userStatus)) ?></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="userEditModal-<?= e($uId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="<?= url('views/admin/users/edit/edit.php?id=' . urlencode($uId)) ?>">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit User</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="id" value="<?= e($uId) ?>">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Full Name</label>
+                                <input name="name" class="form-control" value="<?= e($userName) ?>" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" value="<?= e($userEmail) ?>" disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Role</label>
+                                <select name="role" class="form-select">
+                                    <?php foreach (['admin','house_master','house_mistress','senior-houseparent','security','nurse','student'] as $roleOption): ?>
+                                        <option value="<?= e($roleOption) ?>" <?= $userRole === $roleOption ? 'selected' : '' ?>><?= e(ucfirst(str_replace('_', ' ', $roleOption))) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Status</label>
+                                <select name="status" class="form-select">
+                                    <option value="active" <?= $userStatus === 'active' ? 'selected' : '' ?>>Active</option>
+                                    <option value="inactive" <?= $userStatus === 'inactive' ? 'selected' : '' ?>>Inactive</option>
+                                </select>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">House</label>
+                                <select name="houseId" class="form-select">
+                                    <option value="">Select house</option>
+                                    <?php foreach (HouseService::all() as $house): ?>
+                                        <option value="<?= e((string) ($house['id'] ?? '')) ?>" <?= (($userHouseId ?? '') === ($house['id'] ?? '')) ? 'selected' : '' ?>><?= e($house['name'] ?? 'House') ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="userDeleteModal-<?= e($uId) ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title text-danger">Delete User</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">Are you sure you want to delete <strong><?= e($userName) ?></strong>?</p>
+                    <p class="text-muted mb-0">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form method="POST" action="<?= url('views/admin/users/delete/delete.php?id=' . urlencode($uId)) ?>">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
 
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -55,6 +55,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $search = strtolower(trim(sanitize($_GET['search'] ?? '')));
 $statusFilter = sanitize($_GET['status'] ?? '');
 $roomFilter = sanitize($_GET['roomId'] ?? '');
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 $beds = array_values(array_filter($beds, function ($bed) use ($search, $statusFilter, $roomFilter, $roomMap, $houseMap) {
     $room = $roomMap[(string) ($bed['roomId'] ?? '')] ?? [];
     $roomName = (string) ($room['roomNumber'] ?? $bed['roomId'] ?? '');
@@ -63,6 +65,10 @@ $beds = array_values(array_filter($beds, function ($bed) use ($search, $statusFi
         && ($statusFilter === '' || ($bed['status'] ?? 'available') === $statusFilter)
         && ($roomFilter === '' || (string) ($bed['roomId'] ?? '') === $roomFilter);
 }));
+    $totalBeds = count($beds);
+    $totalPages = max(1, (int) ceil($totalBeds / $limit));
+    $page = min($page, $totalPages);
+    $beds = array_slice($beds, ($page - 1) * $limit, $limit);
 
 $pageTitle = 'Bed Management';
 $navItems = [
@@ -86,7 +92,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
         <div class="row g-3 mb-3">
-            <div class="col-md-3"><div class="card stat-card p-3"><small class="text-muted">Beds shown</small><strong class="fs-3"><?= e((string) count($beds)) ?></strong></div></div>
+            <div class="col-md-3"><div class="card stat-card p-3"><small class="text-muted">Beds shown</small><strong class="fs-3"><?= e((string) $totalBeds) ?></strong></div></div>
             <div class="col-md-3"><div class="card stat-card p-3"><small class="text-muted">Occupied</small><strong class="fs-3 text-warning"><?= e((string) count(array_filter($beds, static fn ($bed) => ($bed['status'] ?? '') === 'occupied'))) ?></strong></div></div>
             <div class="col-md-3"><div class="card stat-card p-3"><small class="text-muted">Available</small><strong class="fs-3 text-success"><?= e((string) count(array_filter($beds, static fn ($bed) => ($bed['status'] ?? 'available') === 'available'))) ?></strong></div></div>
             <div class="col-md-3"><div class="card stat-card p-3"><small class="text-muted">Maintenance</small><strong class="fs-3 text-secondary"><?= e((string) count(array_filter($beds, static fn ($bed) => ($bed['status'] ?? '') === 'maintenance'))) ?></strong></div></div>
@@ -199,7 +205,16 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="modal fade" id="viewBed<?= e($bedId) ?>" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Bed <?= e($bed['bedNumber'] ?? '-') ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p><strong>Room:</strong> <?= e($room['roomNumber'] ?? '-') ?></p><p><strong>House:</strong> <?= e($houseMap[(string) ($room['houseId'] ?? '')] ?? '-') ?></p><p><strong>Student:</strong> <?= $student ? e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) : 'Unassigned' ?></p><p><strong>Status:</strong> <?= e($status) ?></p></div></div></div></div>
             <div class="modal fade" id="editBed<?= e($bedId) ?>" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="POST"><div class="modal-header"><h5 class="modal-title">Edit bed</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="action" value="update"><input type="hidden" name="bedId" value="<?= e($bedId) ?>"><label class="form-label">Bed number</label><input name="bedNumber" class="form-control mb-3" value="<?= e($bed['bedNumber'] ?? '') ?>" required><label class="form-label">Room</label><select name="roomId" class="form-select mb-3" required><?php foreach ($rooms as $optionRoom): ?><option value="<?= e((string) ($optionRoom['id'] ?? '')) ?>" <?= (string) ($bed['roomId'] ?? '') === (string) ($optionRoom['id'] ?? '') ? 'selected' : '' ?>><?= e($optionRoom['roomNumber'] ?? '-') ?> - <?= e($houseMap[(string) ($optionRoom['houseId'] ?? '')] ?? '-') ?></option><?php endforeach; ?></select><label class="form-label">Status</label><select name="status" class="form-select"><option value="available" <?= $status === 'available' ? 'selected' : '' ?>>Available</option><option value="maintenance" <?= $status === 'maintenance' ? 'selected' : '' ?>>Maintenance</option></select></div><div class="modal-footer"><button class="btn btn-primary">Save changes</button></div></form></div></div></div>
             <?php if (!$student && $status !== 'maintenance'): ?><div class="modal fade" id="assignBed<?= e($bedId) ?>" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="POST"><div class="modal-header"><h5 class="modal-title">Assign bed <?= e($bed['bedNumber'] ?? '-') ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="action" value="assign"><input type="hidden" name="bedId" value="<?= e($bedId) ?>"><label class="form-label">Student</label><select name="studentId" class="form-select" required><option value="">Select student</option><?php foreach ($students as $optionStudent): ?><option value="<?= e((string) ($optionStudent['id'] ?? '')) ?>"><?= e(trim(($optionStudent['firstName'] ?? '') . ' ' . ($optionStudent['lastName'] ?? ''))) ?> (<?= e($optionStudent['admissionNo'] ?? '') ?>)</option><?php endforeach; ?></select></div><div class="modal-footer"><button class="btn btn-primary">Assign bed</button></div></form></div></div></div><?php endif; ?>
-        <?php endforeach; endif; ?></tbody></table></div></div>
+        <?php endforeach; endif; ?></tbody></table></div>
+            <?php
+            $paginationQuery = [];
+            foreach (['search' => $search, 'roomId' => $roomFilter, 'status' => $statusFilter] as $key => $value) {
+                if ($value !== '') $paginationQuery[] = $key . '=' . urlencode($value);
+            }
+            $paginationBaseUrl = url('views/admin/beds/index/index.php' . (!empty($paginationQuery) ? '?' . implode('&', $paginationQuery) : ''));
+            require APP_ROOT . '/app/views/components/pagination/pagination.php';
+            ?>
+        </div></div>
     </div>
 </div>
 <div class="modal fade" id="createBedModal" tabindex="-1">

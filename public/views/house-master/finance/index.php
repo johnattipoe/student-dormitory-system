@@ -43,6 +43,7 @@ try {
 $payments = [];
 try {
     $payments = FirebaseService::getInstance()->getCollection(COL_FINANCE_PAYMENTS, [], 1000);
+    $payments = array_values(array_filter($payments, static fn(array $payment): bool => (string) ($payment['houseId'] ?? '') === (string) $houseId));
 } catch (Throwable $e) {
     $payments = [];
 }
@@ -125,7 +126,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="card-body p-4">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                     <h5 class="fw-bold mb-0">House payment ledger</h5>
-                    <a href="<?= url('index.php?route=' . urlencode('/views/admin/finance/export_csv/index.php') . '&houseId=' . urlencode((string) $houseId)) ?>" class="btn btn-outline-success btn-sm">Export CSV</a>
+                    <div class="d-flex gap-2">
+                        <a href="<?= url('index.php?route=' . urlencode('/views/admin/finance/payments/index.php')) ?>" class="btn btn-primary btn-sm">Record Payment</a>
+                        <a href="<?= url('index.php?route=' . urlencode('/views/admin/finance/export_csv/index.php') . '&houseId=' . urlencode((string) $houseId)) ?>" class="btn btn-outline-success btn-sm">Export CSV</a>
+                    </div>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-bordered align-middle">

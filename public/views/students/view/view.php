@@ -41,6 +41,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <dt class="col-sm-3">Class Code</dt><dd class="col-sm-9"><?= e($student['course'] ?? '') ?></dd>
                     <dt class="col-sm-3">House</dt><dd class="col-sm-9"><?= e($student['houseId'] ?? '-') ?></dd>
                     <dt class="col-sm-3">Status</dt><dd class="col-sm-9"><?= e($student['status'] ?? '') ?></dd>
+                        <dt class="col-sm-3">Residence Type</dt><dd class="col-sm-9"><?= e(strtolower((string) ($student['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></dd>
                 </dl>
             <?php else: ?>
                 <div class="alert alert-warning">No student selected.</div>

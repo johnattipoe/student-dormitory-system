@@ -29,6 +29,8 @@ foreach (StudentService::all() as $st) {
 }
 
 $search = strtolower(sanitize($_GET['search'] ?? ''));
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 if ($search !== '') {
     $incidents = array_values(array_filter($incidents, function ($incident) use ($search, $students) {
         $stId = (string) ($incident['studentId'] ?? '');
@@ -38,6 +40,10 @@ if ($search !== '') {
             || str_contains($stName, $search);
     }));
 }
+$totalFilteredIncidents = count($incidents);
+$totalPages = max(1, (int) ceil($totalFilteredIncidents / $limit));
+$page = min($page, $totalPages);
+$incidents = array_slice($incidents, ($page - 1) * $limit, $limit);
 
 $openCount = count(array_filter($incidents, fn($i) => ($i['status'] ?? 'open') === 'open'));
 $resolvedCount = count(array_filter($incidents, fn($i) => ($i['status'] ?? '') === 'resolved'));
@@ -136,7 +142,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-shield-exclamation me-2"></i>Security Incidents</h6>
-                <small class="text-muted">Showing <strong><?= count($incidents) ?></strong> record(s)</small>
+                <small class="text-muted">Showing <strong><?= e((string) $totalFilteredIncidents) ?></strong> record(s)</small>
             </div>
             <div class="card-body p-0">
                 <table class="table table-hover align-middle mb-0 data-table w-100">
@@ -184,9 +190,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     </td>
                                     <td class="small text-muted"><?= e(substr((string) ($incident['createdAt'] ?? '-'), 0, 10)) ?></td>
                                     <td class="text-end text-nowrap">
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/security/incidents/view/view.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>"><i class="bi bi-eye me-1"></i>View</a>
-                                        <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/security/incidents/edit/edit.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>"><i class="bi bi-pencil me-1"></i>Edit</a>
-                                        <a class="btn btn-sm btn-outline-danger" href="<?= url('views/security/incidents/delete/delete.php?id=' . urlencode((string) ($incident['id'] ?? ''))) ?>"><i class="bi bi-trash"></i></a>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#securityIncidentView-<?= e((string) ($incident['id'] ?? '')) ?>"><i class="bi bi-eye me-1"></i>View</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#securityIncidentEdit-<?= e((string) ($incident['id'] ?? '')) ?>"><i class="bi bi-pencil me-1"></i>Edit</button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#securityIncidentDelete-<?= e((string) ($incident['id'] ?? '')) ?>"><i class="bi bi-trash"></i></button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -198,7 +204,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </tbody>
                 </table>
             </div>
+            <?php $paginationBaseUrl = url('views/security/incidents/incidents/incidents.php' . ($search !== '' ? '?search=' . urlencode($search) : '')); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
         </div>
     </div>
 </div>
+<?php foreach ($incidents as $incident): ?>
+    <?php $modalIncidentId = (string) ($incident['id'] ?? ''); $modalIncidentStatus = (string) ($incident['status'] ?? 'open'); ?>
+    <div class="modal fade" id="securityIncidentView-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Incident Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Title</dt><dd class="col-sm-7"><?= e($incident['title'] ?? $incident['type'] ?? 'Incident') ?></dd><dt class="col-sm-5">Priority</dt><dd class="col-sm-7"><?= e(ucfirst((string) ($incident['priority'] ?? $incident['severity'] ?? 'medium'))) ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucwords(str_replace('_', ' ', $modalIncidentStatus))) ?></dd><dt class="col-sm-5">Details</dt><dd class="col-sm-7"><?= e($incident['description'] ?? $incident['notes'] ?? '—') ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+    <div class="modal fade" id="securityIncidentEdit-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><form method="POST" action="<?= url('views/security/incidents/edit/edit.php?id=' . urlencode($modalIncidentId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalIncidentId) ?>"><label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($incident['title'] ?? $incident['type'] ?? '') ?>" required><label class="form-label">Status</label><select name="status" class="form-select mb-3"><option value="open" <?= $modalIncidentStatus === 'open' ? 'selected' : '' ?>>Open</option><option value="investigating" <?= $modalIncidentStatus === 'investigating' ? 'selected' : '' ?>>Investigating</option><option value="resolved" <?= $modalIncidentStatus === 'resolved' ? 'selected' : '' ?>>Resolved</option></select><label class="form-label">Description</label><textarea name="description" class="form-control" rows="4"><?= e($incident['description'] ?? $incident['notes'] ?? '') ?></textarea></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
+    <div class="modal fade" id="securityIncidentDelete-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">Delete <strong><?= e($incident['title'] ?? $incident['type'] ?? 'this incident') ?></strong>?</div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/security/incidents/delete/delete.php?id=' . urlencode($modalIncidentId)) ?>"><input type="hidden" name="id" value="<?= e($modalIncidentId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

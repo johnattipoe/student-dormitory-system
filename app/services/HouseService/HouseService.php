@@ -4,9 +4,9 @@ namespace App\Services;
 
 class HouseService
 {
-    public static function all(): array
+    public static function all(int $limit = 150): array
     {
-        return FirebaseService::getInstance()->getCollection(\COL_HOUSES, [], 200);
+        return FirebaseService::getInstance()->getCollection(\COL_HOUSES, [], $limit);
     }
 
     public static function find(string $id): ?array

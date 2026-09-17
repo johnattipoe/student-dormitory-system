@@ -19,7 +19,6 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\StudentService;
 use App\Services\UserService;
 use App\Services\HouseService;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 
 $userService = new UserService();
 
@@ -29,10 +28,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download_template'])) {
     header('Content-Disposition: attachment; filename="student_import_template.csv"');
     
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['FirstName', 'LastName', 'AdmissionNo', 'Gender', 'Class', 'Form', 'Course', 'NHISNumber', 'GuardianName', 'GuardianPhone', 'GuardianEmail']);
+    fputcsv($output, ['FirstName', 'LastName', 'AdmissionNo', 'Gender', 'Class', 'Form', 'Course', 'NHISNumber', 'ResidenceType', 'GuardianName', 'GuardianPhone', 'GuardianEmail']);
     
     // Add sample row
-    fputcsv($output, ['John', 'Doe', 'ADM001', 'Male', 'SHS 1', 'Form 1', 'General Science', 'NHIS12345678', 'Jane Doe', '0241234567', 'guardian@example.com']);
+    fputcsv($output, ['John', 'Doe', 'ADM001', 'Male', 'SHS 1', 'Form 1', 'General Science', 'NHIS12345678', 'Boarding', 'Jane Doe', '0241234567', 'guardian@example.com']);
     
     fclose($output);
     exit;
@@ -49,7 +48,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $extension = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
         if (validate_uploaded_file($file, ['csv', 'xlsx']) === null) {
             try {
-                $spreadsheet = IOFactory::load($file['tmp_name']);
+                $spreadsheet = call_user_func(
+                    ['PhpOffice\\PhpSpreadsheet\\IOFactory', 'load'],
+                    $file['tmp_name']
+                );
                 $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
                 $header = array_map(fn($value) => strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $value)), array_shift($rows) ?: []);
                 $headerMap = [];
@@ -67,6 +69,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         continue;
                     }
                     $formValue = sanitize($row[$headerMap['form'] ?? 5] ?? $row[$headerMap['level'] ?? 5] ?? '');
+                    $residenceType = strtolower(trim((string) ($row[$headerMap['residencetype'] ?? 8] ?? ($_POST['residenceType'] ?? 'boarding'))));
+                    if (!in_array($residenceType, ['boarding', 'day'], true)) {
+                        $residenceType = 'boarding';
+                    }
                     $studentData = [
                         'firstName' => $firstName,
                         'lastName' => $lastName,
@@ -78,10 +84,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'course' => sanitize($row[$headerMap['course'] ?? 6] ?? ''),
                         'nhisNumber' => sanitize($row[$headerMap['nhisnumber'] ?? 7] ?? ''),
                         'houseId' => sanitize($_POST['houseId'] ?? ''),
+                        'residenceType' => $residenceType,
                         'status' => 'active',
-                        'guardianName' => sanitize($row[$headerMap['guardianname'] ?? 8] ?? ''),
-                        'guardianPhone' => sanitize($row[$headerMap['guardianphone'] ?? 9] ?? ''),
-                        'guardianEmail' => sanitize($row[$headerMap['guardianemail'] ?? 10] ?? ''),
+                        'guardianName' => sanitize($row[$headerMap['guardianname'] ?? 9] ?? ''),
+                        'guardianPhone' => sanitize($row[$headerMap['guardianphone'] ?? 10] ?? ''),
+                        'guardianEmail' => sanitize($row[$headerMap['guardianemail'] ?? 11] ?? ''),
                     ];
                     $studentId = StudentService::create($studentData);
                     $successCount++;
@@ -266,6 +273,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     </div>
 
                                     <div class="mb-3">
+                                        <label class="form-label fw-semibold">Residence Type</label>
+                                        <select name="residenceType" class="form-select">
+                                            <option value="boarding">Boarding</option>
+                                            <option value="day">Day</option>
+                                        </select>
+                                        <small class="text-muted">Used when the spreadsheet does not include a ResidenceType column.</small>
+                                    </div>
+
+                                    <div class="mb-3">
                                         <label class="form-label fw-semibold">CSV or XLSX Spreadsheet File <span class="text-danger">*</span></label>
                                         <input type="file" name="students_file" class="form-control" accept=".csv,.xlsx" required>
                                         <small class="text-muted d-block mt-2">
@@ -309,7 +325,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <div class="card-body p-4">
                                 <p class="small text-muted mb-2">Ensure your spreadsheet header row includes the exact column names below:</p>
                                 <div class="bg-light p-2 rounded-3 border small font-monospace mb-3">
-                                    FirstName, LastName, AdmissionNo, Gender, Class, Form, Course, NHISNumber, GuardianName, GuardianPhone, GuardianEmail
+                                    FirstName, LastName, AdmissionNo, Gender, Class, Form, Course, NHISNumber, ResidenceType, GuardianName, GuardianPhone, GuardianEmail
                                 </div>
                                 <ul class="small text-muted ps-3 mb-0">
                                     <li class="mb-1"><strong>AdmissionNo</strong> and <strong>FirstName</strong> are mandatory fields.</li>

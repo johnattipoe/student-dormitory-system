@@ -4,13 +4,13 @@ namespace App\Services;
 
 class AttendanceService
 {
-    public static function all(?string $date = null, ?string $houseId = null): array
+    public static function all(?string $date = null, ?string $houseId = null, int $limit = 150): array
     {
         if ($date) {
-            return self::forDate($date, $houseId);
+            return self::forDate($date, $houseId, $limit);
         }
 
-        return FirebaseService::getInstance()->getCollection(\COL_ATTENDANCE, [], 500);
+        return FirebaseService::getInstance()->getCollection(\COL_ATTENDANCE, [], $limit);
     }
 
     public static function report(?string $date = null, ?string $houseId = null): array
@@ -19,13 +19,13 @@ class AttendanceService
         return self::summary($date, $houseId);
     }
 
-    public static function byHouse(?string $houseId): array
+    public static function byHouse(?string $houseId, int $limit = 150): array
     {
         if (!$houseId) {
             return [];
         }
 
-        return FirebaseService::getInstance()->where(\COL_ATTENDANCE, 'houseId', '=', $houseId, 500);
+        return FirebaseService::getInstance()->where(\COL_ATTENDANCE, 'houseId', '=', $houseId, $limit);
     }
 
     public static function todayByHouse(?string $houseId): array
@@ -33,9 +33,9 @@ class AttendanceService
         return self::forDate(date('Y-m-d'), $houseId);
     }
 
-    public static function byHouseDate(?string $houseId, ?string $date = null): array
+    public static function byHouseDate(?string $houseId, ?string $date = null, int $limit = 150): array
     {
-        return self::forDate($date ?? date('Y-m-d'), $houseId);
+        return self::forDate($date ?? date('Y-m-d'), $houseId, $limit);
     }
 
     /** Mark attendance for one student on a given date. */
@@ -159,9 +159,9 @@ class AttendanceService
         return true;
     }
 
-    public static function forDate(string $date, ?string $houseId = null): array
+    public static function forDate(string $date, ?string $houseId = null, int $limit = 150): array
     {
-        $records = FirebaseService::getInstance()->where(\COL_ATTENDANCE, 'date', '=', $date);
+        $records = FirebaseService::getInstance()->where(\COL_ATTENDANCE, 'date', '=', $date, $limit);
         if ($houseId) {
             $records = array_values(array_filter($records, fn($r) => ($r['houseId'] ?? null) === $houseId));
         }
@@ -175,13 +175,20 @@ class AttendanceService
 
     public static function summary(string $date, ?string $houseId = null): array
     {
-        $records = self::forDate($date, $houseId);
-        $counts = ['present' => 0, 'absent' => 0, 'excused' => 0, 'late' => 0];
-        foreach ($records as $r) {
-            $status = $r['status'] ?? 'absent';
-            if (isset($counts[$status])) $counts[$status]++;
+        $wheres = [['date', '=', $date]];
+        if ($houseId) {
+            $wheres[] = ['houseId', '=', $houseId];
         }
-        $counts['total'] = count($records);
+
+        $counts = ['present' => 0, 'absent' => 0, 'excused' => 0, 'late' => 0];
+        foreach (array_keys($counts) as $status) {
+            $query = $wheres;
+            $query[] = ['status', '=', $status];
+            $counts[$status] = FirebaseService::getInstance()->count(\COL_ATTENDANCE, $query);
+        }
+
+        $counts['total'] = FirebaseService::getInstance()->count(\COL_ATTENDANCE, $wheres);
+
         return $counts;
     }
 }

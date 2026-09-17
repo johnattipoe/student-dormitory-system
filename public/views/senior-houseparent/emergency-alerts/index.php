@@ -152,9 +152,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/senior-houseparent/emergency-alerts/log/create.php?contactId=' . urlencode($contactId)) ?>" title="Log Emergency Call">
                                 <i class="bi bi-journal-plus me-1"></i> Log Call
                             </a>
-                            <a class="btn btn-sm btn-outline-primary" href="<?= url('views/senior-houseparent/emergency-alerts/contacts/edit/edit.php?id=' . urlencode($contactId)) ?>" title="Edit Contact">
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#seniorContactEdit-<?= e($contactId) ?>" title="Edit Contact">
                                 <i class="bi bi-pencil"></i>
-                            </a>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -196,9 +196,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td><?= e($inc['triggeredByName'] ?? 'Staff') ?></td>
                                     <td class="text-end">
                                         <?php if ($incId !== ''): ?>
-                                            <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/senior-houseparent/emergency-alerts/log/view.php?id=' . urlencode($incId)) ?>">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#seniorEmergencyLogView-<?= e($incId) ?>">
                                                 <i class="bi bi-eye"></i> View
-                                            </a>
+                                            </button>
                                         <?php else: ?>
                                             <span class="text-muted small">—</span>
                                         <?php endif; ?>
@@ -212,4 +212,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php foreach ($contacts as $contact): ?>
+    <?php $modalContactId = (string) ($contact['id'] ?? ''); ?>
+    <div class="modal fade" id="seniorContactEdit-<?= e($modalContactId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><form method="POST" action="<?= url('views/senior-houseparent/emergency-alerts/contacts/edit/edit.php?id=' . urlencode($modalContactId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Emergency Contact</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">Name</label><input name="name" class="form-control mb-3" value="<?= e($contact['name'] ?? '') ?>" required><label class="form-label">Role / Title</label><input name="roleTitle" class="form-control mb-3" value="<?= e($contact['roleTitle'] ?? '') ?>"><label class="form-label">Phone</label><input name="phone" class="form-control mb-3" value="<?= e($contact['phone'] ?? '') ?>" required><label class="form-label">Email</label><input name="email" type="email" class="form-control mb-3" value="<?= e($contact['email'] ?? '') ?>"><label class="form-label">Priority</label><select name="priority" class="form-select"><option value="critical" <?= ($contact['priority'] ?? '') === 'critical' ? 'selected' : '' ?>>Critical</option><option value="high" <?= ($contact['priority'] ?? '') === 'high' ? 'selected' : '' ?>>High</option><option value="normal" <?= ($contact['priority'] ?? 'normal') === 'normal' ? 'selected' : '' ?>>Normal</option></select></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
+<?php endforeach; ?>
+<?php foreach ($incidents as $inc): ?>
+    <?php $modalEmergencyLogId = (string) ($inc['id'] ?? ''); ?>
+    <div class="modal fade" id="seniorEmergencyLogView-<?= e($modalEmergencyLogId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Emergency Call Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Contact</dt><dd class="col-sm-7"><?= e($inc['contactName'] ?? '—') ?></dd><dt class="col-sm-5">Phone</dt><dd class="col-sm-7"><?= e($inc['contactPhone'] ?? '—') ?></dd><dt class="col-sm-5">Time</dt><dd class="col-sm-7"><?= e($inc['triggeredAt'] ?? '—') ?></dd><dt class="col-sm-5">Logged By</dt><dd class="col-sm-7"><?= e($inc['triggeredByName'] ?? 'Staff') ?></dd><dt class="col-sm-5">Notes</dt><dd class="col-sm-7"><?= e($inc['notes'] ?? '—') ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

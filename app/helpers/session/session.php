@@ -1,6 +1,6 @@
 <?php
 /** Flash message helpers (one-time messages shown after redirect) */
-function flash(string $key, ?string $message = null)
+function flash(string $key, ?string $message = null): ?string
 {
     if ($message !== null) {
         $_SESSION['_flash'][$key] = $message;
@@ -8,7 +8,7 @@ function flash(string $key, ?string $message = null)
     }
     $value = $_SESSION['_flash'][$key] ?? null;
     unset($_SESSION['_flash'][$key]);
-    return $value;
+    return $value !== null ? (string) $value : null;
 }
 
 function old(string $key, $default = '')
@@ -16,7 +16,7 @@ function old(string $key, $default = '')
     return $_SESSION['_old'][$key] ?? $default;
 }
 
-function session_put(string $key, $value): void
+function session_put(string $key, mixed $value): void
 {
     $_SESSION[$key] = $value;
 }

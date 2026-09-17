@@ -38,6 +38,12 @@ $notifications = array_values(array_filter($notifications, function ($note) use 
         && ($notificationRead === '' || (($notificationRead === 'unread') === empty($note['read'])))
         && ($notificationSearch === '' || str_contains(strtolower((string) ($note['title'] ?? '')), $notificationSearch) || str_contains(strtolower((string) ($note['message'] ?? '')), $notificationSearch));
 }));
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$totalNotifications = count($notifications);
+$totalPages = max(1, (int) ceil($totalNotifications / $limit));
+$page = min($page, $totalPages);
+$notifications = array_slice($notifications, ($page - 1) * $limit, $limit);
 $unreadCount = count(array_filter($notifications, fn($note) => empty($note['read'])));
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/house-master/dashboard/index.php')],
@@ -152,7 +158,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-bell me-2"></i>All Notifications</h6>
-                <small class="text-muted">Showing <?= count($notifications) ?> records</small>
+                <small class="text-muted">Showing <?= count($notifications) ?> of <?= e((string) $totalNotifications) ?> records</small>
             </div>
             <div class="card-body p-0">
                 <table class="table table-hover align-middle mb-0 data-table w-100">
@@ -187,7 +193,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-nowrap">
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= url('views/house-master/notifications/view/view.php?id=' . urlencode((string) ($note['id'] ?? ''))) ?>"><i class="bi bi-eye me-1"></i>View</a>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#houseNotificationViewModal-<?= e((string) ($note['id'] ?? '')) ?>"><i class="bi bi-eye me-1"></i>View</button>
                                         <?php if (empty($note['read'])): ?>
                                             <form method="POST" action="<?= url('views/house-master/notifications/index/index.php') ?>" class="d-inline">
                                                 <input type="hidden" name="action" value="mark_read">
@@ -207,6 +213,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </table>
             </div>
         </div>
+
+        <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
     </div>
 </div>
+<?php foreach ($notifications as $note): ?>
+    <?php $modalNotificationId = (string) ($note['id'] ?? ''); ?>
+    <div class="modal fade" id="houseNotificationViewModal-<?= e($modalNotificationId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Notification Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><h6><?= e($note['title'] ?? 'Notification') ?></h6><span class="badge bg-<?= e(($note['type'] ?? 'info') === 'danger' ? 'danger' : (($note['type'] ?? 'info') === 'warning' ? 'warning text-dark' : (($note['type'] ?? 'info') === 'success' ? 'success' : 'info'))) ?> mb-3"><?= e(ucfirst($note['type'] ?? 'info')) ?></span><p class="mb-0" style="white-space: pre-line;"><?= e($note['message'] ?? '') ?></p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+<?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

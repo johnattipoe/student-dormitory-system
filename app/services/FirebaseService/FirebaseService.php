@@ -69,6 +69,31 @@ class FirebaseService
         return sprintf('Firebase credentials file not found: %s', $credentialPath);
     }
 
+    private function requestLimit(int $limit): int
+    {
+        $requestedLimit = filter_var($_GET['limit'] ?? null, FILTER_VALIDATE_INT);
+        if ($requestedLimit !== false && $requestedLimit > 0) {
+            $limit = min(150, max(1, $requestedLimit));
+        }
+
+        return $limit;
+    }
+
+    private function requestOffset(int $limit, int $offset): int
+    {
+        $requestedOffset = filter_var($_GET['offset'] ?? null, FILTER_VALIDATE_INT);
+        if ($requestedOffset !== false && $requestedOffset >= 0) {
+            return $requestedOffset;
+        }
+
+        $requestedPage = filter_var($_GET['page'] ?? null, FILTER_VALIDATE_INT);
+        if ($requestedPage !== false && $requestedPage > 1) {
+            return ($requestedPage - 1) * $limit;
+        }
+
+        return $offset;
+    }
+
     /** Fetch a single document as an assoc array (with 'id'), or null if it doesn't exist. */
     public function getDocument(string $collection, string $id): ?array
     {
@@ -85,7 +110,46 @@ class FirebaseService
      * Fetch documents from a collection, optionally filtered.
      * $wheres: array of [field, operator, value] triples, e.g. [['role', '=', 'student']]
      */
-    public function getCollection(string $collection, array $wheres = [], int $limit = 500): array
+    public function getCollection(string $collection, array $wheres = [], int $limit = 150, int $offset = 0): array
+    {
+        if (!$this->credentialsAvailable()) {
+            throw new \RuntimeException($this->credentialsErrorMessage());
+        }
+
+        $limit = $this->requestLimit($limit);
+        $offset = $this->requestOffset($limit, $offset);
+
+        $query = $this->client()->collection($collection);
+        foreach ($wheres as [$field, $op, $value]) {
+            $query = $query->where($field, $op, $value);
+        }
+
+        $fetchLimit = $offset > 0 ? $offset + $limit : $limit;
+        $query = $query->limit($fetchLimit);
+
+        $out = [];
+        $seen = 0;
+        foreach ($query->documents() as $doc) {
+            if (!$doc->exists()) {
+                continue;
+            }
+
+            if ($offset > 0 && $seen < $offset) {
+                $seen++;
+                continue;
+            }
+
+            $out[] = array_merge(['id' => $doc->id()], $doc->data());
+            if (count($out) >= $limit) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /** Efficiently count documents matching optional filters without loading the full collection. */
+    public function count(string $collection, array $wheres = []): int
     {
         if (!$this->credentialsAvailable()) {
             throw new \RuntimeException($this->credentialsErrorMessage());
@@ -95,15 +159,23 @@ class FirebaseService
         foreach ($wheres as [$field, $op, $value]) {
             $query = $query->where($field, $op, $value);
         }
-        $query = $query->limit($limit);
 
-        $out = [];
-        foreach ($query->documents() as $doc) {
-            if ($doc->exists()) {
-                $out[] = array_merge(['id' => $doc->id()], $doc->data());
-            }
+        return (int) $query->count();
+    }
+
+    /** Efficiently sum a numeric field across matching documents without loading the full collection. */
+    public function sum(string $collection, string $field, array $wheres = []): int|float
+    {
+        if (!$this->credentialsAvailable()) {
+            throw new \RuntimeException($this->credentialsErrorMessage());
         }
-        return $out;
+
+        $query = $this->client()->collection($collection);
+        foreach ($wheres as [$fieldName, $op, $value]) {
+            $query = $query->where($fieldName, $op, $value);
+        }
+
+        return $query->sum($field);
     }
 
     /** Create a document. Returns its generated (or given) id. */
@@ -158,8 +230,8 @@ class FirebaseService
      * Convenience alias matching the flat where() shape used by the earlier
      * *Service classes (StudentService, RoomService, etc).
      */
-    public function where(string $collection, string $field, string $op, mixed $value, int $limit = 500): array
+    public function where(string $collection, string $field, string $op, mixed $value, int $limit = 150, int $offset = 0): array
     {
-        return $this->getCollection($collection, [[$field, $op, $value]], $limit);
+        return $this->getCollection($collection, [[$field, $op, $value]], $limit, $offset);
     }
 }
