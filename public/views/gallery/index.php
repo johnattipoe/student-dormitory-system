@@ -368,16 +368,13 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <p class="mb-1 small text-muted"><?= e($item['houseName']) ?></p>
                                         <p class="mb-2 small text-muted">Uploaded: <?= e($item['uploadedAt']) ?></p>
                                         <div class="d-flex justify-content-between align-items-center gap-2">
-                                            <a href="<?= e($item['file']) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">View</a>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#galleryLightbox" data-gallery-image="<?= e($item['file']) ?>" data-gallery-title="<?= e($item['studentName']) ?>" data-gallery-house="<?= e($item['houseName']) ?>" data-gallery-uploaded="<?= e($item['uploadedAt']) ?>">
+                                                <i class="bi bi-eye me-1"></i>View
+                                            </button>
                                             <?php if (in_array($role, [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true)): ?>
-                                                <form method="POST" class="d-inline" onsubmit="return confirm('Delete this student photo?');">
-                                                    <input type="hidden" name="action" value="delete_gallery_photo">
-                                                    <input type="hidden" name="photoFile" value="<?= e($item['fileName']) ?>">
-                                                    <input type="hidden" name="photoHouseId" value="<?= e($item['houseId']) ?>">
-                                                    <input type="hidden" name="houseId" value="<?= e($selectedHouseId) ?>">
-                                                    <input type="hidden" name="studentId" value="<?= e($selectedStudentId) ?>">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                                                </form>
+                                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#galleryDeleteModal" data-gallery-delete-file="<?= e($item['fileName']) ?>" data-gallery-delete-house="<?= e($item['houseId']) ?>" data-gallery-delete-student="<?= e($item['studentName']) ?>">
+                                                    <i class="bi bi-trash me-1"></i>Delete
+                                                </button>
                                             <?php endif; ?>
                                         </div>
                                     </div>
@@ -402,8 +399,35 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <img id="galleryLightboxImage" src="" alt="Student gallery image" class="img-fluid rounded shadow-sm" style="max-height: 75vh; width: auto; max-width: 100%;">
                 <div class="mt-3">
                     <p id="galleryLightboxTitle" class="mb-0 fw-semibold text-dark"></p>
+                    <p id="galleryLightboxMeta" class="mb-0 small text-muted"></p>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="galleryDeleteModal" tabindex="-1" aria-labelledby="galleryDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold" id="galleryDeleteModalLabel"><i class="bi bi-trash3 text-danger me-2"></i>Delete student photo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="<?= url('index.php?route=' . urlencode('/views/gallery/index.php')) ?>">
+                <div class="modal-body pt-0">
+                    <p class="mb-2">Are you sure you want to delete this photo?</p>
+                    <p id="galleryDeleteStudent" class="fw-semibold text-dark mb-0"></p>
+                    <input type="hidden" name="action" value="delete_gallery_photo">
+                    <input type="hidden" name="photoFile" id="galleryDeleteFile">
+                    <input type="hidden" name="photoHouseId" id="galleryDeleteHouse">
+                    <input type="hidden" name="houseId" value="<?= e($selectedHouseId) ?>">
+                    <input type="hidden" name="studentId" value="<?= e($selectedStudentId) ?>">
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash3 me-1"></i>Delete photo</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -411,10 +435,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const modal = document.getElementById('galleryLightbox');
-        if (!modal) return;
-
         const imageEl = document.getElementById('galleryLightboxImage');
         const titleEl = document.getElementById('galleryLightboxTitle');
+        const metaEl = document.getElementById('galleryLightboxMeta');
 
         document.querySelectorAll('[data-gallery-image]').forEach(function (trigger) {
             trigger.addEventListener('click', function (event) {
@@ -423,7 +446,27 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 if (!src) return;
                 if (imageEl) imageEl.src = src;
                 if (titleEl) titleEl.textContent = title || 'Student Photo';
+                if (metaEl) {
+                    const house = trigger.getAttribute('data-gallery-house') || '';
+                    const uploaded = trigger.getAttribute('data-gallery-uploaded') || '';
+                    metaEl.textContent = [house, uploaded ? 'Uploaded: ' + uploaded : ''].filter(Boolean).join(' | ');
+                }
             });
+        });
+
+        const deleteModal = document.getElementById('galleryDeleteModal');
+        if (!deleteModal) return;
+
+        const deleteFileEl = document.getElementById('galleryDeleteFile');
+        const deleteHouseEl = document.getElementById('galleryDeleteHouse');
+        const deleteStudentEl = document.getElementById('galleryDeleteStudent');
+
+        deleteModal.addEventListener('show.bs.modal', function (event) {
+            const trigger = event.relatedTarget;
+            if (!trigger) return;
+            if (deleteFileEl) deleteFileEl.value = trigger.getAttribute('data-gallery-delete-file') || '';
+            if (deleteHouseEl) deleteHouseEl.value = trigger.getAttribute('data-gallery-delete-house') || '';
+            if (deleteStudentEl) deleteStudentEl.textContent = trigger.getAttribute('data-gallery-delete-student') || 'Student photo';
         });
     });
 </script>
