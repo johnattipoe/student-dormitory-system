@@ -50,8 +50,7 @@ RUN printf '%s\n' \
 RUN a2enconf student-dormitory
 
 ENV PORT=10000
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN sed -ri 's/^Listen 80$/Listen 10000/' /etc/apache2/ports.conf \
+    && sed -ri 's#<VirtualHost \*:80>#<VirtualHost *:10000>#' /etc/apache2/sites-available/000-default.conf
 
 EXPOSE 10000
-CMD ["/usr/local/bin/docker-entrypoint.sh", "apache2-foreground"]
