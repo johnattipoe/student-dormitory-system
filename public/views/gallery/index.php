@@ -69,7 +69,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_student_photo'
         $allowedExt = ['jpg', 'jpeg', 'png', 'webp'];
         $allowedMime = ['image/jpeg', 'image/png', 'image/webp'];
         $extension = strtolower(pathinfo((string) $photo['name'], PATHINFO_EXTENSION));
-        $mimeType = strtolower((string) ($photo['type'] ?? ''));
+        $mimeType = '';
+        if (!empty($photo['tmp_name']) && is_file($photo['tmp_name']) && function_exists('finfo_open')) {
+            $fileInfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($fileInfo !== false) {
+                $mimeType = strtolower((string) finfo_file($fileInfo, $photo['tmp_name']));
+                finfo_close($fileInfo);
+            }
+        }
+        if ($mimeType === '') {
+            $mimeType = strtolower((string) ($photo['type'] ?? ''));
+        }
 
         if ($photo['error'] !== UPLOAD_ERR_OK) {
             $uploadError = 'The selected image could not be uploaded. Please try again.';
@@ -83,8 +93,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_student_photo'
         $filename = 'student-photo-' . time() . '-' . $safeName;
         $storageObject = 'student-gallery/' . $filename;
 
+        $uploadStage = 'storage upload';
         try {
             $firebase->uploadStorageFile((string) $photo['tmp_name'], $storageObject, $mimeType);
+            $uploadStage = 'student lookup';
             $student = StudentService::find($studentId) ?? [];
             $studentName = trim((($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')));
             $metadata = [
@@ -98,7 +110,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_student_photo'
                 'uploadedBy' => $role,
                 'uploadedAt' => date('Y-m-d H:i:s'),
             ];
+            $uploadStage = 'Firestore metadata write';
             $metadata['id'] = $firebase->addDocument(COL_GALLERY_PHOTOS, $metadata);
+            $uploadStage = 'legacy metadata cache';
             $uploadDir = APP_ROOT . '/public/uploads/student-gallery';
             if (!is_dir($uploadDir)) {
                 @mkdir($uploadDir, 0775, true);
@@ -114,8 +128,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_student_photo'
             } catch (Throwable $cleanupError) {
                 error_log('Gallery Storage cleanup failed: ' . $cleanupError->getMessage());
             }
-            $uploadError = 'Image upload failed. Please try again.';
-            error_log('Gallery Storage upload failed: ' . $e->getMessage());
+            $uploadError = 'Image upload failed during ' . $uploadStage . '. Please try again.';
+            error_log('Gallery upload failed during ' . $uploadStage . ': ' . $e->getMessage());
         }
     }
 
