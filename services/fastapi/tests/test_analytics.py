@@ -5,9 +5,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from main import app
 
-client = TestClient(app)
+client = TestClient(
+    app,
+    headers={"Authorization": f"Bearer {settings.api_token}"},
+)
 
 
 def test_root_status():

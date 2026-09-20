@@ -8,6 +8,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from google.cloud import firestore
+from google.cloud.firestore_v1 import aggregation
 
 ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT / ".env", override=False)
@@ -93,9 +94,24 @@ def _stream_collection(db: firestore.Client, collection_name: str) -> list[Any]:
     return result
 
 
+def _count_query(
+    db: firestore.Client,
+    collection_name: str,
+    wheres: list[tuple[str, str, Any]] | None = None,
+) -> int:
+    query = db.collection(collection_name)
+    for field, operator, value in wheres or []:
+        query = query.where(field, operator, value)
+
+    count_query = aggregation.AggregationQuery(query)
+    count_query.count(alias="total")
+    results = count_query.get()
+    return int(results[0][0].value) if results else 0
+
+
 def count_collection(collection_name: str) -> int:
     db = get_firestore_client()
-    return len(_stream_collection(db, collection_name))
+    return _count_query(db, collection_name)
 
 
 def room_occupancy_stats() -> dict[str, Any]:
@@ -184,35 +200,24 @@ def incident_breakdown() -> dict[str, Any]:
 def analytics_summary() -> dict[str, Any]:
     try:
         db = get_firestore_client()
-        students = _stream_collection(db, "students")
-        exeats = _stream_collection(db, "exeats")
-        medical_records = _stream_collection(db, "medical_records")
         incidents = _stream_collection(db, "incidents")
-        attendance = _stream_collection(db, "attendance")
         rooms = _stream_collection(db, "rooms")
-        houses = _stream_collection(db, "houses")
-        visitors = _stream_collection(db, "visitors")
-
-        active_exeat_requests = 0
-        for doc in exeats:
-            data = _as_dict(doc)
-            status = str(data.get("status", "")).lower()
-            if status in {"pending", "approved", "departed"}:
-                active_exeat_requests += 1
-
-        medical_alerts = 0
-        for doc in medical_records:
-            data = _as_dict(doc)
-            severity = str(data.get("severity", "")).lower()
-            if severity in {"severe", "critical", "emergency"}:
-                medical_alerts += 1
+        active_exeat_requests = sum(
+            _count_query(db, "exeats", [("status", "==", status)])
+            for status in ("pending", "approved", "departed")
+        )
+        medical_alerts = sum(
+            _count_query(db, "medical_records", [("severity", "==", severity)])
+            for severity in ("severe", "critical", "emergency")
+        )
 
         attendance_statuses = {"present": 0, "absent": 0, "late": 0, "excused": 0}
-        for doc in attendance:
-            data = _as_dict(doc)
-            status = str(data.get("status", "")).lower()
-            if status in attendance_statuses:
-                attendance_statuses[status] += 1
+        for status in attendance_statuses:
+            attendance_statuses[status] = _count_query(
+                db,
+                "attendance",
+                [("status", "==", status)],
+            )
 
         total_attendance = sum(attendance_statuses.values())
         attendance_rate = 0.0
@@ -260,13 +265,13 @@ def analytics_summary() -> dict[str, Any]:
             incident_severities[severity] = incident_severities.get(severity, 0) + 1
 
         summary = {
-            "totalStudents": len(students),
+            "totalStudents": _count_query(db, "students"),
             "activeExeatRequests": active_exeat_requests,
             "medicalAlerts": medical_alerts,
             "securityIncidents": len(incidents),
-            "totalVisitors": len(visitors),
+            "totalVisitors": _count_query(db, "visitors"),
             "totalRooms": len(rooms),
-            "totalHouses": len(houses),
+            "totalHouses": _count_query(db, "houses"),
             "attendanceRate": attendance_rate,
             "attendance": attendance_statuses,
             "roomOccupancy": {
@@ -351,14 +356,14 @@ def student_stats() -> dict[str, Any]:
 def attendance_stats() -> dict[str, Any]:
     try:
         db = get_firestore_client()
-        attendance = _stream_collection(db, "attendance")
         counts = {"present": 0, "absent": 0, "late": 0, "excused": 0}
 
-        for doc in attendance:
-            data = _as_dict(doc)
-            status = str(data.get("status", "")).lower()
-            if status in counts:
-                counts[status] += 1
+        for status in counts:
+            counts[status] = _count_query(
+                db,
+                "attendance",
+                [("status", "==", status)],
+            )
 
         total = sum(counts.values())
         rate = 0.0

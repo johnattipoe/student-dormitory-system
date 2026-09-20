@@ -107,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $collectionCounts = [];
 foreach (array_keys($backupCollections) as $collection) {
     try {
-        $collectionCounts[$collection] = count($firebase->getCollection($collection, [], 1000));
+        $collectionCounts[$collection] = $firebase->count($collection);
     } catch (Throwable $e) {
         $collectionCounts[$collection] = null;
     }

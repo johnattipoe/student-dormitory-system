@@ -159,16 +159,9 @@ class RoomService
         }
 
         $db = FirebaseService::getInstance();
-        if ($houseId) {
-            $roomRecords = self::all($houseId, 150);
-            $rooms = count($roomRecords);
-            $totalCapacity = array_sum(array_map(static fn(array $room): int => (int) ($room['capacity'] ?? 0), $roomRecords));
-            $totalOccupied = array_sum(array_map(static fn(array $room): int => (int) ($room['occupied'] ?? 0), $roomRecords));
-        } else {
-            $rooms = $db->count(\COL_ROOMS, $wheres);
-            $totalCapacity = (int) $db->sum(\COL_ROOMS, 'capacity');
-            $totalOccupied = (int) $db->sum(\COL_ROOMS, 'occupied');
-        }
+        $rooms = $db->count(\COL_ROOMS, $wheres);
+        $totalCapacity = (int) $db->sum(\COL_ROOMS, 'capacity', $wheres);
+        $totalOccupied = (int) $db->sum(\COL_ROOMS, 'occupied', $wheres);
 
         return [
             'rooms'       => $rooms,

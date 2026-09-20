@@ -38,7 +38,7 @@ foreach ($students as $student) {
 $today = date('Y-m-d');
 $todayAttendance = AttendanceService::todayByHouse($houseId);
 $todayVisitors = (new VisitorService())->todayByHouse($houseId);
-$openIncidents = (new IncidentService())->byHouse($houseId, true);
+$openIncidentCount = (new IncidentService())->openByHouse($houseId);
 $attendanceSummary = AttendanceService::summary($today, $houseId);
 $roomStats = RoomService::occupancyStats($houseId);
 
@@ -152,12 +152,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
 
             <div class="col-sm-6 col-lg-3">
-                <div class="card stat-card h-100 p-3 border-start border-4 border-<?= count($openIncidents) > 0 ? 'danger' : 'secondary' ?> shadow-sm">
+                <div class="card stat-card h-100 p-3 border-start border-4 border-<?= $openIncidentCount > 0 ? 'danger' : 'secondary' ?> shadow-sm">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold">Open Incidents</span>
-                            <h3 class="fw-bold my-1 text-<?= count($openIncidents) > 0 ? 'danger' : 'dark' ?>"><?= e((string) count($openIncidents)) ?></h3>
-                            <span class="small text-muted"><?= count($openIncidents) > 0 ? 'Pending resolution' : 'No active issues' ?></span>
+                            <h3 class="fw-bold my-1 text-<?= $openIncidentCount > 0 ? 'danger' : 'dark' ?>"><?= e((string) $openIncidentCount) ?></h3>
+                            <span class="small text-muted"><?= $openIncidentCount > 0 ? 'Pending resolution' : 'No active issues' ?></span>
                         </div>
                         <div class="rounded-3 bg-danger bg-opacity-10 p-2 text-danger">
                             <i class="bi bi-flag fs-4"></i>

@@ -21,14 +21,15 @@ use App\Services\NotificationService;
 
 RoleMiddleware::allow($allowedRoles);
 
-$studentCount      = count(FirebaseService::getInstance()->getCollection(COL_STUDENTS, [], 1000));
-$houseCount        = count(FirebaseService::getInstance()->getCollection(COL_HOUSES, [], 100));
-$roomCount         = count(FirebaseService::getInstance()->getCollection(COL_ROOMS, [], 500));
-$incidentCount     = count(FirebaseService::getInstance()->getCollection(COL_INCIDENTS, [], 500));
-$attendanceCount   = count(FirebaseService::getInstance()->getCollection(COL_ATTENDANCE, [], 500));
-$allocationCount   = count(FirebaseService::getInstance()->getCollection(COL_ROOM_ALLOCATIONS, [], 500));
-$activityLogCount  = count(FirebaseService::getInstance()->getCollection(COL_ACTIVITY_LOGS, [], 500));
-$notificationCount = count((new NotificationService())->all());
+$firebase = FirebaseService::getInstance();
+$studentCount = $firebase->count(COL_STUDENTS);
+$houseCount = $firebase->count(COL_HOUSES);
+$roomCount = $firebase->count(COL_ROOMS);
+$incidentCount = $firebase->count(COL_INCIDENTS);
+$attendanceCount = $firebase->count(COL_ATTENDANCE);
+$allocationCount = $firebase->count(COL_ROOM_ALLOCATIONS);
+$activityLogCount = $firebase->count(COL_ACTIVITY_LOGS);
+$notificationCount = (new NotificationService())->count();
 
 $metrics = [
     'students' => $studentCount,

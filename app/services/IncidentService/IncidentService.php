@@ -189,7 +189,36 @@ class IncidentService
 
     public function openByHouse(?string $houseId): int
     {
-        return count($this->byHouse($houseId, true));
+        if (!$houseId) {
+            return 0;
+        }
+
+        try {
+            $students = $this->firebase->getCollection(
+                'students',
+                [['houseId', '=', $houseId]]
+            );
+
+            $studentIds = [];
+            foreach ($students as $student) {
+                $studentId = $student['studentId'] ?? $student['id'] ?? null;
+                if ($studentId) {
+                    $studentIds[] = (string) $studentId;
+                }
+            }
+
+            $count = 0;
+            foreach (array_chunk(array_values(array_unique($studentIds)), 10) as $studentIdBatch) {
+                $count += $this->firebase->count($this->collection, [
+                    ['studentId', 'in', $studentIdBatch],
+                    ['status', '=', 'open'],
+                ]);
+            }
+
+            return $count;
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 
     public function byHouse(
