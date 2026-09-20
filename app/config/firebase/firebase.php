@@ -88,5 +88,9 @@ return [
     'credentials_path' => $credentialsPath,
     'firebase_enabled' => filter_var($_ENV['FIREBASE_ENABLED'] ?? false, FILTER_VALIDATE_BOOLEAN),
     'api_key' => $_ENV['FIREBASE_API_KEY'] ?? getenv('FIREBASE_API_KEY') ?? '',
-    'storage_bucket' => $_ENV['FIREBASE_STORAGE_BUCKET'] ?? getenv('FIREBASE_STORAGE_BUCKET') ?? '',
+    'r2_endpoint' => $_ENV['R2_ENDPOINT'] ?? getenv('R2_ENDPOINT') ?? '',
+    'r2_bucket' => $_ENV['R2_BUCKET'] ?? getenv('R2_BUCKET') ?? '',
+    'r2_access_key_id' => $_ENV['R2_ACCESS_KEY_ID'] ?? getenv('R2_ACCESS_KEY_ID') ?? '',
+    'r2_secret_access_key' => $_ENV['R2_SECRET_ACCESS_KEY'] ?? getenv('R2_SECRET_ACCESS_KEY') ?? '',
+    'r2_public_url' => $_ENV['R2_PUBLIC_URL'] ?? getenv('R2_PUBLIC_URL') ?? '',
 ];

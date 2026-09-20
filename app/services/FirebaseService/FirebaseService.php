@@ -54,35 +54,45 @@ class FirebaseService
             && file_exists($credentialPath);
     }
 
-    private function storageBucket(): object
+    private function storageClient(): object
     {
         if ($this->storageClient === null) {
             $config = require APP_ROOT . '/app/config/firebase/firebase.php';
-            $bucketName = trim((string) ($config['storage_bucket'] ?? ''));
-            if ($bucketName === '') {
-                throw new \RuntimeException('Firebase Storage bucket is not configured. Set FIREBASE_STORAGE_BUCKET in .env.');
+            $endpoint = trim((string) ($config['r2_endpoint'] ?? ''));
+            $accessKey = trim((string) ($config['r2_access_key_id'] ?? ''));
+            $secretKey = trim((string) ($config['r2_secret_access_key'] ?? ''));
+            if ($endpoint === '' || $accessKey === '' || $secretKey === '') {
+                throw new \RuntimeException('Cloudflare R2 is not configured. Set R2_ENDPOINT, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY in .env.');
             }
 
-            $storageClient = '\\Google\\Cloud\\Storage\\StorageClient';
-            $this->storageClient = new $storageClient([
-                'projectId' => $config['project_id'],
-                'keyFilePath' => $config['credentials_path'],
+            $s3Client = '\\Aws\\S3\\S3Client';
+            $this->storageClient = new $s3Client([
+                'version' => 'latest',
+                'region' => 'auto',
+                'endpoint' => rtrim($endpoint, '/'),
+                'credentials' => [
+                    'key' => $accessKey,
+                    'secret' => $secretKey,
+                ],
             ]);
         }
 
-        $config = require APP_ROOT . '/app/config/firebase/firebase.php';
-        return $this->storageClient->bucket((string) $config['storage_bucket']);
+        return $this->storageClient;
     }
 
     public function uploadStorageFile(string $localPath, string $objectName, string $contentType): string
     {
-        if (!$this->credentialsAvailable() || !is_file($localPath)) {
-            throw new \RuntimeException('Unable to upload gallery image to Firebase Storage.');
+        $config = require APP_ROOT . '/app/config/firebase/firebase.php';
+        $bucket = trim((string) ($config['r2_bucket'] ?? ''));
+        if ($bucket === '' || !is_file($localPath)) {
+            throw new \RuntimeException('Unable to upload gallery image to Cloudflare R2.');
         }
 
-        $object = $this->storageBucket()->upload(fopen($localPath, 'r'), [
-            'name' => ltrim($objectName, '/'),
-            'metadata' => ['contentType' => $contentType],
+        $this->storageClient()->putObject([
+            'Bucket' => $bucket,
+            'Key' => ltrim($objectName, '/'),
+            'SourceFile' => $localPath,
+            'ContentType' => $contentType,
         ]);
 
         return ltrim($objectName, '/');
@@ -94,8 +104,17 @@ class FirebaseService
             return '';
         }
 
-        $object = $this->storageBucket()->object(ltrim($objectName, '/'));
-        return $object->signedUrl(new \DateTimeImmutable('+1 day'));
+        $config = require APP_ROOT . '/app/config/firebase/firebase.php';
+        $publicUrl = rtrim((string) ($config['r2_public_url'] ?? ''), '/');
+        if ($publicUrl !== '') {
+            return $publicUrl . '/' . str_replace('%2F', '/', rawurlencode(ltrim($objectName, '/')));
+        }
+
+        $command = $this->storageClient()->getCommand('GetObject', [
+            'Bucket' => (string) ($config['r2_bucket'] ?? ''),
+            'Key' => ltrim($objectName, '/'),
+        ]);
+        return (string) $this->storageClient()->createPresignedRequest($command, '+1 day')->getUri();
     }
 
     public function deleteStorageFile(string $objectName): void
@@ -104,10 +123,11 @@ class FirebaseService
             return;
         }
 
-        $object = $this->storageBucket()->object(ltrim($objectName, '/'));
-        if ($object->exists()) {
-            $object->delete();
-        }
+        $config = require APP_ROOT . '/app/config/firebase/firebase.php';
+        $this->storageClient()->deleteObject([
+            'Bucket' => (string) ($config['r2_bucket'] ?? ''),
+            'Key' => ltrim($objectName, '/'),
+        ]);
     }
 
     private function credentialsErrorMessage(): string
