@@ -42,41 +42,6 @@ if ($selectedStudentId !== '' && $selectedHouseId === '') {
     $selectedHouseId = (string) ($selectedStudent['houseId'] ?? '');
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_gallery_photo') {
-    $photoFile = sanitize($_POST['photoFile'] ?? '');
-    $photoHouseId = sanitize($_POST['photoHouseId'] ?? '');
-    $canDelete = in_array($role, [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true);
-
-    if (!$canDelete) {
-        flash('error', 'You do not have permission to delete gallery photos.');
-    } elseif ($role === ROLE_HOUSE_MASTER || $role === ROLE_HOUSE_MISTRESS) {
-        if ($currentHouseId && $photoHouseId !== $currentHouseId) {
-            flash('error', 'You can only delete photos from your own house.');
-        } else {
-            $photoPath = $galleryDir ?? (APP_ROOT . '/public/uploads/student-gallery');
-            if ($photoFile !== '') {
-                $photoPathFile = $photoPath . '/' . basename($photoFile);
-                $photoMetaFile = $photoPath . '/' . basename($photoFile) . '.json';
-                if (file_exists($photoPathFile)) unlink($photoPathFile);
-                if (file_exists($photoMetaFile)) unlink($photoMetaFile);
-                flash('success', 'Student photo deleted successfully.');
-            }
-        }
-    } elseif ($photoFile !== '') {
-        $photoPath = $galleryDir ?? (APP_ROOT . '/public/uploads/student-gallery');
-        $photoPathFile = $photoPath . '/' . basename($photoFile);
-        $photoMetaFile = $photoPath . '/' . basename($photoFile) . '.json';
-        if (file_exists($photoPathFile)) unlink($photoPathFile);
-        if (file_exists($photoMetaFile)) unlink($photoMetaFile);
-        flash('success', 'Student photo deleted successfully.');
-    }
-
-    if (empty($_SESSION['_flash'])) {
-        redirect(url('index.php?route=' . urlencode('/views/gallery/index.php') . '&houseId=' . urlencode($selectedHouseId) . '&studentId=' . urlencode($selectedStudentId)));
-    }
-    redirect(url('index.php?route=' . urlencode('/views/gallery/index.php') . '&houseId=' . urlencode($selectedHouseId) . '&studentId=' . urlencode($selectedStudentId)));
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_student_photo'])) {
     $houseId = sanitize($_POST['houseId'] ?? '');
     $studentId = sanitize($_POST['studentId'] ?? '');
@@ -368,13 +333,16 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <p class="mb-1 small text-muted"><?= e($item['houseName']) ?></p>
                                         <p class="mb-2 small text-muted">Uploaded: <?= e($item['uploadedAt']) ?></p>
                                         <div class="d-flex justify-content-between align-items-center gap-2">
-                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#galleryLightbox" data-gallery-image="<?= e($item['file']) ?>" data-gallery-title="<?= e($item['studentName']) ?>" data-gallery-house="<?= e($item['houseName']) ?>" data-gallery-uploaded="<?= e($item['uploadedAt']) ?>">
+                                            <a href="<?= url('index.php?route=' . urlencode('/views/gallery/view/view.php') . '&file=' . urlencode($item['fileName'])) ?>" class="btn btn-sm btn-outline-primary">
                                                 <i class="bi bi-eye me-1"></i>View
-                                            </button>
+                                            </a>
                                             <?php if (in_array($role, [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true)): ?>
-                                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#galleryDeleteModal" data-gallery-delete-file="<?= e($item['fileName']) ?>" data-gallery-delete-house="<?= e($item['houseId']) ?>" data-gallery-delete-student="<?= e($item['studentName']) ?>">
+                                                <a href="<?= url('index.php?route=' . urlencode('/views/gallery/edit/edit.php') . '&file=' . urlencode($item['fileName'])) ?>" class="btn btn-sm btn-outline-warning">
+                                                    <i class="bi bi-pencil me-1"></i>Edit
+                                                </a>
+                                                <a href="<?= url('index.php?route=' . urlencode('/views/gallery/delete/delete.php') . '&file=' . urlencode($item['fileName'])) ?>" class="btn btn-sm btn-outline-danger">
                                                     <i class="bi bi-trash me-1"></i>Delete
-                                                </button>
+                                                </a>
                                             <?php endif; ?>
                                         </div>
                                     </div>
@@ -387,88 +355,5 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
-
-<div class="modal fade" id="galleryLightbox" tabindex="-1" aria-labelledby="galleryLightboxLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-xl">
-        <div class="modal-content border-0">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold" id="galleryLightboxLabel">Student Photo</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body text-center p-3">
-                <img id="galleryLightboxImage" src="" alt="Student gallery image" class="img-fluid rounded shadow-sm" style="max-height: 75vh; width: auto; max-width: 100%;">
-                <div class="mt-3">
-                    <p id="galleryLightboxTitle" class="mb-0 fw-semibold text-dark"></p>
-                    <p id="galleryLightboxMeta" class="mb-0 small text-muted"></p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="galleryDeleteModal" tabindex="-1" aria-labelledby="galleryDeleteModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header border-0">
-                <h5 class="modal-title fw-bold" id="galleryDeleteModalLabel"><i class="bi bi-trash3 text-danger me-2"></i>Delete student photo</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form method="POST" action="<?= url('index.php?route=' . urlencode('/views/gallery/index.php')) ?>">
-                <div class="modal-body pt-0">
-                    <p class="mb-2">Are you sure you want to delete this photo?</p>
-                    <p id="galleryDeleteStudent" class="fw-semibold text-dark mb-0"></p>
-                    <input type="hidden" name="action" value="delete_gallery_photo">
-                    <input type="hidden" name="photoFile" id="galleryDeleteFile">
-                    <input type="hidden" name="photoHouseId" id="galleryDeleteHouse">
-                    <input type="hidden" name="houseId" value="<?= e($selectedHouseId) ?>">
-                    <input type="hidden" name="studentId" value="<?= e($selectedStudentId) ?>">
-                </div>
-                <div class="modal-footer border-0">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash3 me-1"></i>Delete photo</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const modal = document.getElementById('galleryLightbox');
-        const imageEl = document.getElementById('galleryLightboxImage');
-        const titleEl = document.getElementById('galleryLightboxTitle');
-        const metaEl = document.getElementById('galleryLightboxMeta');
-
-        document.querySelectorAll('[data-gallery-image]').forEach(function (trigger) {
-            trigger.addEventListener('click', function (event) {
-                const src = trigger.getAttribute('data-gallery-image');
-                const title = trigger.getAttribute('data-gallery-title');
-                if (!src) return;
-                if (imageEl) imageEl.src = src;
-                if (titleEl) titleEl.textContent = title || 'Student Photo';
-                if (metaEl) {
-                    const house = trigger.getAttribute('data-gallery-house') || '';
-                    const uploaded = trigger.getAttribute('data-gallery-uploaded') || '';
-                    metaEl.textContent = [house, uploaded ? 'Uploaded: ' + uploaded : ''].filter(Boolean).join(' | ');
-                }
-            });
-        });
-
-        const deleteModal = document.getElementById('galleryDeleteModal');
-        if (!deleteModal) return;
-
-        const deleteFileEl = document.getElementById('galleryDeleteFile');
-        const deleteHouseEl = document.getElementById('galleryDeleteHouse');
-        const deleteStudentEl = document.getElementById('galleryDeleteStudent');
-
-        deleteModal.addEventListener('show.bs.modal', function (event) {
-            const trigger = event.relatedTarget;
-            if (!trigger) return;
-            if (deleteFileEl) deleteFileEl.value = trigger.getAttribute('data-gallery-delete-file') || '';
-            if (deleteHouseEl) deleteHouseEl.value = trigger.getAttribute('data-gallery-delete-house') || '';
-            if (deleteStudentEl) deleteStudentEl.textContent = trigger.getAttribute('data-gallery-delete-student') || 'Student photo';
-        });
-    });
-</script>
 
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>
