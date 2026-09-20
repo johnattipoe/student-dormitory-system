@@ -88,4 +88,5 @@ return [
     'credentials_path' => $credentialsPath,
     'firebase_enabled' => filter_var($_ENV['FIREBASE_ENABLED'] ?? false, FILTER_VALIDATE_BOOLEAN),
     'api_key' => $_ENV['FIREBASE_API_KEY'] ?? getenv('FIREBASE_API_KEY') ?? '',
+    'storage_bucket' => $_ENV['FIREBASE_STORAGE_BUCKET'] ?? getenv('FIREBASE_STORAGE_BUCKET') ?? '',
 ];

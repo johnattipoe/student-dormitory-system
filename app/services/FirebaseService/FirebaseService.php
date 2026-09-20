@@ -11,6 +11,7 @@ class FirebaseService
 {
     private static ?FirebaseService $instance = null;
     private ?object $client = null;
+    private ?object $storageClient = null;
 
     public static function getInstance(): self
     {
@@ -51,6 +52,62 @@ class FirebaseService
             && is_string($credentialPath)
             && $credentialPath !== ''
             && file_exists($credentialPath);
+    }
+
+    private function storageBucket(): object
+    {
+        if ($this->storageClient === null) {
+            $config = require APP_ROOT . '/app/config/firebase/firebase.php';
+            $bucketName = trim((string) ($config['storage_bucket'] ?? ''));
+            if ($bucketName === '') {
+                throw new \RuntimeException('Firebase Storage bucket is not configured. Set FIREBASE_STORAGE_BUCKET in .env.');
+            }
+
+            $storageClient = '\\Google\\Cloud\\Storage\\StorageClient';
+            $this->storageClient = new $storageClient([
+                'projectId' => $config['project_id'],
+                'keyFilePath' => $config['credentials_path'],
+            ]);
+        }
+
+        $config = require APP_ROOT . '/app/config/firebase/firebase.php';
+        return $this->storageClient->bucket((string) $config['storage_bucket']);
+    }
+
+    public function uploadStorageFile(string $localPath, string $objectName, string $contentType): string
+    {
+        if (!$this->credentialsAvailable() || !is_file($localPath)) {
+            throw new \RuntimeException('Unable to upload gallery image to Firebase Storage.');
+        }
+
+        $object = $this->storageBucket()->upload(fopen($localPath, 'r'), [
+            'name' => ltrim($objectName, '/'),
+            'metadata' => ['contentType' => $contentType],
+        ]);
+
+        return ltrim($objectName, '/');
+    }
+
+    public function storageUrl(string $objectName): string
+    {
+        if ($objectName === '') {
+            return '';
+        }
+
+        $object = $this->storageBucket()->object(ltrim($objectName, '/'));
+        return $object->signedUrl(new \DateTimeImmutable('+1 day'));
+    }
+
+    public function deleteStorageFile(string $objectName): void
+    {
+        if ($objectName === '') {
+            return;
+        }
+
+        $object = $this->storageBucket()->object(ltrim($objectName, '/'));
+        if ($object->exists()) {
+            $object->delete();
+        }
     }
 
     private function credentialsErrorMessage(): string

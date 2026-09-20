@@ -18,11 +18,11 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\FirebaseService;
 
 $pageTitle = 'Medical Reports';
-$records = FirebaseService::getInstance()->getCollection('medical_records', [], 200);
-$normal = count(array_filter($records, fn($r) => strtolower((string) ($r['severity'] ?? 'normal')) === 'normal'));
-$moderate = count(array_filter($records, fn($r) => strtolower((string) ($r['severity'] ?? '')) === 'moderate'));
-$severe = count(array_filter($records, fn($r) => strtolower((string) ($r['severity'] ?? '')) === 'severe'));
-$emergency = count(array_filter($records, fn($r) => strtolower((string) ($r['severity'] ?? '')) === 'emergency'));
+$firebase = FirebaseService::getInstance();
+$normal = $firebase->count('medical_records', [['severity', '=', 'normal']]);
+$moderate = $firebase->count('medical_records', [['severity', '=', 'moderate']]);
+$severe = $firebase->count('medical_records', [['severity', '=', 'severe']]);
+$emergency = $firebase->count('medical_records', [['severity', '=', 'emergency']]);
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],

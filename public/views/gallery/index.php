@@ -18,8 +18,10 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\HouseService;
 use App\Services\StudentService;
+use App\Services\FirebaseService;
 
 $role = current_role();
+$firebase = FirebaseService::getInstance();
 $currentUser = current_user() ?? [];
 $currentHouseId = current_house_id();
 
@@ -47,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_student_photo'
     $studentId = sanitize($_POST['studentId'] ?? '');
     $photo = $_FILES['photo'] ?? null;
     $uploadError = null;
+    $mimeType = '';
 
     if ($role === ROLE_HOUSE_MASTER || $role === ROLE_HOUSE_MISTRESS) {
         if ($currentHouseId && $houseId !== $currentHouseId) {
@@ -76,42 +79,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_student_photo'
     }
 
     if ($uploadError === null) {
-        $uploadDir = APP_ROOT . '/public/uploads/student-gallery';
-        if (!is_dir($uploadDir)) {
-            if (!@mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
-                $uploadError = 'The upload folder is not writable. Please contact an administrator.';
+        $safeName = preg_replace('/[^A-Za-z0-9._-]+/', '-', basename((string) $photo['name']));
+        $filename = 'student-photo-' . time() . '-' . $safeName;
+        $storageObject = 'student-gallery/' . $filename;
+
+        try {
+            $firebase->uploadStorageFile((string) $photo['tmp_name'], $storageObject, $mimeType);
+            $student = StudentService::find($studentId) ?? [];
+            $studentName = trim((($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')));
+            $metadata = [
+                'studentId' => $studentId,
+                'studentName' => $studentName !== '' ? $studentName : 'Student',
+                'houseId' => $houseId,
+                'houseName' => $houses[$houseId] ?? 'House',
+                'file' => $filename,
+                'storageObject' => $storageObject,
+                'originalName' => $photo['name'],
+                'uploadedBy' => $role,
+                'uploadedAt' => date('Y-m-d H:i:s'),
+            ];
+            $metadata['id'] = $firebase->addDocument(COL_GALLERY_PHOTOS, $metadata);
+            $uploadDir = APP_ROOT . '/public/uploads/student-gallery';
+            if (!is_dir($uploadDir)) {
+                @mkdir($uploadDir, 0775, true);
             }
-        }
-
-        if ($uploadError === null && !is_writable($uploadDir)) {
-            $uploadError = 'The upload folder is not writable. Please contact an administrator.';
-        }
-
-        if ($uploadError === null) {
-            $safeName = preg_replace('/[^A-Za-z0-9._-]+/', '-', basename((string) $photo['name']));
-            $filename = 'student-photo-' . time() . '-' . $safeName;
-            $target = $uploadDir . '/' . $filename;
-
-            if (!@move_uploaded_file($photo['tmp_name'], $target)) {
-                $uploadError = 'Image upload failed. Please try again.';
-            } else {
-                $student = StudentService::find($studentId) ?? [];
-                $studentName = trim((($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')));
-                $metadata = [
-                    'id' => 'G-' . date('YmdHis'),
-                    'studentId' => $studentId,
-                    'studentName' => $studentName !== '' ? $studentName : 'Student',
-                    'houseId' => $houseId,
-                    'houseName' => $houses[$houseId] ?? 'House',
-                    'file' => $filename,
-                    'originalName' => $photo['name'],
-                    'uploadedBy' => $role,
-                    'uploadedAt' => date('Y-m-d H:i:s'),
-                ];
-                file_put_contents($target . '.json', json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-                flash('success', 'Student photo uploaded successfully.');
-                redirect(url('index.php?route=' . urlencode('/views/gallery/index.php') . '&houseId=' . urlencode($houseId)));
+            if (is_dir($uploadDir) && is_writable($uploadDir)) {
+                file_put_contents($uploadDir . '/' . $filename . '.json', json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
             }
+            flash('success', 'Student photo uploaded successfully.');
+            redirect(url('index.php?route=' . urlencode('/views/gallery/index.php') . '&houseId=' . urlencode($houseId)));
+        } catch (Throwable $e) {
+            try {
+                $firebase->deleteStorageFile($storageObject);
+            } catch (Throwable $cleanupError) {
+                error_log('Gallery Storage cleanup failed: ' . $cleanupError->getMessage());
+            }
+            $uploadError = 'Image upload failed. Please try again.';
+            error_log('Gallery Storage upload failed: ' . $e->getMessage());
         }
     }
 
@@ -122,6 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_student_photo'
 
 $gallery = [];
 $galleryDir = APP_ROOT . '/public/uploads/student-gallery';
+$metadataByFile = [];
 if (is_dir($galleryDir)) {
     $files = glob($galleryDir . '/*.json');
     foreach ($files as $jsonFile) {
@@ -130,9 +135,28 @@ if (is_dir($galleryDir)) {
             continue;
         }
 
+        $metadataByFile[(string) $meta['file']] = $meta;
+    }
+}
+try {
+    foreach ($firebase->getCollection(COL_GALLERY_PHOTOS, [], 500) as $meta) {
+        if (!empty($meta['file'])) {
+            $metadataByFile[(string) $meta['file']] = $meta;
+        }
+    }
+} catch (Throwable $e) {
+    error_log('Gallery metadata read failed: ' . $e->getMessage());
+}
+
+foreach ($metadataByFile as $meta) {
+        if (!is_array($meta) || empty($meta['file'])) {
+            continue;
+        }
+
         $fileHouseId = (string) ($meta['houseId'] ?? '');
         $filePath = $galleryDir . '/' . $meta['file'];
-        if (!file_exists($filePath)) {
+        $storageObject = (string) ($meta['storageObject'] ?? '');
+        if ($storageObject === '' && !file_exists($filePath)) {
             continue;
         }
 
@@ -155,18 +179,19 @@ if (is_dir($galleryDir)) {
             continue;
         }
 
+        $imageUrl = $storageObject !== '' ? $firebase->storageUrl($storageObject) : url('uploads/student-gallery/' . $meta['file']);
         $gallery[] = [
             'id' => $meta['id'] ?? $meta['studentId'] ?? uniqid('gallery_', true),
             'studentId' => $meta['studentId'] ?? '',
             'studentName' => $meta['studentName'] ?? 'Student',
             'houseId' => $fileHouseId,
             'houseName' => $meta['houseName'] ?? ($houses[$fileHouseId] ?? 'House'),
-            'file' => url('uploads/student-gallery/' . $meta['file']),
+            'file' => $imageUrl,
             'fileName' => $meta['file'],
+            'storageObject' => $storageObject,
             'originalName' => $meta['originalName'] ?? $meta['file'],
             'uploadedAt' => $meta['uploadedAt'] ?? '',
         ];
-    }
 }
 
 usort($gallery, static function ($a, $b) {
@@ -325,29 +350,123 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <?php foreach ($gallery as $item): ?>
                             <div class="gallery-item">
                                 <div class="card border-0 shadow-sm overflow-hidden h-100">
-                                    <a href="<?= e($item['file']) ?>" target="_blank" rel="noopener" data-bs-toggle="modal" data-bs-target="#galleryLightbox" data-gallery-image="<?= e($item['file']) ?>" data-gallery-title="<?= e($item['studentName']) ?>">
+                                    <button type="button" class="btn p-0 border-0 w-100" data-bs-toggle="modal" data-bs-target="#galleryViewModal-<?= e(md5((string) $item['fileName'])) ?>" aria-label="View photo of <?= e($item['studentName']) ?>">
                                         <img src="<?= e($item['file']) ?>" class="card-img-top" alt="<?= e($item['studentName']) ?>" style="height: 220px; object-fit: cover;">
-                                    </a>
+                                    </button>
                                     <div class="card-body">
                                         <h6 class="fw-bold mb-1"><?= e($item['studentName']) ?></h6>
                                         <p class="mb-1 small text-muted"><?= e($item['houseName']) ?></p>
                                         <p class="mb-2 small text-muted">Uploaded: <?= e($item['uploadedAt']) ?></p>
                                         <div class="d-flex justify-content-between align-items-center gap-2">
-                                            <a href="<?= url('index.php?route=' . urlencode('/views/gallery/view/view.php') . '&file=' . urlencode($item['fileName'])) ?>" class="btn btn-sm btn-outline-primary">
+                                            <?php $modalId = md5((string) $item['fileName']); ?>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#galleryViewModal-<?= e($modalId) ?>">
                                                 <i class="bi bi-eye me-1"></i>View
-                                            </a>
+                                            </button>
                                             <?php if (in_array($role, [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true)): ?>
-                                                <a href="<?= url('index.php?route=' . urlencode('/views/gallery/edit/edit.php') . '&file=' . urlencode($item['fileName'])) ?>" class="btn btn-sm btn-outline-warning">
+                                                <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#galleryEditModal-<?= e($modalId) ?>">
                                                     <i class="bi bi-pencil me-1"></i>Edit
-                                                </a>
-                                                <a href="<?= url('index.php?route=' . urlencode('/views/gallery/delete/delete.php') . '&file=' . urlencode($item['fileName'])) ?>" class="btn btn-sm btn-outline-danger">
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#galleryDeleteModal-<?= e($modalId) ?>">
                                                     <i class="bi bi-trash me-1"></i>Delete
-                                                </a>
+                                                </button>
                                             <?php endif; ?>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+
+                            <div class="modal fade" id="galleryViewModal-<?= e($modalId) ?>" tabindex="-1" aria-labelledby="galleryViewModalLabel-<?= e($modalId) ?>" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered modal-lg">
+                                    <div class="modal-content border-0 shadow">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title fw-bold" id="galleryViewModalLabel-<?= e($modalId) ?>"><i class="bi bi-image text-info me-2"></i><?= e($item['studentName']) ?></h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body text-center">
+                                            <img src="<?= e($item['file']) ?>" alt="<?= e($item['studentName']) ?>" class="img-fluid rounded" style="max-height: 65vh; object-fit: contain;">
+                                            <p class="small text-muted mt-3 mb-0"><?= e($item['houseName']) ?><?php if ($item['uploadedAt'] !== ''): ?> | Uploaded: <?= e($item['uploadedAt']) ?><?php endif; ?></p>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <a href="<?= url('index.php?route=' . urlencode('/views/gallery/view/view.php') . '&file=' . urlencode($item['fileName'])) ?>" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-up-right me-1"></i>Open Page</a>
+                                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <?php if (in_array($role, [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true)): ?>
+                                <div class="modal fade" id="galleryEditModal-<?= e($modalId) ?>" tabindex="-1" aria-labelledby="galleryEditModalLabel-<?= e($modalId) ?>" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                                        <div class="modal-content border-0 shadow">
+                                            <form method="POST" enctype="multipart/form-data" action="<?= e(url('index.php?route=' . urlencode('/views/gallery/edit/edit.php') . '&file=' . urlencode($item['fileName']))) ?>">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title fw-bold" id="galleryEditModalLabel-<?= e($modalId) ?>"><i class="bi bi-pencil-square text-warning me-2"></i>Edit Photo Details</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="file" value="<?= e($item['fileName']) ?>">
+                                                    <div class="row g-4 align-items-start">
+                                                        <div class="col-md-4 text-center">
+                                                            <img src="<?= e($item['file']) ?>" alt="<?= e($item['studentName']) ?>" class="img-fluid rounded border" style="max-height: 220px; object-fit: contain;">
+                                                            <p class="small text-muted mt-2 mb-0"><?= e($item['fileName']) ?></p>
+                                                        </div>
+                                                        <div class="col-md-8">
+                                                            <div class="alert alert-light border small mb-3"><i class="bi bi-info-circle me-1"></i>Update the assignment or optionally replace the image.</div>
+                                                            <label for="gallery-house-<?= e($modalId) ?>" class="form-label fw-semibold">House</label>
+                                                            <select id="gallery-house-<?= e($modalId) ?>" name="houseId" class="form-select mb-3" required>
+                                                                <?php foreach ($houses as $houseId => $houseName): ?>
+                                                                    <?php if (($role === ROLE_HOUSE_MASTER || $role === ROLE_HOUSE_MISTRESS) && $currentHouseId && $houseId !== $currentHouseId) continue; ?>
+                                                                    <option value="<?= e($houseId) ?>" <?= $item['houseId'] === $houseId ? 'selected' : '' ?>><?= e($houseName) ?></option>
+                                                                <?php endforeach; ?>
+                                                            </select>
+                                                            <label for="gallery-student-<?= e($modalId) ?>" class="form-label fw-semibold">Student</label>
+                                                            <select id="gallery-student-<?= e($modalId) ?>" name="studentId" class="form-select" required>
+                                                                <?php foreach ($studentOptions as $student): ?>
+                                                                    <?php $optionStudentId = (string) ($student['id'] ?? ''); $optionStudentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')); ?>
+                                                                    <?php $optionHouseId = (string) ($student['houseId'] ?? ''); ?>
+                                                                    <?php if ($item['houseId'] !== '' && $optionHouseId !== '' && $optionHouseId !== $item['houseId'] && $optionStudentId !== $item['studentId']) continue; ?>
+                                                                    <option value="<?= e($optionStudentId) ?>" <?= $item['studentId'] === $optionStudentId ? 'selected' : '' ?>><?= e($optionStudentName ?: $optionStudentId) ?><?= !empty($student['admissionNo']) ? ' (' . e($student['admissionNo']) . ')' : '' ?></option>
+                                                                <?php endforeach; ?>
+                                                            </select>
+                                                            <div class="form-text">The current student remains available even if their house assignment differs.</div>
+                                                            <label for="gallery-photo-<?= e($modalId) ?>" class="form-label fw-semibold mt-3">Replace Image <span class="text-muted fw-normal">(optional)</span></label>
+                                                            <input id="gallery-photo-<?= e($modalId) ?>" type="file" name="photo" class="form-control" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+                                                            <div class="form-text">Leave empty to keep the current image.</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <a href="<?= url('index.php?route=' . urlencode('/views/gallery/edit/edit.php') . '&file=' . urlencode($item['fileName'])) ?>" class="btn btn-outline-secondary">Open Full Page</a>
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1"></i>Save Changes</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="modal fade" id="galleryDeleteModal-<?= e($modalId) ?>" tabindex="-1" aria-labelledby="galleryDeleteModalLabel-<?= e($modalId) ?>" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content border-0 shadow">
+                                            <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/gallery/delete/delete.php') . '&file=' . urlencode($item['fileName']))) ?>">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title fw-bold text-danger" id="galleryDeleteModalLabel-<?= e($modalId) ?>"><i class="bi bi-trash3 me-2"></i>Delete Student Photo</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="file" value="<?= e($item['fileName']) ?>">
+                                                    <p class="mb-0">Delete the photo for <strong><?= e($item['studentName']) ?></strong>? This cannot be undone.</p>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <a href="<?= url('index.php?route=' . urlencode('/views/gallery/delete/delete.php') . '&file=' . urlencode($item['fileName'])) ?>" class="btn btn-outline-secondary">Open Full Page</a>
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash3 me-1"></i>Delete Photo</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                     </div>
                 <?php endif; ?>

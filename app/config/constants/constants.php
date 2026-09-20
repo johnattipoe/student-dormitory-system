@@ -75,6 +75,7 @@ define('COL_FINANCE_ACCESS', 'finance_access');
 define('COL_FINANCE_FEES', 'finance_fees');
 define('COL_FINANCE_PAYMENTS', 'finance_payments');
 define('COL_SETTINGS', 'settings');
+define('COL_GALLERY_PHOTOS', 'gallery_photos');
 
 define('PERMISSION_FULL', 'full');
 define('PERMISSION_MANAGE', 'manage');
