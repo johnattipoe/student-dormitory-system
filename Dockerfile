@@ -33,6 +33,10 @@ RUN composer install \
     --no-interaction \
     --prefer-dist
 
+RUN mkdir -p /var/www/html/public/uploads/student-gallery \
+    && chown -R www-data:www-data /var/www/html/public/uploads \
+    && chmod -R u+rwX,g+rwX /var/www/html/public/uploads
+
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 RUN sed -ri "s#DocumentRoot /var/www/html#DocumentRoot ${APACHE_DOCUMENT_ROOT}#g" /etc/apache2/sites-available/*.conf
 

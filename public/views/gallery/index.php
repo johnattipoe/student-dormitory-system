@@ -113,32 +113,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_student_photo'
     if ($uploadError === null) {
         $uploadDir = APP_ROOT . '/public/uploads/student-gallery';
         if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
+            if (!@mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
+                $uploadError = 'The upload folder is not writable. Please contact an administrator.';
+            }
         }
 
-        $safeName = preg_replace('/[^A-Za-z0-9._-]+/', '-', basename((string) $photo['name']));
-        $filename = 'student-photo-' . time() . '-' . $safeName;
-        $target = $uploadDir . '/' . $filename;
+        if ($uploadError === null && !is_writable($uploadDir)) {
+            $uploadError = 'The upload folder is not writable. Please contact an administrator.';
+        }
 
-        if (!move_uploaded_file($photo['tmp_name'], $target)) {
-            $uploadError = 'Image upload failed. Please try again.';
-        } else {
-            $student = StudentService::find($studentId) ?? [];
-            $studentName = trim((($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')));
-            $metadata = [
-                'id' => 'G-' . date('YmdHis'),
-                'studentId' => $studentId,
-                'studentName' => $studentName !== '' ? $studentName : 'Student',
-                'houseId' => $houseId,
-                'houseName' => $houses[$houseId] ?? 'House',
-                'file' => $filename,
-                'originalName' => $photo['name'],
-                'uploadedBy' => $role,
-                'uploadedAt' => date('Y-m-d H:i:s'),
-            ];
-            file_put_contents($target . '.json', json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-            flash('success', 'Student photo uploaded successfully.');
-            redirect(url('index.php?route=' . urlencode('/views/gallery/index.php') . '&houseId=' . urlencode($houseId)));
+        if ($uploadError === null) {
+            $safeName = preg_replace('/[^A-Za-z0-9._-]+/', '-', basename((string) $photo['name']));
+            $filename = 'student-photo-' . time() . '-' . $safeName;
+            $target = $uploadDir . '/' . $filename;
+
+            if (!@move_uploaded_file($photo['tmp_name'], $target)) {
+                $uploadError = 'Image upload failed. Please try again.';
+            } else {
+                $student = StudentService::find($studentId) ?? [];
+                $studentName = trim((($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')));
+                $metadata = [
+                    'id' => 'G-' . date('YmdHis'),
+                    'studentId' => $studentId,
+                    'studentName' => $studentName !== '' ? $studentName : 'Student',
+                    'houseId' => $houseId,
+                    'houseName' => $houses[$houseId] ?? 'House',
+                    'file' => $filename,
+                    'originalName' => $photo['name'],
+                    'uploadedBy' => $role,
+                    'uploadedAt' => date('Y-m-d H:i:s'),
+                ];
+                file_put_contents($target . '.json', json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+                flash('success', 'Student photo uploaded successfully.');
+                redirect(url('index.php?route=' . urlencode('/views/gallery/index.php') . '&houseId=' . urlencode($houseId)));
+            }
         }
     }
 
