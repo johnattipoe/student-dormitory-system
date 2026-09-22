@@ -44,9 +44,24 @@ foreach ($students as $student) {
 $houses = [];
 foreach (HouseService::all() as $house) {
     if (!empty($house['id'])) {
-        $houses[(string) $house['id']] = $house['name'] ?? $house['id'];
+        $houses[trim((string) $house['id'])] = (string) ($house['name'] ?? $house['id']);
     }
 }
+$resolveHouseName = static function ($houseId) use (&$houses): string {
+    $normalizedId = trim((string) $houseId);
+    if ($normalizedId === '') {
+        return '—';
+    }
+    if (isset($houses[$normalizedId])) {
+        return $houses[$normalizedId];
+    }
+    $house = HouseService::find($normalizedId);
+    if (is_array($house) && !empty($house['name'])) {
+        $houses[$normalizedId] = (string) $house['name'];
+        return $houses[$normalizedId];
+    }
+    return $normalizedId;
+};
 $search = strtolower(sanitize($_GET['search'] ?? ''));
 if ($search !== '') {
     $students = array_values(array_filter($students, function ($student) use ($search) {
@@ -155,7 +170,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <th>Class</th>
                     <th>Class Code</th>
                     <th>House</th>
-                    <th>Residence</th>
+                    <th>Residence Type</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
@@ -167,15 +182,17 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <td><?= e(trim(($s['firstName'] ?? '') . ' ' . ($s['lastName'] ?? ''))) ?></td>
                         <td><?= e($s['class'] ?? ($s['form'] ?? $s['level'] ?? '—')) ?></td>
                         <td><?= e($s['course'] ?? '') ?></td>
-                        <td><?= e($houses[(string) ($s['houseId'] ?? '')] ?? ($s['houseId'] ?? '—')) ?></td>
+                        <td><?= e($resolveHouseName($s['houseId'] ?? '')) ?></td>
                         <td><span class="badge bg-warning text-dark"><?= e(strtolower((string) ($s['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></span></td>
                         <td><span class="badge bg-<?= ($s['status'] ?? '') === 'active' ? 'success' : 'secondary' ?>"><?= e($s['status'] ?? '') ?></span></td>
                         <td>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#studentViewModal-<?= e((string) ($s['id'] ?? '')) ?>"><i class="bi bi-eye"></i></button>
-                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#studentEditModal-<?= e((string) ($s['id'] ?? '')) ?>"><i class="bi bi-pencil"></i></button>
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Student actions">
+                            <button type="button" class="btn btn-outline-secondary" title="View student" data-bs-toggle="modal" data-bs-target="#studentViewModal-<?= e((string) ($s['id'] ?? '')) ?>"><i class="bi bi-eye"></i><span class="visually-hidden">View</span></button>
+                            <button type="button" class="btn btn-outline-primary" title="Edit student" data-bs-toggle="modal" data-bs-target="#studentEditModal-<?= e((string) ($s['id'] ?? '')) ?>"><i class="bi bi-pencil"></i><span class="visually-hidden">Edit</span></button>
                             <?php if (current_role() === ROLE_ADMIN || current_role() === ROLE_HOUSE_MASTER): ?>
-                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#studentDeleteModal-<?= e((string) ($s['id'] ?? '')) ?>"><i class="bi bi-trash"></i></button>
+                            <button type="button" class="btn btn-outline-danger" title="Delete student" data-bs-toggle="modal" data-bs-target="#studentDeleteModal-<?= e((string) ($s['id'] ?? '')) ?>"><i class="bi bi-trash"></i><span class="visually-hidden">Delete</span></button>
                             <?php endif; ?>
+                            </div>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -190,7 +207,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <?php
     $studentId = (string) ($s['id'] ?? '');
     $studentName = trim((string) (($s['firstName'] ?? '') . ' ' . ($s['lastName'] ?? '')));
-    $studentHouse = $houses[(string) ($s['houseId'] ?? '')] ?? ($s['houseId'] ?? '—');
+    $studentHouse = $resolveHouseName($s['houseId'] ?? '');
     ?>
     <div class="modal fade" id="studentViewModal-<?= e($studentId) ?>" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -205,6 +222,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <dt class="col-sm-5">Admission No.</dt><dd class="col-sm-7"><?= e($s['admissionNo'] ?? '—') ?></dd>
                         <dt class="col-sm-5">Class</dt><dd class="col-sm-7"><?= e($s['class'] ?? ($s['form'] ?? $s['level'] ?? '—')) ?></dd>
                         <dt class="col-sm-5">House</dt><dd class="col-sm-7"><?= e($studentHouse) ?></dd>
+                        <dt class="col-sm-5">Residence Type</dt><dd class="col-sm-7"><?= e(strtolower((string) ($s['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></dd>
                         <dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e($s['status'] ?? 'active') ?></dd>
                     </dl>
                 </div>
@@ -231,6 +249,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><option value="active" <?= ($s['status'] ?? '') === 'active' ? 'selected' : '' ?>>Active</option><option value="inactive" <?= ($s['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Inactive</option><option value="suspended" <?= ($s['status'] ?? '') === 'suspended' ? 'selected' : '' ?>>Suspended</option></select></div>
                             <div class="col-md-6"><label class="form-label">Class</label><input name="class" class="form-control" value="<?= e($s['class'] ?? ($s['form'] ?? $s['level'] ?? '')) ?>"></div>
                             <div class="col-md-6"><label class="form-label">House</label><select name="houseId" class="form-select"><option value="">— Unassigned —</option><?php foreach ($houses as $houseId => $houseName): ?><option value="<?= e($houseId) ?>" <?= ($s['houseId'] ?? '') === $houseId ? 'selected' : '' ?>><?= e($houseName) ?></option><?php endforeach; ?></select></div>
+                            <div class="col-md-6"><label class="form-label">Residence Type</label><select name="residenceType" class="form-select"><option value="boarding" <?= strtolower((string) ($s['residenceType'] ?? 'boarding')) === 'boarding' ? 'selected' : '' ?>>Boarding</option><option value="day" <?= strtolower((string) ($s['residenceType'] ?? 'boarding')) === 'day' ? 'selected' : '' ?>>Day</option></select></div>
                         </div>
                     </div>
                     <div class="modal-footer">

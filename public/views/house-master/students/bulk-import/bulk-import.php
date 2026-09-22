@@ -16,7 +16,6 @@ $allowedRoles = [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\StudentService;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 
 $houseId = current_user()['houseId'] ?? null;
 $errors = [];
@@ -26,8 +25,8 @@ if (isset($_GET['download_template'])) {
     header('Content-Type: text/csv');
     header('Content-Disposition: attachment; filename="house_student_import_template.csv"');
     $out = fopen('php://output', 'w');
-    fputcsv($out, ['FirstName','LastName','AdmissionNo','Gender','Class','Form','Course','NHISNumber','GuardianName','GuardianPhone','GuardianEmail']);
-    fputcsv($out, ['Kofi','Mensah','ADM-2026-001','Male','Science 1','Form 1','General Science','NHIS-12345678','Kwame Mensah','+233201234567','guardian@example.com']);
+    fputcsv($out, ['FirstName','LastName','AdmissionNo','Gender','Class','Form','Course','NHISNumber','ResidenceType','GuardianName','GuardianPhone','GuardianEmail']);
+    fputcsv($out, ['Kofi','Mensah','ADM-2026-001','Male','Science 1','Form 1','General Science','NHIS-12345678','boarding','Kwame Mensah','+233201234567','guardian@example.com']);
     fclose($out);
     exit;
 }
@@ -40,7 +39,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
         $errors[] = 'Please upload a valid CSV or XLSX file.';
     } else {
         try {
-            $rows = IOFactory::load($file['tmp_name'])->getActiveSheet()->toArray(null, true, true, false);
+            $spreadsheet = call_user_func(
+                ['PhpOffice\\PhpSpreadsheet\\IOFactory', 'load'],
+                $file['tmp_name']
+            );
+            $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
             $header = array_map(fn($v) => strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $v)), array_shift($rows) ?: []);
             $map = [];
             foreach ($header as $i => $name) {
@@ -57,6 +60,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                 if ($first === '' || $admission === '') continue;
 
                 $formVal = sanitize($value('form', 5)) ?: sanitize($value('level', 5)) ?: 'Form 1';
+                $residenceType = strtolower(trim((string) $value('residencetype', 8)));
+                if (!in_array($residenceType, ['boarding', 'day'], true)) {
+                    $residenceType = 'boarding';
+                }
 
                 StudentService::create([
                     'firstName' => $first,
@@ -68,9 +75,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                     'level' => $formVal,
                     'course' => sanitize($value('course', 6)),
                     'nhisNumber' => sanitize($value('nhisnumber', 7)),
-                    'guardianName' => sanitize($value('guardianname', 8)),
-                    'guardianPhone' => sanitize($value('guardianphone', 9)),
-                    'guardianEmail' => sanitize($value('guardianemail', 10)),
+                    'residenceType' => $residenceType,
+                    'guardianName' => sanitize($value('guardianname', 9)),
+                    'guardianPhone' => sanitize($value('guardianphone', 10)),
+                    'guardianEmail' => sanitize($value('guardianemail', 11)),
                     'houseId' => $houseId,
                     'status' => 'active',
                 ]);

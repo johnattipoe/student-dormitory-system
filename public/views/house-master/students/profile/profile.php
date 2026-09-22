@@ -200,6 +200,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <span class="text-muted small d-block">Dormitory Room</span>
                                     <strong>Room <?= e($roomName) ?></strong>
                                 </div>
+                                <div class="col-sm-6">
+                                    <span class="text-muted small d-block">Residence Type</span>
+                                    <strong><?= e(strtolower((string) ($student['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></strong>
+                                </div>
                             </div>
                         </div>
                     </div>

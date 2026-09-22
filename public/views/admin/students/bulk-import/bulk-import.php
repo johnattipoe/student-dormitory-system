@@ -365,6 +365,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                             </th>
                                             <th>Student Name</th>
                                             <th>Admission No</th>
+                                            <th>Residence Type</th>
                                             <th>Current Status</th>
                                         </tr>
                                     </thead>
@@ -378,6 +379,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                                     </td>
                                                     <td><strong><?= e(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?></strong></td>
                                                     <td><span class="font-monospace text-muted"><?= e($student['admissionNo'] ?? '') ?></span></td>
+                                                    <td><span class="badge bg-warning text-dark"><?= e(strtolower((string) ($student['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></span></td>
                                                     <td>
                                                         <span class="badge bg-<?= ($student['status'] ?? '') === 'active' ? 'success' : 'danger' ?>">
                                                             <?= e(ucfirst($student['status'] ?? 'active')) ?>
@@ -387,7 +389,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                             <?php endforeach; ?>
                                         <?php else: ?>
                                             <tr>
-                                                <td colspan="4" class="text-center text-muted py-4">No students registered in the system.</td>
+                                                <td colspan="5" class="text-center text-muted py-4">No students registered in the system.</td>
                                             </tr>
                                         <?php endif; ?>
                                     </tbody>
