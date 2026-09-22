@@ -1,6 +1,7 @@
 <?php
 $defaultSettings = [
     'app_name' => $_ENV['APP_NAME'] ?? 'Student Dormitory System',
+    'version' => $_ENV['APP_VERSION'] ?? '1.0.0',
     'env' => $_ENV['APP_ENV'] ?? 'local',
     'app_url' => $_ENV['APP_URL'] ?? 'http://localhost:8000',
     'debug' => filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN),
@@ -70,6 +71,7 @@ if (is_string($resolvedTimezone) && $resolvedTimezone !== '') {
 
 return [
     'name' => $defaultSettings['app_name'],
+    'version' => $defaultSettings['version'] ?? '1.0.0',
     'env' => $defaultSettings['env'] ?? ($_ENV['APP_ENV'] ?? 'local'),
     'url' => $defaultSettings['app_url'],
     'debug' => filter_var($defaultSettings['debug'], FILTER_VALIDATE_BOOLEAN),

@@ -65,6 +65,11 @@
           <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
         </button>
       </form>
+
+      <div class="login-footer mt-4 pt-3 border-top text-center">
+        <div class="small text-muted">Version: <?= e($appConfig['version'] ?? '1.0.0') ?></div>
+        <div class="small text-muted">Developed by: WISDOM SILAS & ATTIPOE JOHN</div>
+      </div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
