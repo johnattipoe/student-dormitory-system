@@ -306,6 +306,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <td><span class="badge bg-<?= $status === 'full' ? 'danger' : ($status === 'maintenance' ? 'secondary' : ($status === 'occupied' ? 'warning' : 'success')) ?>"><?= ucfirst(e($status)) ?></span></td>
                                         <td><?= !empty($occupantsByRoom[$roomId]) ? e((string) count($occupantsByRoom[$roomId])) . ' resident(s)' : '<span class="text-muted">Empty</span>' ?></td>
                                         <td class="text-end">
+                                            <button type="button" class="btn btn-sm btn-outline-success text-nowrap" data-print-target="allocationRoomPrint-<?= e($roomId) ?>" onclick="printRoomAllocation(this.dataset.printTarget)" title="Print room residents"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print</button>
                                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#allocationRoomViewModal-<?= e($roomId) ?>" title="View room"><i class="bi bi-eye"></i></button>
                                             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#allocationRoomEditModal-<?= e($roomId) ?>" title="Edit room"><i class="bi bi-pencil"></i></button>
                                         </td>
@@ -366,7 +367,61 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 </div>
 <?php foreach ($rooms as $room): ?>
     <?php $allocationRoomId = (string) ($room['id'] ?? ''); $allocationStatus = (string) ($room['status'] ?? 'available'); ?>
+    <div id="allocationRoomPrint-<?= e($allocationRoomId) ?>" class="d-none">
+        <h1>Room <?= e($room['roomNumber'] ?? '-') ?> Residents</h1>
+        <p><?= e($houseMap[(string) ($room['houseId'] ?? '')] ?? ($room['houseId'] ?? '-')) ?> &middot; <?= e((string) count($occupantsByRoom[$allocationRoomId] ?? [])) ?> resident(s)</p>
+        <table>
+            <thead><tr><th>No.</th><th>Student Name</th><th>Admission No.</th></tr></thead>
+            <tbody>
+                <?php foreach (($occupantsByRoom[$allocationRoomId] ?? []) as $residentIndex => $resident): ?>
+                    <tr>
+                        <td><?= e((string) ($residentIndex + 1)) ?></td>
+                        <td><?= e(trim(($resident['firstName'] ?? '') . ' ' . ($resident['lastName'] ?? ''))) ?></td>
+                        <td><?= e($resident['admissionNo'] ?? '-') ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php if (empty($occupantsByRoom[$allocationRoomId])): ?>
+                    <tr><td colspan="3">No students are assigned to this room.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
     <div class="modal fade" id="allocationRoomViewModal-<?= e($allocationRoomId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Room Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Room</dt><dd class="col-sm-7"><?= e($room['roomNumber'] ?? '—') ?></dd><dt class="col-sm-5">House</dt><dd class="col-sm-7"><?= e($houseMap[(string) ($room['houseId'] ?? '')] ?? ($room['houseId'] ?? '—')) ?></dd><dt class="col-sm-5">Capacity</dt><dd class="col-sm-7"><?= e((string) ($room['capacity'] ?? 0)) ?> beds</dd><dt class="col-sm-5">Occupied</dt><dd class="col-sm-7"><?= e((string) ($room['occupied'] ?? 0)) ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst($allocationStatus)) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
     <div class="modal fade" id="allocationRoomEditModal-<?= e($allocationRoomId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><form method="POST" action="<?= url('views/admin/rooms/edit/edit.php?id=' . urlencode($allocationRoomId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Room</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($allocationRoomId) ?>"><div class="row g-3"><div class="col-md-6"><label class="form-label">Room Number</label><input name="roomNumber" class="form-control" value="<?= e($room['roomNumber'] ?? '') ?>" required></div><div class="col-md-6"><label class="form-label">House</label><select name="houseId" class="form-select"><?php foreach ($houses as $house): ?><option value="<?= e((string) ($house['id'] ?? '')) ?>" <?= (($room['houseId'] ?? '') === ($house['id'] ?? '')) ? 'selected' : '' ?>><?= e($house['name'] ?? '') ?></option><?php endforeach; ?></select></div><div class="col-md-6"><label class="form-label">Capacity</label><input type="number" name="capacity" class="form-control" min="1" value="<?= e((string) ($room['capacity'] ?? 1)) ?>" required></div><div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><option value="available" <?= $allocationStatus === 'available' ? 'selected' : '' ?>>Available</option><option value="full" <?= $allocationStatus === 'full' ? 'selected' : '' ?>>Full</option><option value="maintenance" <?= $allocationStatus === 'maintenance' ? 'selected' : '' ?>>Maintenance</option></select></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Save changes</button></div></form></div></div></div>
 <?php endforeach; ?>
+<script>
+function printRoomAllocation(targetId) {
+    const printContent = document.getElementById(targetId);
+    if (!printContent) return;
+
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) {
+        window.alert('Allow pop-ups to print the room resident list.');
+        return;
+    }
+
+    printWindow.onload = function () {
+        printWindow.focus();
+        printWindow.print();
+    };
+    printWindow.document.write(`<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Room Residents</title>
+    <style>
+        body { color: #222; font: 14px Arial, sans-serif; margin: 32px; }
+        h1 { font-size: 22px; margin-bottom: 6px; }
+        p { color: #555; margin-top: 0; }
+        table { border-collapse: collapse; margin-top: 24px; width: 100%; }
+        th, td { border: 1px solid #999; padding: 9px 10px; text-align: left; }
+        th { background: #f1f3f5; }
+        @media print { body { margin: 12mm; } }
+    </style>
+</head>
+<body>${printContent.innerHTML}</body>
+</html>`);
+    printWindow.document.close();
+}
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>
