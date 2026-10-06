@@ -277,6 +277,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
+                        <input type="hidden" name="id" value="<?= e($rId) ?>">
                         <div class="row g-3">
                             <div class="col-md-6"><label class="form-label">Room Number</label><input name="roomNumber" class="form-control" value="<?= e($room['roomNumber'] ?? '') ?>" required></div>
                             <div class="col-md-6"><label class="form-label">House</label><select name="houseId" class="form-select"><?php foreach ($houses as $house): ?><option value="<?= e((string) ($house['id'] ?? '')) ?>" <?= (($room['houseId'] ?? '') === ((string) ($house['id'] ?? ''))) ? 'selected' : '' ?>><?= e($house['name'] ?? '') ?></option><?php endforeach; ?></select></div>
