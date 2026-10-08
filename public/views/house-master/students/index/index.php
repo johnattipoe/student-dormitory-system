@@ -170,7 +170,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <!-- Filter Bar -->
         <div class="card stat-card shadow-sm mb-4 border-0">
             <div class="card-body p-3">
-                <form method="GET" class="row g-2 align-items-center">
+                <form method="GET" action="<?= url('views/house-master/students/index/index.php') ?>" class="row g-2 align-items-center">
                     <div class="col-md-7">
                         <input name="search" class="form-control form-control-sm" placeholder="Search by name, admission number, class, or course..." value="<?= e($studentSearch) ?>">
                     </div>
@@ -183,7 +183,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </select>
                     </div>
                     <div class="col-md-2 d-flex gap-2">
-                        <button class="btn btn-primary btn-sm flex-grow-1">Filter</button> 
+                        <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Filter</button>
                         <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/students/index/index.php') ?>">Reset</a>
                     </div>
                 </form>

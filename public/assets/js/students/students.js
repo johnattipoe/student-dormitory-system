@@ -1,9 +1,52 @@
 // students.js — client-side helpers for the students list/create/edit screens.
 document.addEventListener('DOMContentLoaded', function () {
+  const filterForm = document.getElementById('studentListFilterForm');
+  const filterInput = document.getElementById('studentSearchField');
+  const filterButton = document.getElementById('studentFilterButton');
+  const table = document.querySelector('table.data-table');
+
+  const applyStudentTableFilter = () => {
+    const term = (filterInput?.value ?? '').trim().toLowerCase();
+
+    if (window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(table)) {
+      jQuery(table).DataTable().search(term).draw();
+      return;
+    }
+
+    if (!table) return;
+
+    table.querySelectorAll('tbody tr').forEach(row => {
+      const haystack = (row.textContent || '').toLowerCase();
+      row.style.display = term === '' || haystack.includes(term) ? '' : 'none';
+    });
+  };
+
+  if (filterForm && filterInput && filterButton) {
+    filterButton.addEventListener('click', function (event) {
+      event.preventDefault();
+      applyStudentTableFilter();
+    });
+
+    filterInput.addEventListener('input', function () {
+      applyStudentTableFilter();
+    });
+
+    filterInput.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        applyStudentTableFilter();
+      }
+    });
+
+    filterForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      applyStudentTableFilter();
+    });
+  }
+
   // Live-filter the students table by name/admission no. as a lightweight
   // alternative to DataTables' built-in search box (kept in sync with it).
   const quickSearch = document.getElementById('studentQuickSearch');
-  const table = document.querySelector('table.data-table');
   if (quickSearch && table) {
     quickSearch.addEventListener('input', function () {
       if (window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(table)) {

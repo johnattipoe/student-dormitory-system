@@ -131,7 +131,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <!-- Filter Search Bar -->
         <div class="card stat-card shadow-sm mb-4 border-0">
             <div class="card-body p-3">
-                <form method="GET" class="row g-2 align-items-center">
+                <form method="GET" action="<?= url('views/senior-houseparent/students/index/index.php') ?>" class="row g-2 align-items-center">
                     <div class="col-md-9">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
@@ -139,7 +139,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </div>
                     </div>
                     <div class="col-md-3 d-flex gap-2">
-                        <button class="btn btn-primary btn-sm flex-grow-1"><i class="bi bi-filter me-1"></i> Filter</button> 
+                        <button type="submit" class="btn btn-primary btn-sm flex-grow-1"><i class="bi bi-filter me-1"></i> Filter</button>
                         <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/senior-houseparent/students/index/index.php') ?>">Reset</a>
                     </div>
                 </form>

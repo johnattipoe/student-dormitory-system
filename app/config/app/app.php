@@ -1,9 +1,18 @@
 <?php
+$requestHost = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+$defaultAppUrl = !empty($requestHost)
+    ? ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . $requestHost)
+    : 'http://localhost:8000';
+$envAppUrl = trim((string) ($_ENV['APP_URL'] ?? ''));
+$resolvedAppUrl = $envAppUrl !== '' && preg_match('#^(https?:)?//(localhost|127\.0\.0\.1)(?::\d+)?/?$#i', rtrim($envAppUrl, '/')) !== 1
+    ? $envAppUrl
+    : $defaultAppUrl;
+
 $defaultSettings = [
     'app_name' => $_ENV['APP_NAME'] ?? 'Student Dormitory System',
     'version' => $_ENV['APP_VERSION'] ?? '1.0.0',
     'env' => $_ENV['APP_ENV'] ?? 'local',
-    'app_url' => $_ENV['APP_URL'] ?? 'http://localhost:8000',
+    'app_url' => $resolvedAppUrl,
     'debug' => filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN),
     'session_timeout' => (int) ($_ENV['SESSION_LIFETIME'] ?? 120),
     'attendance_grace_minutes' => 10,

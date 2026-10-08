@@ -59,7 +59,14 @@ function asset(string $path = ''): string
 function base_url(string $path = ''): string
 {
     $app = app_config();
-    return rtrim($app['url'], '/') . '/' . ltrim($path, '/');
+    $configuredUrl = trim((string) ($app['url'] ?? ''));
+    $requestHost = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? null;
+    if ($requestHost !== null && preg_match('#^(https?:)?//(localhost|127\.0\.0\.1)(?::\d+)?/?$#i', rtrim($configuredUrl, '/')) === 1) {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $configuredUrl = $scheme . '://' . $requestHost;
+    }
+
+    return rtrim($configuredUrl, '/') . '/' . ltrim($path, '/');
 }
 
 function e(string $value): string

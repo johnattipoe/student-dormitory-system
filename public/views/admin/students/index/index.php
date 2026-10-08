@@ -150,12 +150,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
        
         <div class="card stat-card p-3 mb-3">
-            <form method="GET" class="row g-2">
+            <form id="studentListFilterForm" method="GET" action="<?= url('views/admin/students/index/index.php') ?>" class="row g-2" data-student-filter-form>
                 <div class="col-md-9">
-                    <input name="search" class="form-control form-control-sm" placeholder="Search name, admission number, class, or course" value="<?= e($search) ?>">
+                    <input id="studentSearchField" name="search" class="form-control form-control-sm" placeholder="Search name, admission number, class, or course" value="<?= e($search) ?>" aria-label="Student search">
                 </div>
                 <div class="col-md-3">
-                    <button class="btn btn-primary btn-sm">Filter</button> 
+                    <button id="studentFilterButton" type="button" class="btn btn-primary btn-sm">Filter</button>
                     <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/students/index/index.php') ?>">Reset</a>
                 </div>
             </form>
