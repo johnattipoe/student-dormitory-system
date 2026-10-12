@@ -16,15 +16,20 @@ $allowedRoles = [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_SENIOR_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\HouseService;
+use App\Services\RoomService;
 use App\Services\StudentService;
 
 $pageTitle = 'Students';
-$page = max(1, (int) ($_GET['page'] ?? 1));
-$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 $houseId = current_role() === ROLE_ADMIN ? null : current_user()['houseId'] ?? null;
-$students = StudentService::all($houseId, $limit);
-$totalStudents = StudentService::count($houseId);
-$totalPages = max(1, (int) ceil($totalStudents / $limit));
+$students = StudentService::allRecords($houseId);
+$roomNumbers = [];
+foreach (RoomService::all($houseId, 150) as $room) {
+    $roomId = trim((string) ($room['id'] ?? ''));
+    if ($roomId !== '') {
+        $roomNumbers[$roomId] = (string) ($room['roomNumber'] ?? '');
+    }
+}
+$totalStudents = count($students);
 $studentSummary = [
     'total' => $totalStudents,
     'active' => 0,
@@ -149,20 +154,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
        
-        <div class="card stat-card p-3 mb-3">
-            <form id="studentListFilterForm" method="GET" action="<?= url('views/admin/students/index/index.php') ?>" class="row g-2" data-student-filter-form>
-                <div class="col-md-9">
-                    <input id="studentSearchField" name="search" class="form-control form-control-sm" placeholder="Search name, admission number, class, or course" value="<?= e($search) ?>" aria-label="Student search">
-                </div>
-                <div class="col-md-3">
-                    <button id="studentFilterButton" type="button" class="btn btn-primary btn-sm">Filter</button>
-                    <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/students/index/index.php') ?>">Reset</a>
-                </div>
-            </form>
-        </div>
-
         <div class="card stat-card p-3">
-            <table class="table table-hover data-table w-100">
+            <table class="table table-hover data-table w-100" data-no-copy-export="true" data-export-exclude-last-column="true">
                 <thead>
                 <tr>
                     <th>Admission No.</th>
@@ -198,7 +191,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <?php endforeach; ?>
                 </tbody>
             </table>
-            <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
         </div>
     </div>
 </div>
@@ -208,25 +200,60 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     $studentId = (string) ($s['id'] ?? '');
     $studentName = trim((string) (($s['firstName'] ?? '') . ' ' . ($s['lastName'] ?? '')));
     $studentHouse = $resolveHouseName($s['houseId'] ?? '');
+    $studentRoomId = trim((string) ($s['roomId'] ?? ''));
+    $studentRoomNumber = $studentRoomId !== '' ? ($roomNumbers[$studentRoomId] ?? '') : '';
+    $displayStudentValue = static function ($value): string {
+        $value = trim((string) ($value ?? ''));
+        return e($value !== '' ? $value : '—');
+    };
+    $studentStatus = ucfirst(strtolower((string) ($s['status'] ?? 'active')));
     ?>
     <div class="modal fade" id="studentViewModal-<?= e($studentId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Student Profile</h5>
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content student-profile-modal">
+                <div class="modal-header student-modal-header">
+                    <span class="student-modal-icon"><i class="bi bi-person-vcard"></i></span>
+                    <div class="student-modal-heading">
+                        <span class="student-modal-kicker">Student record</span>
+                        <h5 class="modal-title"><?= e($studentName ?: 'Student Profile') ?></h5>
+                        <p>Admission No. <?= $displayStudentValue($s['admissionNo'] ?? '') ?></p>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
-                    <dl class="row mb-0">
-                        <dt class="col-sm-5">Name</dt><dd class="col-sm-7"><?= e($studentName ?: '—') ?></dd>
-                        <dt class="col-sm-5">Admission No.</dt><dd class="col-sm-7"><?= e($s['admissionNo'] ?? '—') ?></dd>
-                        <dt class="col-sm-5">Class</dt><dd class="col-sm-7"><?= e($s['class'] ?? ($s['form'] ?? $s['level'] ?? '—')) ?></dd>
-                        <dt class="col-sm-5">House</dt><dd class="col-sm-7"><?= e($studentHouse) ?></dd>
-                        <dt class="col-sm-5">Residence Type</dt><dd class="col-sm-7"><?= e(strtolower((string) ($s['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></dd>
-                        <dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e($s['status'] ?? 'active') ?></dd>
-                    </dl>
+                <div class="modal-body student-profile-body">
+                    <section class="student-profile-section">
+                        <h6><i class="bi bi-person-lines-fill"></i> Personal and academic</h6>
+                        <dl class="student-detail-grid">
+                            <div><dt>First Name</dt><dd><?= $displayStudentValue($s['firstName'] ?? '') ?></dd></div>
+                            <div><dt>Last Name</dt><dd><?= $displayStudentValue($s['lastName'] ?? '') ?></dd></div>
+                            <div><dt>Gender</dt><dd><?= $displayStudentValue(ucfirst((string) ($s['gender'] ?? ''))) ?></dd></div>
+                            <div><dt>Class</dt><dd><?= $displayStudentValue($s['class'] ?? '') ?></dd></div>
+                            <div><dt>Form / Level</dt><dd><?= $displayStudentValue($s['form'] ?? $s['level'] ?? '') ?></dd></div>
+                            <div><dt>Class Code</dt><dd><?= $displayStudentValue($s['course'] ?? '') ?></dd></div>
+                            <div><dt>Email</dt><dd><?= $displayStudentValue($s['email'] ?? '') ?></dd></div>
+                            <div><dt>Phone</dt><dd><?= $displayStudentValue($s['phone'] ?? '') ?></dd></div>
+                            <div><dt>NHIS Number</dt><dd><?= $displayStudentValue($s['nhisNumber'] ?? '') ?></dd></div>
+                        </dl>
+                    </section>
+                    <section class="student-profile-section">
+                        <h6><i class="bi bi-house-door"></i> Housing and status</h6>
+                        <dl class="student-detail-grid">
+                            <div><dt>House</dt><dd><?= $displayStudentValue($studentHouse) ?></dd></div>
+                            <div><dt>Room Number</dt><dd><?= $displayStudentValue($studentRoomNumber) ?></dd></div>
+                            <div><dt>Residence Type</dt><dd><?= strtolower((string) ($s['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding' ?></dd></div>
+                            <div><dt>Status</dt><dd><span class="student-status-value"><?= e($studentStatus) ?></span></dd></div>
+                        </dl>
+                    </section>
+                    <section class="student-profile-section">
+                        <h6><i class="bi bi-person-heart"></i> Parent / guardian</h6>
+                        <dl class="student-detail-grid">
+                            <div><dt>Guardian Name</dt><dd><?= $displayStudentValue($s['guardianName'] ?? '') ?></dd></div>
+                            <div><dt>Guardian Phone</dt><dd><?= $displayStudentValue($s['guardianPhone'] ?? '') ?></dd></div>
+                            <div><dt>Guardian Email</dt><dd><?= $displayStudentValue($s['guardianEmail'] ?? '') ?></dd></div>
+                        </dl>
+                    </section>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer student-modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
@@ -234,25 +261,52 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     </div>
 
     <div class="modal fade" id="studentEditModal-<?= e($studentId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
+        <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+            <div class="modal-content student-edit-modal">
                 <form method="POST" action="<?= url('views/admin/students/edit/edit.php?id=' . urlencode($studentId)) ?>">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Edit Student</h5>
+                    <div class="modal-header student-modal-header">
+                        <span class="student-modal-icon student-edit-icon"><i class="bi bi-pencil-square"></i></span>
+                        <div class="student-modal-heading">
+                            <span class="student-modal-kicker">Student record</span>
+                            <h5 class="modal-title">Edit <?= e($studentName ?: 'Student') ?></h5>
+                            <p>Update personal, academic, residence, and guardian details</p>
+                        </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body">
-                        <div class="row g-3">
+                    <div class="modal-body student-edit-body">
+                        <section class="student-edit-section">
+                        <h6 class="student-edit-section-heading"><i class="bi bi-person-lines-fill"></i> Personal and academic</h6>
+                        <div class="row g-3 mb-4">
                             <div class="col-md-6"><label class="form-label">First Name</label><input name="firstName" class="form-control" value="<?= e($s['firstName'] ?? '') ?>" required></div>
                             <div class="col-md-6"><label class="form-label">Last Name</label><input name="lastName" class="form-control" value="<?= e($s['lastName'] ?? '') ?>" required></div>
                             <div class="col-md-6"><label class="form-label">Admission No.</label><input name="admissionNo" class="form-control" value="<?= e($s['admissionNo'] ?? '') ?>"></div>
-                            <div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><option value="active" <?= ($s['status'] ?? '') === 'active' ? 'selected' : '' ?>>Active</option><option value="inactive" <?= ($s['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Inactive</option><option value="suspended" <?= ($s['status'] ?? '') === 'suspended' ? 'selected' : '' ?>>Suspended</option></select></div>
-                            <div class="col-md-6"><label class="form-label">Class</label><input name="class" class="form-control" value="<?= e($s['class'] ?? ($s['form'] ?? $s['level'] ?? '')) ?>"></div>
+                            <div class="col-md-6"><label class="form-label">Gender</label><select name="gender" class="form-select"><option value="">Select Gender</option><option value="male" <?= strtolower((string) ($s['gender'] ?? '')) === 'male' ? 'selected' : '' ?>>Male</option><option value="female" <?= strtolower((string) ($s['gender'] ?? '')) === 'female' ? 'selected' : '' ?>>Female</option><option value="other" <?= strtolower((string) ($s['gender'] ?? '')) === 'other' ? 'selected' : '' ?>>Other</option></select></div>
+                            <div class="col-md-6"><label class="form-label">Class</label><input name="class" class="form-control" value="<?= e($s['class'] ?? '') ?>"></div>
+                            <div class="col-md-6"><label class="form-label">Form / Level</label><input name="form" class="form-control" value="<?= e($s['form'] ?? $s['level'] ?? '') ?>"></div>
+                            <div class="col-md-6"><label class="form-label">Class Code</label><input name="course" class="form-control" value="<?= e($s['course'] ?? '') ?>"></div>
+                            <div class="col-md-6"><label class="form-label">NHIS Number</label><input name="nhisNumber" class="form-control" value="<?= e($s['nhisNumber'] ?? '') ?>"></div>
+                            <div class="col-md-6"><label class="form-label">Email</label><input type="email" name="email" class="form-control" value="<?= e($s['email'] ?? '') ?>"></div>
+                            <div class="col-md-6"><label class="form-label">Phone</label><input type="tel" name="phone" class="form-control" value="<?= e($s['phone'] ?? '') ?>"></div>
+                        </div>
+                        </section>
+                        <section class="student-edit-section">
+                        <h6 class="student-edit-section-heading"><i class="bi bi-house-door"></i> Housing and status</h6>
+                        <div class="row g-3 mb-4">
                             <div class="col-md-6"><label class="form-label">House</label><select name="houseId" class="form-select"><option value="">— Unassigned —</option><?php foreach ($houses as $houseId => $houseName): ?><option value="<?= e($houseId) ?>" <?= ($s['houseId'] ?? '') === $houseId ? 'selected' : '' ?>><?= e($houseName) ?></option><?php endforeach; ?></select></div>
                             <div class="col-md-6"><label class="form-label">Residence Type</label><select name="residenceType" class="form-select"><option value="boarding" <?= strtolower((string) ($s['residenceType'] ?? 'boarding')) === 'boarding' ? 'selected' : '' ?>>Boarding</option><option value="day" <?= strtolower((string) ($s['residenceType'] ?? 'boarding')) === 'day' ? 'selected' : '' ?>>Day</option></select></div>
+                            <div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><option value="active" <?= ($s['status'] ?? '') === 'active' ? 'selected' : '' ?>>Active</option><option value="inactive" <?= ($s['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Inactive</option><option value="suspended" <?= ($s['status'] ?? '') === 'suspended' ? 'selected' : '' ?>>Suspended</option><option value="graduated" <?= ($s['status'] ?? '') === 'graduated' ? 'selected' : '' ?>>Graduated</option></select></div>
                         </div>
+                        </section>
+                        <section class="student-edit-section">
+                        <h6 class="student-edit-section-heading"><i class="bi bi-person-heart"></i> Parent / guardian</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6"><label class="form-label">Guardian Name</label><input name="guardianName" class="form-control" value="<?= e($s['guardianName'] ?? '') ?>"></div>
+                            <div class="col-md-6"><label class="form-label">Guardian Phone</label><input type="tel" name="guardianPhone" class="form-control" value="<?= e($s['guardianPhone'] ?? '') ?>"></div>
+                            <div class="col-md-12"><label class="form-label">Guardian Email</label><input type="email" name="guardianEmail" class="form-control" value="<?= e($s['guardianEmail'] ?? '') ?>"></div>
+                        </div>
+                        </section>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer student-modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save changes</button>
                     </div>

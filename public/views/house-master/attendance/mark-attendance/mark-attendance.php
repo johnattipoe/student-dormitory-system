@@ -243,7 +243,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
-                        <table class="table table-hover align-middle mb-0">
+                        <table class="table table-hover align-middle mb-0" data-no-copy-export="true">
                             <thead class="table-light sticky-top">
                                 <tr>
                                     <th style="width: 45px;" class="text-center">

@@ -76,7 +76,16 @@ class ExeatService
 
         try {
             $student = StudentService::find($studentId) ?? [];
-            $id = $this->firebase->addDocument($this->collection, [
+            $createdAt = date(DATE_ATOM);
+            $createdByRole = (string) ($data['createdByRole'] ?? '');
+            $requestedBy = $data['requestedBy'] ?? null;
+            $staffIssued = in_array($createdByRole, [
+                ROLE_ADMIN,
+                ROLE_HOUSE_MASTER,
+                ROLE_HOUSE_MISTRESS,
+                ROLE_SENIOR_HOUSEPARENT,
+            ], true);
+            $recordData = [
                 'studentId' => $studentId,
                 'studentName' => $data['studentName'] ?? $this->studentName($student),
                 'houseId' => $data['houseId'] ?? $student['houseId'] ?? null,
@@ -91,14 +100,24 @@ class ExeatService
                 'destination' => $destination,
                 'reason' => $reason,
                 'guardianPhone' => $data['guardianPhone'] ?? $student['guardianPhone'] ?? '',
-                'status' => 'pending',
-                'requestedBy' => $data['requestedBy'] ?? null,
-                'createdByRole' => $data['createdByRole'] ?? null,
-                'createdAt' => date(DATE_ATOM),
-            ]);
+                'status' => $staffIssued ? 'departed' : 'pending',
+                'requestedBy' => $requestedBy,
+                'createdByRole' => $createdByRole !== '' ? $createdByRole : null,
+                'createdAt' => $createdAt,
+            ];
+            if ($staffIssued) {
+                $recordData['reviewedAt'] = $createdAt;
+                $recordData['reviewedBy'] = $requestedBy;
+                $recordData['departedAt'] = $createdAt;
+                $recordData['departedBy'] = $requestedBy;
+            }
+            $id = $this->firebase->addDocument($this->collection, $recordData);
 
             $typeLabel = $exeatType === 'internal' ? 'Internal' : 'External';
-            return ['success' => true, 'message' => $typeLabel . ' exeat request submitted successfully.', 'id' => $id];
+            $message = $staffIssued
+                ? $typeLabel . ' exeat issued and marked as departed.'
+                : $typeLabel . ' exeat request submitted successfully.';
+            return ['success' => true, 'message' => $message, 'id' => $id];
         } catch (\Throwable $e) {
             return ['success' => false, 'message' => 'Unable to submit exeat request: ' . $e->getMessage()];
         }

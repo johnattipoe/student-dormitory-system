@@ -131,7 +131,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <?php endif; ?>
 
         <!-- Form Card -->
-        <div class="card stat-card shadow-sm border-0" style="max-width: 880px;">
+        <div class="card stat-card shadow-sm border-0 w-100">
             <div class="card-header bg-white py-3">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-person-badge me-2 text-primary"></i>Student Registration Form</h6>
             </div>
@@ -240,8 +240,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <option value="suspended" <?= ($old['status'] ?? '') === 'suspended' ? 'selected' : '' ?>>Suspended</option>
                                 </select>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Residence Type</label>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Residence Type</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="bi bi-house-door"></i></span>
                                 <select name="residenceType" class="form-select">
                                     <option value="boarding" <?= ($old['residenceType'] ?? 'boarding') === 'boarding' ? 'selected' : '' ?>>Boarding</option>
                                     <option value="day" <?= ($old['residenceType'] ?? '') === 'day' ? 'selected' : '' ?>>Day</option>

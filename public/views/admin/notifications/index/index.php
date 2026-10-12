@@ -54,14 +54,6 @@ $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_p
 $notifications = $notificationService->all($limit);
 $totalNotifications = $notificationService->count();
 $totalPages = max(1, (int) ceil($totalNotifications / $limit));
-$search = strtolower(sanitize($_GET['search'] ?? ''));
-$readFilter = sanitize($_GET['read'] ?? '');
-if ($search !== '' || $readFilter !== '') {
-    $notifications = array_values(array_filter($notifications, function ($notification) use ($search, $readFilter) {
-        return ($search === '' || str_contains(strtolower((string) ($notification['title'] ?? '')), $search) || str_contains(strtolower((string) ($notification['message'] ?? '')), $search))
-            && ($readFilter === '' || ($readFilter === 'unread' ? empty($notification['read']) : !empty($notification['read'])));
-    }));
-}
 $users = (new UserService())->all();
 $userMap = [];
 foreach ($users as $user) {
@@ -98,8 +90,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <?php if ($unreadCount > 0): ?><form method="POST" class="d-inline"><input type="hidden" name="action" value="mark_all_read"><button class="btn btn-sm btn-outline-primary">Mark all read</button></form><?php endif; ?>
             </div>
         </div>
-        <div class="card stat-card p-3 mb-3"><form method="GET" class="row g-2"><div class="col-md-8"><input name="search" class="form-control form-control-sm" placeholder="Search notifications" value="<?= e($search) ?>"></div><div class="col-md-2"><select name="read" class="form-select form-select-sm"><option value="">All</option><option value="unread" <?= $readFilter === 'unread' ? 'selected' : '' ?>>Unread</option><option value="read" <?= $readFilter === 'read' ? 'selected' : '' ?>>Read</option></select></div><div class="col-md-2"><button class="btn btn-primary btn-sm">Filter</button></div></form></div>
-
         <div class="modal fade" id="createNotificationModal" tabindex="-1" aria-labelledby="createNotificationModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">

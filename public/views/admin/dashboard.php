@@ -50,13 +50,23 @@ $notificationCount  = $notificationService->count();
 $openIncidentCount  = $safeCount(COL_INCIDENTS, [['status', '=', 'open']]);
 $unreadNotificationCount = $safeCount('notifications', [['read', '=', false]]);
 
+// Keep the dashboard available if Firestore is temporarily unavailable.
+$safeCollection = static function (string $collection, int $limit) use ($firebase): array {
+    try {
+        return $firebase->getCollection($collection, [], $limit);
+    } catch (\Throwable $e) {
+        error_log('Dashboard collection fetch failed for ' . $collection . ': ' . $e->getMessage());
+        return [];
+    }
+};
+
 // Recent activity logs
-$recentLogs = $firebase->getCollection(COL_ACTIVITY_LOGS, [], 8);
+$recentLogs = $safeCollection(COL_ACTIVITY_LOGS, 8);
 usort($recentLogs, static fn($a, $b) => strcmp((string)($b['createdAt'] ?? ''), (string)($a['createdAt'] ?? '')));
 $recentLogs = array_slice($recentLogs, 0, 8);
 
 // Recent incidents
-$recentIncidents = $firebase->getCollection(COL_INCIDENTS, [], 6);
+$recentIncidents = $safeCollection(COL_INCIDENTS, 6);
 usort($recentIncidents, static fn($a, $b) => strcmp((string)($b['reportedAt'] ?? $b['createdAt'] ?? ''), (string)($a['reportedAt'] ?? $a['createdAt'] ?? '')));
 $recentIncidents = array_slice($recentIncidents, 0, 5);
 
@@ -86,10 +96,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
     <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
 
-    <div class="content-wrapper">
+    <div class="content-wrapper role-dashboard">
 
         <!-- Welcome Hero -->
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3 dashboard-hero">
             <div>
                 <h4 class="mb-1 fw-bold text-dark">
                     <i class="bi bi-shield-fill-check text-primary me-2"></i>Welcome, <?= e($adminName) ?>

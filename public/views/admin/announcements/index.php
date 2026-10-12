@@ -243,12 +243,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <!-- Announcements Table Column -->
             <div class="col-lg-7">
                 <div class="card stat-card shadow-sm border-0">
-                    <div class="card-header bg-white py-3">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h6 class="mb-0 fw-bold"><i class="bi bi-list-check me-2 text-success"></i>Existing Announcements</h6>
+                        <form method="GET" class="m-0" role="search" data-live-search data-live-search-table="#announcementsTable" data-no-page-reload="true">
+                            <input type="search" name="search" class="form-control form-control-sm" placeholder="Search announcements..." aria-label="Search announcements" style="width: 240px; max-width: 100%;">
+                        </form>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
+                            <table id="announcementsTable" class="table table-hover align-middle mb-0">
                                 <thead class="table-light">
                                     <tr>
                                         <th>Notice Title</th>
@@ -267,8 +270,16 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                             $annId = (string) ($announcement['id'] ?? '');
                                             $aType = $announcement['type'] ?? 'info';
                                             $aStatus = $announcement['status'] ?? 'published';
+                                            $searchText = implode(' ', [
+                                                (string) ($announcement['title'] ?? ''),
+                                                (string) ($announcement['message'] ?? ''),
+                                                (string) ($announcement['audience'] ?? 'all'),
+                                                (string) ($announcement['targetRole'] ?? ''),
+                                                (string) $aType,
+                                                (string) $aStatus,
+                                            ]);
                                             ?>
-                                            <tr>
+                                            <tr data-search-text="<?= e($searchText) ?>">
                                                 <td>
                                                     <strong class="text-dark d-block"><?= e($announcement['title'] ?? 'Untitled') ?></strong>
                                                     <small class="text-muted"><?= e($shortText((string) ($announcement['message'] ?? ''))) ?></small>

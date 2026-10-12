@@ -44,6 +44,7 @@ if (!function_exists('resolveCredentialsPath')) {
 if (!function_exists('loadCredentialsFromEnv')) {
     function loadCredentialsFromEnv(): ?string
     {
+        static $projectMismatchLogged = false;
         $base64Creds = $_ENV['FIREBASE_CREDENTIALS_BASE64'] ?? getenv('FIREBASE_CREDENTIALS_BASE64');
         if (!$base64Creds) {
             return null;
@@ -54,6 +55,19 @@ if (!function_exists('loadCredentialsFromEnv')) {
             $jsonData = base64_decode($base64Creds, true);
             if ($jsonData === false) {
                 error_log('Warning: Invalid base64 in FIREBASE_CREDENTIALS_BASE64');
+                return null;
+            }
+
+            $credentials = json_decode($jsonData, true);
+            $configuredProjectId = trim((string) ($_ENV['FIREBASE_PROJECT_ID'] ?? getenv('FIREBASE_PROJECT_ID') ?? ''));
+            if (!is_array($credentials)
+                || ($credentials['type'] ?? '') !== 'service_account'
+                || $configuredProjectId === ''
+                || ($credentials['project_id'] ?? '') !== $configuredProjectId) {
+                if (!$projectMismatchLogged) {
+                    error_log('Warning: FIREBASE_CREDENTIALS_BASE64 does not contain a service-account key for FIREBASE_PROJECT_ID.');
+                    $projectMismatchLogged = true;
+                }
                 return null;
             }
 
@@ -81,6 +95,22 @@ if (!function_exists('loadCredentialsFromEnv')) {
 
 // Determine credentials path: first try environment variable, then file path
 $credentialsPath = loadCredentialsFromEnv() ?? resolveCredentialsPath($_ENV['FIREBASE_CREDENTIALS'] ?? getenv('FIREBASE_CREDENTIALS'));
+
+// Recover from stale credential paths only when a local key matches the configured project.
+if ($credentialsPath === null) {
+    $projectId = trim((string) ($_ENV['FIREBASE_PROJECT_ID'] ?? getenv('FIREBASE_PROJECT_ID') ?? ''));
+    if ($projectId !== '') {
+        foreach (glob($rootPath . '/credentials/*.json') ?: [] as $candidatePath) {
+            $candidate = json_decode((string) file_get_contents($candidatePath), true);
+            if (is_array($candidate)
+                && ($candidate['type'] ?? '') === 'service_account'
+                && ($candidate['project_id'] ?? '') === $projectId) {
+                $credentialsPath = $candidatePath;
+                break;
+            }
+        }
+    }
+}
 
 // Return config array for FirebaseService
 return [

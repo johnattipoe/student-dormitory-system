@@ -56,17 +56,8 @@ $roomMap = [];
 foreach ($rooms as $room) {
     $roomMap[(string) ($room['id'] ?? '')] = (string) ($room['roomNumber'] ?? $room['id'] ?? '');
 }
-$studentSearch = strtolower(sanitize($_GET['search'] ?? ''));
-$studentStatus = sanitize($_GET['status'] ?? '');
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
-if ($studentSearch !== '' || $studentStatus !== '') {
-    $students = array_values(array_filter($students, function ($student) use ($studentSearch, $studentStatus) {
-        $haystack = strtolower(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' ' . ($student['admissionNo'] ?? '') . ' ' . ($student['class'] ?? '') . ' ' . ($student['course'] ?? '')));
-        return ($studentSearch === '' || str_contains($haystack, $studentSearch))
-            && ($studentStatus === '' || ($student['status'] ?? '') === $studentStatus);
-    }));
-}
 $activeStudentCount = count(array_filter($students, fn($student) => ($student['status'] ?? '') === 'active'));
 $inactiveStudentCount = count(array_filter($students, fn($student) => ($student['status'] ?? '') === 'inactive'));
 $suspendedStudentCount = count(array_filter($students, fn($student) => ($student['status'] ?? '') === 'suspended'));
@@ -167,38 +158,20 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
-        <!-- Filter Bar -->
-        <div class="card stat-card shadow-sm mb-4 border-0">
-            <div class="card-body p-3">
-                <form method="GET" action="<?= url('views/house-master/students/index/index.php') ?>" class="row g-2 align-items-center">
-                    <div class="col-md-7">
-                        <input name="search" class="form-control form-control-sm" placeholder="Search by name, admission number, class, or course..." value="<?= e($studentSearch) ?>">
-                    </div>
-                    <div class="col-md-3">
-                        <select name="status" class="form-select form-select-sm">
-                            <option value="">All Statuses</option>
-                            <option value="active" <?= $studentStatus === 'active' ? 'selected' : '' ?>>Active</option>
-                            <option value="inactive" <?= $studentStatus === 'inactive' ? 'selected' : '' ?>>Inactive</option>
-                            <option value="suspended" <?= $studentStatus === 'suspended' ? 'selected' : '' ?>>Suspended</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 d-flex gap-2">
-                        <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Filter</button>
-                        <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/students/index/index.php') ?>">Reset</a>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         <!-- Students Table -->
         <div class="card stat-card shadow-sm border-0">
-            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-people me-2 text-success"></i>Assigned House Students</h6>
-                <small class="text-muted">Showing <?= e((string) $totalStudents) ?> residents</small>
+                <div class="d-flex align-items-center gap-3">
+                    <form method="GET" class="m-0" role="search" data-live-search data-live-search-table="#houseStudentsTable">
+                        <input type="search" name="search" class="form-control form-control-sm" placeholder="Search students..." aria-label="Search assigned house students" style="width: 240px; max-width: 100%;">
+                    </form>
+                    <small class="text-muted text-nowrap">Showing <?= e((string) $totalStudents) ?> residents</small>
+                </div>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table id="houseStudentsTable" class="table table-hover align-middle mb-0" data-no-copy-export="true" data-external-table-search="true">
                         <thead class="table-light">
                             <tr>
                                 <th style="width: 40px;">
@@ -249,7 +222,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </tbody>
                     </table>
                 </div>
-                <?php $paginationQuery = []; if ($studentSearch !== '') { $paginationQuery[] = 'search=' . urlencode($studentSearch); } if ($studentStatus !== '') { $paginationQuery[] = 'status=' . urlencode($studentStatus); } $paginationBaseUrl = url('views/house-master/students/index/index.php' . (!empty($paginationQuery) ? '?' . implode('&', $paginationQuery) : '')); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
+                <?php $paginationBaseUrl = url('views/house-master/students/index/index.php'); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
             </div>
         </div>
     </div>

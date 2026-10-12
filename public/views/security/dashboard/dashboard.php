@@ -63,10 +63,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 <div class="main-content">
     <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
     <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
-    <div class="content-wrapper">
+    <div class="content-wrapper role-dashboard">
 
         <!-- Welcome Hero -->
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3 dashboard-hero">
             <div>
                 <h4 class="mb-1 fw-bold text-dark">
                     <i class="bi bi-shield-lock-fill text-dark me-2"></i>Welcome, <?= e($officerName) ?>

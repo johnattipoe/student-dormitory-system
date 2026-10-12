@@ -19,6 +19,7 @@
     <script src="<?= asset('js/ts/app.js') ?>"></script>
     <script src="<?= asset('js/ts/features/account-profile.js') ?>"></script>
     <script src="<?= asset('js/ts/features/table-filter.js') ?>"></script>
+    <script src="<?= asset('js/ts/features/workspace-filter.js') ?>"></script>
     <?php
     $currentScript = str_replace('\\', '/', $_GET['route'] ?? $_SERVER['SCRIPT_NAME'] ?? '');
     $autoScripts = [];

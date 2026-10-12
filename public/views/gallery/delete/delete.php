@@ -84,7 +84,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <h4 class="fw-bold text-danger"><i class="bi bi-trash3 me-2"></i>Delete Student Photo</h4>
                 <p>Are you sure you want to permanently delete the photo for <strong><?= e($metadata['studentName'] ?? 'Student') ?></strong>?</p>
                 <?php $deleteImageUrl = !empty($metadata['storageObject']) ? $firebase->storageUrl((string) $metadata['storageObject']) : url('uploads/student-gallery/' . rawurlencode($fileName)); ?>
-                <img src="<?= e($deleteImageUrl) ?>" alt="<?= e($metadata['studentName'] ?? 'Student photo') ?>" class="img-fluid rounded mb-4" style="max-height: 360px; object-fit: contain;">
+                <img src="<?= e($deleteImageUrl) ?>" alt="<?= e($metadata['studentName'] ?? 'Student photo') ?>" class="img-fluid rounded mb-4" style="max-height: 360px; object-fit: contain;" onerror="this.onerror=null;this.src='<?= e(asset('images/gallery-photo-unavailable.svg')) ?>';this.alt='Photo unavailable.';">
                 <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/gallery/delete/delete.php') . '&file=' . urlencode($fileName))) ?>" class="d-flex gap-2 justify-content-end">
                     <input type="hidden" name="file" value="<?= e($fileName) ?>">
                     <a href="<?= e($galleryUrl) ?>" class="btn btn-outline-secondary">Cancel</a>

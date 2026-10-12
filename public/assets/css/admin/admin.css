@@ -155,6 +155,45 @@
 .admin-activity-list time { white-space: nowrap; }
 .admin-empty-state { display: grid; place-items: center; gap: .5rem; padding: 1.5rem; border-radius: 14px; background: #f8fafc; color: #64748b; }
 .admin-empty-state i { font-size: 1.8rem; }
+.house-directory-search {
+  width: 100%;
+  max-width: 340px;
+}
+
+.house-directory-search .input-group {
+  background: #f8fafc;
+  border: 1px solid rgba(14, 116, 144, 0.22);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.02);
+}
+
+.house-directory-search .input-group-text {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  padding-left: .8rem;
+  padding-right: .5rem;
+}
+
+.house-directory-search .form-control {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #0f172a;
+  font-weight: 600;
+  padding-left: .25rem;
+  padding-right: 1rem;
+}
+
+.house-directory-search .form-control::placeholder {
+  color: #94a3b8;
+}
+
+.house-directory-search .form-control:focus {
+  border: 0;
+  box-shadow: none;
+}
 .advanced-settings-page > .d-flex:first-child { padding: 1.5rem; border: 1px solid rgba(37, 99, 235, .14); border-radius: 22px; background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 58%, #ecfeff 100%); box-shadow: 0 12px 30px rgba(30, 64, 175, .08); }
 .advanced-settings-page > .d-flex:first-child h1 { color: #172554; font-size: clamp(1.5rem, 2.4vw, 2.2rem); font-weight: 900; }
 .advanced-settings-page > .d-flex:first-child p { color: #64748b !important; }
@@ -317,6 +356,95 @@ table code { background: #f0f2f8; color: var(--sds-primary-dark, #24488f); paddi
 
 .content-wrapper .table tbody tr:hover {
   background: #f8fbff;
+}
+
+.student-profile-modal,
+.student-edit-modal {
+  overflow: hidden;
+  border: 1px solid #dbe5ef;
+  border-radius: 14px;
+  box-shadow: 0 22px 60px rgba(15, 42, 75, .2);
+}
+
+.student-edit-modal > form {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.student-edit-modal .student-edit-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.student-modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: .9rem;
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid #e2eaf2;
+  background: #f7fafc;
+}
+
+.student-modal-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 12px;
+  color: #1d4ed8;
+  background: #dbeafe;
+  font-size: 1.25rem;
+}
+
+.student-edit-icon {
+  color: #047857;
+  background: #d1fae5;
+}
+
+.student-modal-heading { min-width: 0; flex: 1; }
+.student-modal-kicker { color: #2563eb; font-size: .68rem; font-weight: 800; text-transform: uppercase; }
+.student-modal-heading .modal-title { margin-top: .1rem; color: #172554; font-size: 1.15rem; font-weight: 800; overflow-wrap: anywhere; }
+.student-modal-heading p { margin: .2rem 0 0; color: #64748b; font-size: .84rem; }
+.student-modal-header .btn-close { margin: .15rem 0 0 auto; }
+
+.student-profile-body,
+.student-edit-body { padding: 1.25rem; }
+.student-profile-section + .student-profile-section,
+.student-edit-section + .student-edit-section { margin-top: 1.15rem; padding-top: 1.05rem; border-top: 1px solid #e2eaf2; }
+.student-profile-section h6,
+.student-edit-section-heading { display: flex; align-items: center; gap: .5rem; margin: 0 0 .8rem; color: #1e3a5f; font-size: .9rem; font-weight: 800; }
+.student-profile-section h6 i,
+.student-edit-section-heading i { color: #2563eb; font-size: 1rem; }
+
+.student-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .55rem .7rem;
+  margin: 0;
+}
+
+.student-detail-grid > div { min-width: 0; padding: .65rem .75rem; border: 1px solid #e7edf4; border-radius: 8px; background: #fbfdff; }
+.student-detail-grid dt { margin-bottom: .2rem; color: #64748b; font-size: .66rem; font-weight: 800; text-transform: uppercase; }
+.student-detail-grid dd { margin: 0; color: #1f2937; font-size: .88rem; font-weight: 600; overflow-wrap: anywhere; }
+.student-status-value { display: inline-flex; padding: .18rem .5rem; border-radius: 999px; color: #166534; background: #dcfce7; font-size: .76rem; font-weight: 800; }
+
+.student-edit-section .form-label { margin-bottom: .35rem; color: #475569; font-size: .7rem; font-weight: 800; text-transform: uppercase; }
+.student-edit-section .form-control,
+.student-edit-section .form-select { min-height: 40px; border-color: #cbd5e1; border-radius: 8px; }
+.student-edit-section .form-control:focus,
+.student-edit-section .form-select:focus { border-color: #2563eb; box-shadow: 0 0 0 .18rem rgba(37, 99, 235, .12); }
+.student-modal-footer { padding: .85rem 1.25rem; border-top: 1px solid #e2eaf2; background: #fbfdff; }
+
+@media (max-width: 575.98px) {
+  .student-modal-header { padding: .9rem; }
+  .student-profile-body,
+  .student-edit-body { padding: .9rem; }
+  .student-detail-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 .content-wrapper .btn {

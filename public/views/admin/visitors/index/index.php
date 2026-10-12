@@ -88,9 +88,65 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Track campus guest registrations, monitor check-in movements, and gate passes</p>
             </div>
             <div class="d-flex gap-2">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#registerVisitorModal">
+                    <i class="bi bi-person-plus me-1"></i> Register New Visitor
+                </button>
                 <a href="<?= url('views/admin/visitors/reports/reports.php') ?>" class="btn btn-outline-info btn-sm">
                     <i class="bi bi-bar-chart me-1"></i> Visitor Reports
                 </a>
+            </div>
+        </div>
+
+        <div class="modal fade" id="registerVisitorModal" tabindex="-1" aria-labelledby="registerVisitorModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <form method="POST" action="<?= url('views/admin/visitors/index/index.php') ?>">
+                        <div class="modal-header">
+                            <h5 class="modal-title fw-bold" id="registerVisitorModalLabel">
+                                <i class="bi bi-person-plus me-2 text-primary"></i>Register New Visitor
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-3">
+                                <input type="hidden" name="action" value="register">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Visitor Name <span class="text-danger">*</span></label>
+                                    <input name="visitorName" class="form-control" placeholder="Full name" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Phone Number</label>
+                                    <input name="phone" class="form-control" placeholder="e.g. +233 24 000 0000">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Student to Visit <span class="text-danger">*</span></label>
+                                    <select name="studentId" class="form-select select2" data-select2-search="true" required>
+                                        <option value="">-- Choose student --</option>
+                                        <?php foreach ($students as $student): ?>
+                                            <option value="<?= e((string) ($student['id'] ?? '')) ?>"><?= e(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' (' . ($student['admissionNo'] ?? '') . ')') ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Purpose of Visit</label>
+                                    <input name="purpose" class="form-control" placeholder="e.g. Guardian visit, supplies delivery">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">ID Document Type</label>
+                                    <input name="idType" class="form-control" placeholder="e.g. Ghana Card, Driver License">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">ID Document Number</label>
+                                    <input name="idNumber" class="form-control" placeholder="e.g. GHA-123456789-0">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Register Visitor</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
@@ -136,82 +192,20 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
-        <!-- Register Visitor Form -->
-        <div class="card stat-card shadow-sm border-0 mb-4">
-            <div class="card-header bg-white py-3">
-                <h6 class="mb-0 fw-bold"><i class="bi bi-person-plus me-2 text-primary"></i>Register New Visitor</h6>
-            </div>
-            <div class="card-body p-4">
-                <form method="POST" action="<?= url('views/admin/visitors/index/index.php') ?>" class="row g-3">
-                    <input type="hidden" name="action" value="register">
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold">Visitor Name <span class="text-danger">*</span></label>
-                        <input name="visitorName" class="form-control" placeholder="Full name" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold">Phone Number</label>
-                        <input name="phone" class="form-control" placeholder="e.g. +233 24 000 0000">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold">Student to Visit <span class="text-danger">*</span></label>
-                        <select name="studentId" class="form-select select2" required>
-                            <option value="">-- Choose student --</option>
-                            <?php foreach ($students as $student): ?>
-                                <option value="<?= e((string) ($student['id'] ?? '')) ?>"><?= e(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' (' . ($student['admissionNo'] ?? '') . ')') ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold">Purpose of Visit</label>
-                        <input name="purpose" class="form-control" placeholder="e.g. Guardian visit, supplies delivery">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold">ID Document Type</label>
-                        <input name="idType" class="form-control" placeholder="e.g. Ghana Card, Driver License">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold">ID Document Number</label>
-                        <input name="idNumber" class="form-control" placeholder="e.g. GHA-123456789-0">
-                    </div>
-                    <div class="col-12 mt-3">
-                        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Register Visitor</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Filter Search Bar -->
-        <div class="card stat-card shadow-sm mb-4 border-0">
-            <div class="card-body p-3">
-                <form method="GET" class="row g-2 align-items-center">
-                    <div class="col-md-7">
-                        <input name="search" class="form-control form-control-sm" placeholder="Search by visitor name or student..." value="<?= e($search) ?>">
-                    </div>
-                    <div class="col-md-3">
-                        <select name="status" class="form-select form-select-sm">
-                            <option value="">All Statuses</option>
-                            <option value="inside" <?= $statusFilter === 'inside' ? 'selected' : '' ?>>Currently Inside</option>
-                            <option value="checked_out" <?= $statusFilter === 'checked_out' ? 'selected' : '' ?>>Checked Out</option>
-                            <option value="registered" <?= $statusFilter === 'registered' ? 'selected' : '' ?>>Registered (Pending Entry)</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 d-flex gap-2">
-                        <button class="btn btn-primary btn-sm flex-grow-1">Filter</button>
-                        <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/visitors/index/index.php') ?>">Reset</a>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         <!-- Visitors Table Card -->
         <div class="card stat-card shadow-sm border-0">
-            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-person-badge me-2 text-info"></i>Visitor Log Registry</h6>
-                <small class="text-muted">Showing <?= count($visitors) ?> records</small>
+                <div class="d-flex align-items-center gap-3">
+                    <form method="GET" class="m-0" role="search" data-live-search data-live-search-table="#visitorLogTable" data-no-page-reload="true">
+                        <input type="search" name="search" class="form-control form-control-sm" placeholder="Search visitors..." aria-label="Search visitor records" style="width: 240px; max-width: 100%;">
+                    </form>
+                    <small class="text-muted text-nowrap">Showing <?= count($visitors) ?> records</small>
+                </div>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table id="visitorLogTable" class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                         <tr>
                             <th>Visitor Name</th>
@@ -246,8 +240,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     default => 'bg-warning text-dark',
                                 };
                                 $vId = (string) ($visitor['id'] ?? '');
+                                $searchText = implode(' ', [
+                                    (string) ($visitor['visitorName'] ?? ''),
+                                    (string) ($visitor['phone'] ?? ''),
+                                    $studentName,
+                                    (string) ($visitor['purpose'] ?? ''),
+                                    $vStatus,
+                                ]);
                                 ?>
-                                <tr>
+                                <tr data-search-text="<?= e($searchText) ?>">
                                     <td>
                                         <strong class="text-dark d-block"><?= e($visitor['visitorName'] ?? 'Visitor') ?></strong>
                                         <small class="text-muted"><?= e($visitor['phone'] ?? '') ?></small>

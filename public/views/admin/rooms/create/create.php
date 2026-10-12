@@ -75,7 +75,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
-        <div class="card stat-card shadow-sm border-0" style="max-width: 760px;">
+        <div class="card stat-card shadow-sm border-0 w-100">
             <div class="card-header bg-white py-3">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-pencil-square me-2 text-info"></i>Room Configuration Form</h6>
             </div>

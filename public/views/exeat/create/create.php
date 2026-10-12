@@ -206,6 +206,50 @@ require APP_ROOT . '/app/views/components/header/header.php';
 require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 ?>
 <style>
+.exeat-page-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    padding: 1.35rem 1.4rem;
+    border: 1px solid rgba(37, 99, 235, 0.14);
+    border-radius: 20px;
+    background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 45%, #ecfeff 100%);
+    box-shadow: 0 12px 28px rgba(37, 99, 235, 0.08);
+}
+.exeat-page-hero .title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+}
+.exeat-page-hero .title-icon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    color: #fff;
+    background: linear-gradient(135deg, #2563eb, #7c3aed 60%, #06b6d4);
+    box-shadow: 0 14px 30px rgba(37, 99, 235, 0.22);
+    font-size: 1.4rem;
+}
+.exeat-page-hero h4 {
+    margin: 0;
+    color: #172554;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+}
+.exeat-page-hero p {
+    margin: .2rem 0 0;
+    color: #64748b;
+    font-size: 0.95rem;
+}
+.exeat-page-hero .btn {
+    min-height: 38px;
+    border-radius: 10px;
+    font-weight: 700;
+}
 .exeat-create-form .nav-pills .nav-link {
     border-radius: 10px;
     font-size: 0.9rem;
@@ -234,18 +278,20 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <div class="content-wrapper">
         <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
 
-        <!-- Hero Header -->
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-            <div>
-                <h4 class="mb-1 fw-bold text-dark"><i class="bi bi-calendar2-plus text-primary me-2"></i><?= e($pageTitle) ?></h4>
-                <p class="text-muted mb-0"><?= $canCreateForStudent ? 'Issue internal (hours/day pass) or external (travel/home pass) exeat for students' : 'Submit your dormitory exeat request' ?></p>
+        <div class="exeat-page-hero">
+            <div class="title-wrap">
+                <span class="title-icon"><i class="bi bi-calendar2-plus"></i></span>
+                <div>
+                    <h4><?= e($pageTitle) ?></h4>
+                    <p><?= $canCreateForStudent ? 'Issue internal (hours/day pass) or external (travel/home pass) exeat for students' : 'Submit your dormitory exeat request' ?></p>
+                </div>
             </div>
             <a href="<?= url('views/exeat/index.php') ?>" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left me-1"></i>Back to Exeat List
             </a>
         </div>
 
-        <div class="card stat-card shadow-sm border-0 exeat-create-form" style="max-width: 820px;">
+        <div class="card stat-card shadow-sm border-0 exeat-create-form" style="width: 100%; max-width: none;">
             <div class="card-header bg-white py-3">
                 <ul class="nav nav-pills card-header-pills" id="exeatTypeTabs" role="tablist">
                     <li class="nav-item" role="presentation">

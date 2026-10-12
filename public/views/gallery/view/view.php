@@ -67,7 +67,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card border-0 shadow-sm">
             <div class="card-body text-center p-4">
                 <?php $viewImageUrl = !empty($metadata['storageObject']) ? $firebase->storageUrl((string) $metadata['storageObject']) : url('uploads/student-gallery/' . rawurlencode($fileName)); ?>
-                <img src="<?= e($viewImageUrl) ?>" alt="<?= e($metadata['studentName'] ?? 'Student photo') ?>" class="img-fluid rounded" style="max-height: 70vh; object-fit: contain;">
+                <img src="<?= e($viewImageUrl) ?>" alt="<?= e($metadata['studentName'] ?? 'Student photo') ?>" class="img-fluid rounded" style="max-height: 70vh; object-fit: contain;" onerror="this.onerror=null;this.src='<?= e(asset('images/gallery-photo-unavailable.svg')) ?>';this.alt='Photo unavailable. Return to Gallery and edit this record to upload a replacement.';">
                 <dl class="row text-start mt-4 mb-0 mx-auto" style="max-width: 520px;">
                     <dt class="col-sm-4">Student</dt><dd class="col-sm-8"><?= e($metadata['studentName'] ?? 'Student') ?></dd>
                     <dt class="col-sm-4">House</dt><dd class="col-sm-8"><?= e($metadata['houseName'] ?? 'House') ?></dd>

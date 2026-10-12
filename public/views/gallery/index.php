@@ -365,7 +365,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <div class="gallery-item">
                                 <div class="card border-0 shadow-sm overflow-hidden h-100">
                                     <button type="button" class="btn p-0 border-0 w-100" data-bs-toggle="modal" data-bs-target="#galleryViewModal-<?= e(md5((string) $item['fileName'])) ?>" aria-label="View photo of <?= e($item['studentName']) ?>">
-                                        <img src="<?= e($item['file']) ?>" class="card-img-top" alt="<?= e($item['studentName']) ?>" style="height: 220px; object-fit: cover;">
+                                        <img src="<?= e($item['file']) ?>" class="card-img-top" alt="<?= e($item['studentName']) ?>" style="height: 220px; object-fit: cover;" onerror="this.onerror=null;this.src='<?= e(asset('images/gallery-photo-unavailable.svg')) ?>';this.alt='Photo unavailable. Edit this record to upload a replacement.';">
                                     </button>
                                     <div class="card-body">
                                         <h6 class="fw-bold mb-1"><?= e($item['studentName']) ?></h6>
@@ -397,7 +397,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                         </div>
                                         <div class="modal-body text-center">
-                                            <img src="<?= e($item['file']) ?>" alt="<?= e($item['studentName']) ?>" class="img-fluid rounded" style="max-height: 65vh; object-fit: contain;">
+                                            <img src="<?= e($item['file']) ?>" alt="<?= e($item['studentName']) ?>" class="img-fluid rounded" style="max-height: 65vh; object-fit: contain;" onerror="this.onerror=null;this.src='<?= e(asset('images/gallery-photo-unavailable.svg')) ?>';this.alt='Photo unavailable. Edit this record to upload a replacement.';">
                                             <p class="small text-muted mt-3 mb-0"><?= e($item['houseName']) ?><?php if ($item['uploadedAt'] !== ''): ?> | Uploaded: <?= e($item['uploadedAt']) ?><?php endif; ?></p>
                                         </div>
                                         <div class="modal-footer">
@@ -421,7 +421,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                                     <input type="hidden" name="file" value="<?= e($item['fileName']) ?>">
                                                     <div class="row g-4 align-items-start">
                                                         <div class="col-md-4 text-center">
-                                                            <img src="<?= e($item['file']) ?>" alt="<?= e($item['studentName']) ?>" class="img-fluid rounded border" style="max-height: 220px; object-fit: contain;">
+                                                            <img src="<?= e($item['file']) ?>" alt="<?= e($item['studentName']) ?>" class="img-fluid rounded border" style="max-height: 220px; object-fit: contain;" onerror="this.onerror=null;this.src='<?= e(asset('images/gallery-photo-unavailable.svg')) ?>';this.alt='Photo unavailable. Upload a replacement image below.';">
                                                             <p class="small text-muted mt-2 mb-0"><?= e($item['fileName']) ?></p>
                                                         </div>
                                                         <div class="col-md-8">

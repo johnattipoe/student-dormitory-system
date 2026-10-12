@@ -197,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(url('views/exeat/index.php'));
     }
 
-    if ($isStaff && in_array($action, ['approve', 'reject', 'depart', 'return'], true)) {
+    if ($isStaff && in_array($action, ['reject', 'return'], true)) {
         $recordId = sanitize($_POST['recordId'] ?? '');
         $visibleIds = array_fill_keys(array_map(static fn(array $record): string => (string) ($record['id'] ?? ''), $service->visibleForRole($role, $userId, $houseId, $studentId)), true);
 
@@ -254,11 +254,12 @@ try {
     $houseMap = [];
 }
 
-$statusFilter = strtolower(trim(sanitize($_GET['status'] ?? '')));
-$typeFilter = strtolower(trim(sanitize($_GET['type'] ?? '')));
-$fromDate = sanitize($_GET['from'] ?? '');
-$toDate = sanitize($_GET['to'] ?? '');
-$searchTerm = trim(sanitize($_GET['search'] ?? ''));
+$hideExeatFilters = in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS, ROLE_SENIOR_HOUSEPARENT], true);
+$statusFilter = $hideExeatFilters ? '' : strtolower(trim(sanitize($_GET['status'] ?? '')));
+$typeFilter = $hideExeatFilters ? '' : strtolower(trim(sanitize($_GET['type'] ?? '')));
+$fromDate = $hideExeatFilters ? '' : sanitize($_GET['from'] ?? '');
+$toDate = $hideExeatFilters ? '' : sanitize($_GET['to'] ?? '');
+$searchTerm = $hideExeatFilters ? '' : trim(sanitize($_GET['search'] ?? ''));
 
 if ($statusFilter !== '' && in_array($statusFilter, ['pending', 'approved', 'rejected', 'departed', 'returned'], true)) {
     $records = array_values(array_filter($records, static fn(array $record): bool => strtolower((string) ($record['status'] ?? 'pending')) === $statusFilter));
@@ -516,10 +517,11 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
         <?php endif; ?>
 
-        <!-- Filter Bar -->
-        <div class="card stat-card shadow-sm border-0 mb-4">
-            <div class="card-body exeat-filter-wrapper">
-                <form method="GET" class="row g-2 align-items-end exeat-filter-row">
+        <?php if (!$hideExeatFilters): ?>
+            <!-- Filter Bar -->
+            <div class="card stat-card shadow-sm border-0 mb-4">
+                <div class="card-body exeat-filter-wrapper">
+                    <form method="GET" class="row g-2 align-items-end exeat-filter-row">
                     <div class="col-md-2">
                         <label class="form-label small fw-semibold">Status</label>
                         <select name="status" class="form-select form-select-sm">
@@ -555,22 +557,25 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <a href="<?= url('views/exeat/index.php') ?>" class="btn btn-outline-secondary btn-sm" title="Reset"><i class="bi bi-x"></i></a>
                         <?php endif; ?>
                     </div>
-                </form>
+                    </form>
+                </div>
             </div>
-        </div>
+        <?php endif; ?>
 
         <!-- Data Table -->
         <div class="card stat-card shadow-sm border-0 mb-4">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-journal-text me-2 text-primary"></i>Exeat Applications &amp; Travel Pass Records</h6>
                 <div class="d-flex align-items-center gap-2">
-                    <input type="search" class="form-control form-control-sm" data-ts-table-filter placeholder="Filter shown records..." aria-label="Filter shown records" style="max-width: 220px;">
+                    <?php if (!$hideExeatFilters): ?>
+                        <input type="search" class="form-control form-control-sm" data-ts-table-filter placeholder="Filter shown records..." aria-label="Filter shown records" style="max-width: 220px;">
+                    <?php endif; ?>
                     <span class="badge bg-light text-dark border" data-ts-filter-count><?= count($records) ?> shown</span>
                 </div>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0 w-100 exeat-table" data-no-data-table="true" data-ts-filter-table>
+                    <table class="table table-hover align-middle mb-0 w-100 exeat-table" data-no-data-table="true" <?= !$hideExeatFilters ? 'data-ts-filter-table' : '' ?>>
                         <thead class="table-light">
                             <tr>
                                 <?php if (!$isStudent): ?>
@@ -659,36 +664,16 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         </td>
                                         <td class="text-end text-nowrap">
                                             <div class="d-inline-flex align-items-center gap-1">
-                                                <!-- Staff Primary Quick Action Button (if applicable) -->
-                                                <?php if ($isStaff): ?>
-                                                    <?php if ($recordStatus === 'pending'): ?>
-                                                        <form method="POST" class="d-inline">
-                                                            <?= csrf_field() ?>
-                                                            <input type="hidden" name="recordId" value="<?= e($recId) ?>">
-                                                            <input type="hidden" name="action" value="approve">
-                                                            <button type="submit" class="btn btn-sm btn-success" title="Approve Request">
-                                                                <i class="bi bi-check-lg me-1"></i>Approve
-                                                            </button>
-                                                        </form>
-                                                    <?php elseif ($recordStatus === 'approved'): ?>
-                                                        <form method="POST" class="d-inline">
-                                                            <?= csrf_field() ?>
-                                                            <input type="hidden" name="recordId" value="<?= e($recId) ?>">
-                                                            <input type="hidden" name="action" value="depart">
-                                                            <button type="submit" class="btn btn-sm btn-info text-white" title="Mark as Departed">
-                                                                <i class="bi bi-box-arrow-right me-1"></i>Depart
-                                                            </button>
-                                                        </form>
-                                                    <?php elseif ($recordStatus === 'departed'): ?>
-                                                        <form method="POST" class="d-inline">
-                                                            <?= csrf_field() ?>
-                                                            <input type="hidden" name="recordId" value="<?= e($recId) ?>">
-                                                            <input type="hidden" name="action" value="return">
-                                                            <button type="submit" class="btn btn-sm btn-secondary" title="Mark as Returned">
-                                                                <i class="bi bi-box-arrow-in-left me-1"></i>Return
-                                                            </button>
-                                                        </form>
-                                                    <?php endif; ?>
+                                                <!-- A staff-issued exeat starts as departed; keep only its return action here. -->
+                                                <?php if ($isStaff && $recordStatus === 'departed'): ?>
+                                                    <form method="POST" class="d-inline">
+                                                        <?= csrf_field() ?>
+                                                        <input type="hidden" name="recordId" value="<?= e($recId) ?>">
+                                                        <input type="hidden" name="action" value="return">
+                                                        <button type="submit" class="btn btn-sm btn-secondary" title="Mark as Returned">
+                                                            <i class="bi bi-box-arrow-in-left me-1"></i>Return
+                                                        </button>
+                                                    </form>
                                                 <?php endif; ?>
 
                                                 <!-- Three Dots (⋮) Action Menu -->

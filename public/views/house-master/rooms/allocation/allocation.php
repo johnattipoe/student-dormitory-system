@@ -84,24 +84,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect(url($allocationRoute));
 }
 
-$search = strtolower(trim(sanitize($_GET['search'] ?? '')));
-$statusFilter = sanitize($_GET['status'] ?? '');
-$houseFilter = sanitize($_GET['houseId'] ?? '');
-$rooms = array_values(array_filter($rooms, function ($room) use ($search, $statusFilter, $houseFilter, $houseMap) {
-    $roomId = (string) ($room['id'] ?? '');
-    $houseId = (string) ($room['houseId'] ?? '');
-    $roomName = (string) ($room['roomNumber'] ?? '');
-    $houseName = $houseMap[$houseId] ?? $houseId;
-    $occupied = (int) ($room['occupied'] ?? 0);
-    $capacity = (int) ($room['capacity'] ?? 0);
-    $computedStatus = ($room['status'] ?? '') === 'maintenance'
-        ? 'maintenance'
-        : ($occupied >= $capacity ? 'full' : ($occupied > 0 ? 'occupied' : 'available'));
-    return ($search === '' || str_contains(strtolower($roomName . ' ' . $houseName), $search))
-        && ($statusFilter === '' || $computedStatus === $statusFilter)
-        && ($houseFilter === '' || $houseId === $houseFilter);
-}));
-
 if (isset($_GET['download']) && $_GET['download'] === 'csv') {
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="room-allocation.csv"');
@@ -140,7 +122,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Manage resident bed assignments, transfers, and capacity utilization</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-outline-success btn-sm" href="<?= url($allocationRoute . '?download=csv&search=' . urlencode($search) . '&status=' . urlencode($statusFilter) . '&houseId=' . urlencode($houseFilter)) ?>">
+                <a class="btn btn-outline-success btn-sm" href="<?= url($allocationRoute . '?download=csv') ?>">
                     <i class="bi bi-filetype-csv me-1"></i>Export CSV
                 </a>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url($roomsIndexRoute) ?>">
@@ -247,42 +229,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
-        <!-- Filter Bar -->
-        <div class="card stat-card shadow-sm mb-4 border-0">
-            <div class="card-body p-3">
-                <form method="GET" class="row g-2 align-items-end">
-                    <div class="col-md-4">
-                        <label class="form-label small fw-semibold">Search</label>
-                        <input name="search" class="form-control form-control-sm" placeholder="Search room or house" value="<?= e($search) ?>">
-                    </div>
-                    <?php if ($isAdmin): ?>
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold">House</label>
-                        <select name="houseId" class="form-select form-select-sm">
-                            <option value="">All houses</option>
-                            <?php foreach ($houses as $house): ?>
-                                <option value="<?= e((string) ($house['id'] ?? '')) ?>" <?= $houseFilter === ($house['id'] ?? '') ? 'selected' : '' ?>><?= e($house['name'] ?? '') ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <?php endif; ?>
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold">Status</label>
-                        <select name="status" class="form-select form-select-sm">
-                            <option value="">All statuses</option>
-                            <?php foreach (['available', 'occupied', 'full', 'maintenance'] as $status): ?>
-                                <option value="<?= e($status) ?>" <?= $statusFilter === $status ? 'selected' : '' ?>><?= ucfirst($status) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2 d-flex gap-2">
-                        <button class="btn btn-primary btn-sm flex-fill"><i class="bi bi-funnel me-1"></i>Filter</button>
-                        <a class="btn btn-outline-secondary btn-sm" href="<?= url($allocationRoute) ?>">Reset</a>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         <!-- Rooms Table -->
         <div class="card stat-card shadow-sm border-0 mb-4">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
@@ -291,7 +237,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0 data-table w-100">
+                    <table class="table table-hover align-middle mb-0 data-table w-100" data-no-copy-export="true" data-no-table-search="true">
                         <thead class="table-light">
                             <tr>
                                 <th>Room</th>
@@ -306,7 +252,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </thead>
                         <tbody>
                             <?php if (!$rooms): ?>
-                                <tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No rooms match the selected filters.</td></tr>
+                                <tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No rooms are available for allocation.</td></tr>
                             <?php else: ?>
                                 <?php foreach ($rooms as $room): 
                                     $roomId = (string) ($room['id'] ?? ''); 
@@ -351,7 +297,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0 data-table w-100">
+                    <table class="table table-hover align-middle mb-0 data-table w-100" data-no-copy-export="true" data-no-table-search="true">
                         <thead class="table-light">
                             <tr>
                                 <th>Student</th>

@@ -36,6 +36,12 @@ try {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $returnToUsers = ($_POST['returnTo'] ?? '') === 'users';
+    $usersIndexUrl = base_url('index.php?route=/views/admin/users/index/index.php');
+    $modalReturnUrl = $usersIndexUrl . '&createUser=1';
+    $createPageUrl = base_url('index.php?route=/views/admin/users/create/create.php');
+    $failureRedirect = $returnToUsers ? $modalReturnUrl : $createPageUrl;
+
     $role = sanitize($_POST['role'] ?? '');
     $houseId = in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true) ? sanitize($_POST['houseId'] ?? '') : null;
     $data = [
@@ -60,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['_errors'] = $errors;
         $_SESSION['_old'] = $data;
         flash('error', 'Please fix the highlighted fields.');
-        redirect(base_url('index.php?route=/views/admin/users/create/create.php'));
+        redirect($failureRedirect);
     }
 
     $result = $userService->create($data);
@@ -90,12 +96,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'message' => $result['message'] ?? 'User created.'
             ];
             flash('success', $result['message']);
-            redirect(base_url('index.php?route=/views/admin/users/create/create.php'));
+            redirect($returnToUsers ? $modalReturnUrl : $createPageUrl);
         }
     }
 
+    if (!$result['success'] && $returnToUsers) {
+        $_SESSION['_old'] = $data;
+    }
     flash($result['success'] ? 'success' : 'error', $result['message']);
-    redirect(base_url('index.php?route=' . ($result['success'] ? '/views/admin/users/index/index.php' : '/views/admin/users/create/create.php')));
+    redirect($result['success'] ? $usersIndexUrl : $failureRedirect);
 }
 
 $errors = $_SESSION['_errors'] ?? [];

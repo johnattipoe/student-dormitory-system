@@ -122,10 +122,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 <div class="main-content">
     <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
     <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
-    <div class="content-wrapper">
+    <div class="content-wrapper role-dashboard">
 
         <!-- Welcome Hero -->
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3 dashboard-hero">
             <div class="d-flex align-items-center gap-3">
                 <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold fs-4"
                      style="width:56px;height:56px;flex-shrink:0;">

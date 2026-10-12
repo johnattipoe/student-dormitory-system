@@ -171,7 +171,36 @@ class FirebaseService
         return $offset;
     }
 
-    /** Fetch a single document as an assoc array (with 'id'), or null if it doesn't exist. */
+    private function isAuthenticationFailure(\Throwable $exception): bool
+    {
+        do {
+            $message = strtoupper($exception->getMessage());
+            if ($exception->getCode() === 16
+                || str_contains($message, 'ACCESS_TOKEN_EXPIRED')
+                || str_contains($message, 'UNAUTHENTICATED')) {
+                return true;
+            }
+            $exception = $exception->getPrevious();
+        } while ($exception !== null);
+
+        return false;
+    }
+
+    private function withAuthenticationRefresh(callable $request): mixed
+    {
+        try {
+            return $request($this->client());
+        } catch (\Throwable $exception) {
+            if (!$this->isAuthenticationFailure($exception)) {
+                throw $exception;
+            }
+
+            $this->client = null;
+            return $request($this->client());
+        }
+    }
+
+    /** Fetch a single document as an assoc array (with 'id'), or null if it does not exist. */
     public function getDocument(string $collection, string $id): ?array
     {
         if (!$this->credentialsAvailable()) {
@@ -187,42 +216,48 @@ class FirebaseService
      * Fetch documents from a collection, optionally filtered.
      * $wheres: array of [field, operator, value] triples, e.g. [['role', '=', 'student']]
      */
-    public function getCollection(string $collection, array $wheres = [], int $limit = 150, int $offset = 0): array
+    public function getCollection(string $collection, array $wheres = [], int $limit = 150, int $offset = 0, bool $respectRequestPagination = true): array
     {
         if (!$this->credentialsAvailable()) {
             throw new \RuntimeException($this->credentialsErrorMessage());
         }
 
-        $limit = $this->requestLimit($limit);
-        $offset = $this->requestOffset($limit, $offset);
-
-        $query = $this->client()->collection($collection);
-        foreach ($wheres as [$field, $op, $value]) {
-            $query = $query->where($field, $op, $value);
+        if ($respectRequestPagination) {
+            $limit = $this->requestLimit($limit);
+            $offset = $this->requestOffset($limit, $offset);
+        } else {
+            $limit = max(1, min(150, $limit));
+            $offset = max(0, $offset);
         }
 
         $fetchLimit = $offset > 0 ? $offset + $limit : $limit;
-        $query = $query->limit($fetchLimit);
+        return $this->withAuthenticationRefresh(function ($client) use ($collection, $wheres, $fetchLimit, $offset, $limit): array {
+            $query = $client->collection($collection);
+            foreach ($wheres as [$field, $op, $value]) {
+                $query = $query->where($field, $op, $value);
+            }
+            $query = $query->limit($fetchLimit);
 
-        $out = [];
-        $seen = 0;
-        foreach ($query->documents() as $doc) {
-            if (!$doc->exists()) {
-                continue;
+            $out = [];
+            $seen = 0;
+            foreach ($query->documents() as $doc) {
+                if (!$doc->exists()) {
+                    continue;
+                }
+
+                if ($offset > 0 && $seen < $offset) {
+                    $seen++;
+                    continue;
+                }
+
+                $out[] = array_merge(['id' => $doc->id()], $doc->data());
+                if (count($out) >= $limit) {
+                    break;
+                }
             }
 
-            if ($offset > 0 && $seen < $offset) {
-                $seen++;
-                continue;
-            }
-
-            $out[] = array_merge(['id' => $doc->id()], $doc->data());
-            if (count($out) >= $limit) {
-                break;
-            }
-        }
-
-        return $out;
+            return $out;
+        });
     }
 
     /** Efficiently count documents matching optional filters without loading the full collection. */

@@ -128,8 +128,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $pageTitle = 'House Attendance';
 $date = sanitize($_GET['date'] ?? date('Y-m-d'));
-$searchQuery = sanitize($_GET['search'] ?? '');
-$statusFilter = sanitize($_GET['status'] ?? '');
 $selectedHouseId = sanitize($_GET['houseId'] ?? $assignedHouseId);
 if (!array_key_exists($selectedHouseId, $assignedHouses)) {
     $selectedHouseId = array_key_first($assignedHouses) ?? '';
@@ -155,19 +153,6 @@ foreach ((new UserService())->all() as $user) {
             }
         }
     }
-}
-
-if (!empty($searchQuery)) {
-    $attendance = array_filter($attendance, function($record) use ($searchQuery, $students, $studentRecordId) {
-        $student = current(array_filter($students, fn($s) => $studentRecordId($s) === ((string) ($record['studentId'] ?? ''))));
-        $name = ($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '');
-        $admNo = $student['admissionNo'] ?? '';
-        return stripos($name, $searchQuery) !== false || stripos($admNo, $searchQuery) !== false;
-    });
-}
-
-if (!empty($statusFilter)) {
-    $attendance = array_filter($attendance, fn($record) => ($record['status'] ?? 'present') === $statusFilter);
 }
 
 $summary = AttendanceService::summary($date, $selectedHouseId !== '' ? $selectedHouseId : null);
@@ -305,39 +290,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
-        <!-- Filter Search Bar -->
-        <div class="card stat-card shadow-sm mb-4 border-0">
-            <div class="card-body p-3">
-                <form method="GET" class="row g-2 align-items-center">
-                    <input type="hidden" name="route" value="/views/house-master/attendance/index/index.php">
-                    <input type="hidden" name="houseId" value="<?= e($selectedHouseId) ?>">
-                    
-                    <div class="col-md-3">
-                        <input type="date" name="date" class="form-control form-control-sm" value="<?= e($date) ?>">
-                    </div>
-
-                    <div class="col-md-4">
-                        <input type="text" name="search" class="form-control form-control-sm" placeholder="Search by student name or admission no..." value="<?= e($searchQuery) ?>">
-                    </div>
-
-                    <div class="col-md-3">
-                        <select name="status" class="form-select form-select-sm">
-                            <option value="">All Statuses</option>
-                            <option value="present" <?= $statusFilter === 'present' ? 'selected' : '' ?>>Present</option>
-                            <option value="absent" <?= $statusFilter === 'absent' ? 'selected' : '' ?>>Absent</option>
-                            <option value="late" <?= $statusFilter === 'late' ? 'selected' : '' ?>>Late</option>
-                            <option value="excused" <?= $statusFilter === 'excused' ? 'selected' : '' ?>>Excused</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-2 d-flex gap-2">
-                        <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Filter</button>
-                        <a href="<?= url('views/house-master/attendance/index/index.php') ?>" class="btn btn-outline-secondary btn-sm">Reset</a>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         <!-- Attendance Table -->
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
@@ -346,7 +298,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0" data-no-copy-export="true" data-no-table-search="true">
                         <thead class="table-light">
                             <tr>
                                 <th>Roll Call Date</th>
@@ -360,7 +312,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <tbody>
                             <?php if (empty($attendance)): ?>
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">No attendance records submitted for this date matching your filter.</td>
+                                    <td colspan="6" class="text-center text-muted py-4">No attendance records submitted for this date.</td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($attendance as $record): ?>

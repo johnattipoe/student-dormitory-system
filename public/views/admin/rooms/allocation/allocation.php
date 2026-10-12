@@ -75,24 +75,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect(url('views/admin/rooms/allocation/allocation.php'));
 }
 
-$search = strtolower(trim(sanitize($_GET['search'] ?? '')));
-$statusFilter = sanitize($_GET['status'] ?? '');
-$houseFilter = sanitize($_GET['houseId'] ?? '');
-$rooms = array_values(array_filter($rooms, function ($room) use ($search, $statusFilter, $houseFilter, $houseMap) {
-    $roomId = (string) ($room['id'] ?? '');
-    $houseId = (string) ($room['houseId'] ?? '');
-    $roomName = (string) ($room['roomNumber'] ?? '');
-    $houseName = $houseMap[$houseId] ?? $houseId;
-    $occupied = (int) ($room['occupied'] ?? 0);
-    $capacity = (int) ($room['capacity'] ?? 0);
-    $computedStatus = ($room['status'] ?? '') === 'maintenance'
-        ? 'maintenance'
-        : ($occupied >= $capacity ? 'full' : ($occupied > 0 ? 'occupied' : 'available'));
-    return ($search === '' || str_contains(strtolower($roomName . ' ' . $houseName), $search))
-        && ($statusFilter === '' || $computedStatus === $statusFilter)
-        && ($houseFilter === '' || $houseId === $houseFilter);
-}));
-
 if (isset($_GET['download']) && $_GET['download'] === 'csv') {
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="room-allocation.csv"');
@@ -134,7 +116,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Assign resident students to rooms, process room transfers, and track house density</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-outline-success btn-sm" href="<?= url('views/admin/rooms/allocation/allocation.php?download=csv&search=' . urlencode($search) . '&status=' . urlencode($statusFilter) . '&houseId=' . urlencode($houseFilter)) ?>">
+                <a class="btn btn-outline-success btn-sm" href="<?= url('views/admin/rooms/allocation/allocation.php?download=csv') ?>">
                     <i class="bi bi-filetype-csv me-1"></i> Export CSV
                 </a>
                 <a href="<?= url('views/admin/rooms/index/index.php') ?>" class="btn btn-outline-secondary btn-sm">
@@ -241,37 +223,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
-        <!-- Filter Search Bar -->
-        <div class="card stat-card shadow-sm mb-4 border-0">
-            <div class="card-body p-3">
-                <form method="GET" class="row g-2 align-items-center">
-                    <div class="col-md-5">
-                        <input name="search" class="form-control form-control-sm" placeholder="Search by room number or house name..." value="<?= e($search) ?>">
-                    </div>
-                    <div class="col-md-3">
-                        <select name="houseId" class="form-select form-select-sm">
-                            <option value="">All Dormitory Houses</option>
-                            <?php foreach ($houses as $house): ?>
-                                <option value="<?= e((string) ($house['id'] ?? '')) ?>" <?= $houseFilter === ($house['id'] ?? '') ? 'selected' : '' ?>><?= e($house['name'] ?? '') ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <select name="status" class="form-select form-select-sm">
-                            <option value="">All Room Statuses</option>
-                            <?php foreach (['available','occupied','full','maintenance'] as $status): ?>
-                                <option value="<?= e($status) ?>" <?= $statusFilter === $status ? 'selected' : '' ?>><?= ucfirst($status) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2 d-flex gap-2">
-                        <button class="btn btn-primary btn-sm flex-grow-1">Filter</button> 
-                        <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/rooms/allocation/allocation.php') ?>">Reset</a>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         <!-- Room Inventory Table -->
         <div class="card stat-card shadow-sm border-0 mb-4">
             <div class="card-header bg-white py-3">
@@ -279,7 +230,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0" data-no-copy-export="true" data-export-exclude-last-column="true" data-no-table-search="true">
                         <thead class="table-light">
                             <tr>
                                 <th>Room</th>
@@ -327,7 +278,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0" data-no-copy-export="true" data-export-exclude-last-column="true" data-no-table-search="true">
                         <thead class="table-light">
                             <tr>
                                 <th>Student Name</th>

@@ -34,17 +34,6 @@ $totalCapacity = array_sum(array_map(fn($r) => (int) ($r['capacity'] ?? 0), $all
 $totalOccupied = array_sum(array_map(fn($r) => (int) ($r['occupied'] ?? 0), $allRooms));
 $totalVacant = max(0, $totalCapacity - $totalOccupied);
 
-$search = strtolower(sanitize($_GET['search'] ?? ''));
-if ($search !== '') {
-    $rooms = array_values(array_filter($rooms, function ($room) use ($search, $houseMap) {
-        $houseId = (string) ($room['houseId'] ?? '');
-        $houseName = $houseMap[$houseId] ?? $houseId;
-        return str_contains(strtolower((string) ($room['roomNumber'] ?? '')), $search)
-            || str_contains(strtolower($houseName), $search)
-            || str_contains(strtolower($houseId), $search);
-    }));
-}
-
 if (isset($_GET['created'])) $_SESSION['_flash'] = ['type' => 'success', 'message' => 'Room created.'];
 if (isset($_GET['updated'])) $_SESSION['_flash'] = ['type' => 'success', 'message' => 'Room updated.'];
 if (isset($_GET['deleted'])) $_SESSION['_flash'] = ['type' => 'success', 'message' => 'Room deleted.'];
@@ -137,24 +126,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
-        <!-- Filter Search Bar -->
-        <div class="card stat-card shadow-sm mb-4 border-0">
-            <div class="card-body p-3">
-                <form method="GET" class="row g-2 align-items-center">
-                    <div class="col-md-9">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-                            <input name="search" class="form-control form-control-sm border-start-0" placeholder="Search by room number or dormitory house..." value="<?= e($search) ?>">
-                        </div>
-                    </div>
-                    <div class="col-md-3 d-flex gap-2">
-                        <button class="btn btn-primary btn-sm flex-grow-1"><i class="bi bi-filter me-1"></i> Filter</button> 
-                        <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/rooms/index/index.php') ?>">Reset</a>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         <!-- Rooms Table -->
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -165,7 +136,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0" data-no-table-search="true">
                         <thead class="table-light">
                         <tr>
                             <th>Room No.</th>

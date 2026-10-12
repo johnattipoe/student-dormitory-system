@@ -48,3 +48,11 @@
 .card .progress {
   min-width: 120px;
 }
+
+#houseStudentsTable_wrapper .dt-buttons .btn {
+  width: 58px;
+  padding: .2rem .25rem;
+  font-size: .75rem;
+  line-height: 1.25;
+  white-space: nowrap;
+}

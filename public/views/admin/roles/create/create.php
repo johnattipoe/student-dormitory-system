@@ -62,7 +62,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 <div class="main-content">
     <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
     <div class="content-wrapper">
-        <div class="card stat-card p-4" style="max-width: 720px;">
+        <div class="card stat-card p-4 w-100">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                 <h5 class="mb-0">Create Role</h5>
                 <a href="<?= url('views/admin/roles/index/index.php') ?>" class="btn btn-outline-secondary btn-sm">Back to Roles</a>

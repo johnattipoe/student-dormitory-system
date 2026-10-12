@@ -167,21 +167,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 <form method="POST" action="<?= url('views/exeat/index.php') ?>">
                                     <?= csrf_field() ?>
                                     <input type="hidden" name="recordId" value="<?= e($id) ?>">
-                                    <input type="hidden" name="action" value="approve">
-                                    <button type="submit" class="btn btn-success w-100"><i class="bi bi-check-lg me-1"></i>Approve Request</button>
-                                </form>
-                                <form method="POST" action="<?= url('views/exeat/index.php') ?>">
-                                    <?= csrf_field() ?>
-                                    <input type="hidden" name="recordId" value="<?= e($id) ?>">
                                     <input type="hidden" name="action" value="reject">
                                     <button type="submit" class="btn btn-danger w-100"><i class="bi bi-x-lg me-1"></i>Reject Request</button>
-                                </form>
-                            <?php elseif ($status === 'approved'): ?>
-                                <form method="POST" action="<?= url('views/exeat/index.php') ?>">
-                                    <?= csrf_field() ?>
-                                    <input type="hidden" name="recordId" value="<?= e($id) ?>">
-                                    <input type="hidden" name="action" value="depart">
-                                    <button type="submit" class="btn btn-info text-white w-100"><i class="bi bi-box-arrow-right me-1"></i>Mark as Departed</button>
                                 </form>
                             <?php elseif ($status === 'departed'): ?>
                                 <form method="POST" action="<?= url('views/exeat/index.php') ?>">
@@ -302,4 +289,3 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     </div>
 </div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>
-

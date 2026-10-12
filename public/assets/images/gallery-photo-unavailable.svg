@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-labelledby="title description">
+  <title id="title">Photo unavailable</title>
+  <desc id="description">The stored photo could not be found. Edit this record to upload a replacement.</desc>
+  <rect width="640" height="420" fill="#f1f5f9"/>
+  <rect x="2" y="2" width="636" height="416" rx="20" fill="none" stroke="#cbd5e1" stroke-width="4"/>
+  <g fill="none" stroke="#64748b" stroke-linecap="round" stroke-linejoin="round" stroke-width="10">
+    <rect x="252" y="104" width="136" height="112" rx="12"/>
+    <circle cx="292" cy="143" r="11"/>
+    <path d="m264 198 38-35 23 21 20-17 31 31"/>
+  </g>
+  <text x="320" y="278" fill="#334155" font-family="Arial, sans-serif" font-size="28" font-weight="700" text-anchor="middle">Photo unavailable</text>
+  <text x="320" y="320" fill="#64748b" font-family="Arial, sans-serif" font-size="18" text-anchor="middle">Edit this record to upload a replacement.</text>
+</svg>

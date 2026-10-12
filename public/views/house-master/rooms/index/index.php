@@ -23,19 +23,10 @@ $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 $allRooms = RoomService::all($houseId);
 $students = StudentService::all($houseId);
-$roomSearch = strtolower(sanitize($_GET['search'] ?? ''));
-$roomStatus = sanitize($_GET['status'] ?? '');
-$filteredRooms = $allRooms;
-if ($roomSearch !== '' || $roomStatus !== '') {
-    $filteredRooms = array_values(array_filter($filteredRooms, function ($room) use ($roomSearch, $roomStatus) {
-        return ($roomSearch === '' || str_contains(strtolower((string) ($room['roomNumber'] ?? '')), $roomSearch))
-            && ($roomStatus === '' || ($room['status'] ?? '') === $roomStatus);
-    }));
-}
-$totalRooms = count($filteredRooms);
+$totalRooms = count($allRooms);
 $totalPages = max(1, (int) ceil($totalRooms / $limit));
 $page = min($page, $totalPages);
-$rooms = array_slice($filteredRooms, ($page - 1) * $limit, $limit);
+$rooms = array_slice($allRooms, ($page - 1) * $limit, $limit);
 $roomStats = RoomService::occupancyStats($houseId);
 
 $pageTitle = 'House Rooms';
@@ -134,28 +125,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
-        <!-- Filter Search Bar -->
-        <div class="card stat-card shadow-sm mb-4 border-0">
-            <div class="card-body p-3">
-                <form method="GET" class="row g-2 align-items-center">
-                    <div class="col-md-7">
-                        <input name="search" class="form-control form-control-sm" placeholder="Search room number..." value="<?= e($roomSearch) ?>">
-                    </div>
-                    <div class="col-md-3">
-                        <select name="status" class="form-select form-select-sm">
-                            <option value="">All Statuses</option>
-                            <option value="available" <?= $roomStatus === 'available' ? 'selected' : '' ?>>Available (Open Beds)</option>
-                            <option value="occupied" <?= $roomStatus === 'occupied' ? 'selected' : '' ?>>Occupied / Full</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 d-flex gap-2">
-                        <button class="btn btn-primary btn-sm flex-grow-1">Filter</button> 
-                        <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/rooms/index/index.php') ?>">Reset</a>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         <!-- Rooms Table -->
         <div class="card stat-card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
@@ -164,7 +133,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0" data-no-copy-export="true" data-no-table-search="true">
                         <thead class="table-light">
                             <tr>
                                 <th>Room Number</th>
@@ -219,7 +188,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
-        <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
+        <?php $paginationBaseUrl = url('views/house-master/rooms/index/index.php'); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
 
     </div>
 </div>

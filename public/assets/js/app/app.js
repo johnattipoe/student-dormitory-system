@@ -14,6 +14,19 @@ document.addEventListener('DOMContentLoaded', function () {
   SDS.hidePortalStartupLoader();
   SDS.enhancePageChrome();
 
+  document.querySelectorAll('form[data-live-search]').forEach(form => {
+    if (form.dataset.noPageReload === 'true') return;
+
+    const searchInput = form.querySelector('input[name="search"]');
+    if (!searchInput) return;
+
+    let submitTimer;
+    searchInput.addEventListener('input', () => {
+      window.clearTimeout(submitTimer);
+      submitTimer = window.setTimeout(() => form.requestSubmit(), 400);
+    });
+  });
+
   const toggle = document.getElementById('sidebarToggle');
   const sidebar = document.querySelector('.sidebar');
   const collapseBtn = document.getElementById('sidebarCollapseBtn');
@@ -89,8 +102,26 @@ document.addEventListener('DOMContentLoaded', function () {
           },
         };
 
+        if (table.dataset.externalTableSearch === 'true') {
+          options.dom = "<'row'<'col-12'tr>>" +
+            "<'row align-items-center mt-3'<'col-md-5'i><'col-md-7'p>>";
+        }
+
+        if (table.dataset.noTableSearch === 'true') {
+          options.searching = false;
+        }
+
+        if (table.dataset.externalTableSearch === 'true') {
+          options.dom = "<'row'<'col-12'tr>>" +
+            "<'row align-items-center mt-3'<'col-md-5'i><'col-md-7'p>>";
+        }
+
         if (shouldExport && jQuery.fn.dataTable.Buttons) {
-          options.dom = "<'row align-items-center mb-3'<'col-md-6'B><'col-md-6'f>>" +
+          options.dom = table.dataset.externalTableSearch === 'true'
+            ? "<'row align-items-center mb-3'<'col-12'B>>" +
+              "<'row'<'col-12'tr>>" +
+              "<'row align-items-center mt-3'<'col-md-5'i><'col-md-7'p>>"
+            : "<'row align-items-center mb-3'<'col-md-6'B><'col-md-6'f>>" +
             "<'row'<'col-12'tr>>" +
             "<'row align-items-center mt-3'<'col-md-5'i><'col-md-7'p>>";
           options.buttons = [
@@ -100,12 +131,52 @@ document.addEventListener('DOMContentLoaded', function () {
             { extend: 'pdfHtml5', className: 'btn btn-sm btn-outline-danger', text: '<i class="bi bi-filetype-pdf me-1"></i>PDF' },
             { extend: 'print', className: 'btn btn-sm btn-outline-info', text: '<i class="bi bi-printer me-1"></i>Print' },
           ];
+          if (table.dataset.noCopyExport === 'true') {
+            options.buttons = options.buttons.filter(button => button.extend !== 'copyHtml5');
+          }
+          if (table.dataset.exportExcludeLastColumn === 'true') {
+            const columnCount = table.tHead.rows[0].cells.length;
+            const exportableColumns = Array.from({ length: columnCount - 1 }, (_, index) => index);
+            options.buttons.forEach(button => {
+              button.exportOptions = { columns: exportableColumns };
+            });
+          }
         }
 
         jQuery(table).DataTable(options);
       }
       });
     }
+
+    document.querySelectorAll('form[data-live-search]').forEach(form => {
+      if (form.dataset.noPageReload === 'true') return;
+
+      const input = form.querySelector('input[name="search"]');
+      const table = document.querySelector(form.dataset.liveSearchTable || '');
+      if (!input || !table) return;
+
+      const applySearch = () => {
+        if (window.jQuery && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(table)) {
+          jQuery(table).DataTable().search(input.value.trim()).draw();
+          return;
+        }
+
+        const term = input.value.trim().toLowerCase();
+        table.querySelectorAll('tbody tr').forEach(row => {
+          if (!row.querySelector('[colspan]')) {
+            const searchableText = row.dataset.searchText || row.textContent;
+            row.hidden = term !== '' && !searchableText.toLowerCase().includes(term);
+          }
+        });
+      };
+
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        applySearch();
+      });
+      input.addEventListener('input', applySearch);
+      applySearch();
+    });
 
     // Auto-init date/time pickers
     if (window.flatpickr) {
@@ -118,10 +189,14 @@ document.addEventListener('DOMContentLoaded', function () {
     if (window.jQuery && jQuery.fn.select2) {
       jQuery('.select2, select.form-select').each(function () {
         if (!jQuery(this).hasClass('select2-hidden-accessible')) {
+          const modal = this.closest('.modal');
           jQuery(this).select2({
             width: '100%',
             theme: 'bootstrap-5',
-            minimumResultsForSearch: this.options && this.options.length > 8 ? 0 : Infinity,
+            minimumResultsForSearch: this.dataset.select2Search === 'true'
+              ? 0
+              : this.options && this.options.length > 8 ? 0 : Infinity,
+            ...(modal ? { dropdownParent: jQuery(modal) } : {}),
           });
         }
       });

@@ -154,7 +154,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="card-body p-4">
                 <div class="row g-4">
                     <?php $editImageUrl = !empty($metadata['storageObject']) ? $firebase->storageUrl((string) $metadata['storageObject']) : url('uploads/student-gallery/' . rawurlencode($fileName)); ?>
-                    <div class="col-md-5 text-center"><img src="<?= e($editImageUrl) ?>" alt="Gallery photo" class="img-fluid rounded" style="max-height: 360px; object-fit: contain;"></div>
+                    <div class="col-md-5 text-center"><img src="<?= e($editImageUrl) ?>" alt="Gallery photo" class="img-fluid rounded" style="max-height: 360px; object-fit: contain;" onerror="this.onerror=null;this.src='<?= e(asset('images/gallery-photo-unavailable.svg')) ?>';this.alt='Photo unavailable. Choose a replacement image below.';"></div>
                     <div class="col-md-7">
                         <form method="POST" enctype="multipart/form-data" action="<?= e(url('index.php?route=' . urlencode('/views/gallery/edit/edit.php') . '&file=' . urlencode($fileName))) ?>">
                             <input type="hidden" name="file" value="<?= e($fileName) ?>">

@@ -6,3 +6,5 @@ storage/logs/*
 storage/temp/*
 public/uploads/*
 !.gitkeep
+.phpunit.result.cache
+cookies.txt

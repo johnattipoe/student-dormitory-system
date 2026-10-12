@@ -32,6 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = [
         'firstName'     => sanitize($_POST['firstName'] ?? ''),
         'lastName'      => sanitize($_POST['lastName'] ?? ''),
+        'email'         => sanitize($_POST['email'] ?? ''),
+        'phone'         => sanitize($_POST['phone'] ?? ''),
         'admissionNo'   => sanitize($_POST['admissionNo'] ?? ''),
         'class'         => sanitize($_POST['class'] ?? ''),
         'form'          => $formValue,

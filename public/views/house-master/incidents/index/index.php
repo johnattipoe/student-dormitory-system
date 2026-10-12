@@ -20,13 +20,6 @@ use App\Services\StudentService;
 use App\Services\UserService;
 use App\Services\FirebaseService;
 
-$search = sanitize($_GET['search'] ?? '');
-$dateFrom = sanitize($_GET['dateFrom'] ?? '');
-$dateTo = sanitize($_GET['dateTo'] ?? '');
-$severity = sanitize($_GET['severity'] ?? '');
-$status = sanitize($_GET['status'] ?? '');
-$externalStatus = sanitize($_GET['externalStatus'] ?? '');
-
 $houseId = current_user()['houseId'] ?? null;
 $students = StudentService::all($houseId);
 $studentMap = [];
@@ -105,42 +98,6 @@ if (is_dir($externalDir)) {
             $externalIncidents[] = $content;
         }
     }
-}
-
-if (!empty($externalStatus)) {
-    $externalIncidents = array_values(array_filter($externalIncidents, function ($incident) use ($externalStatus) {
-        return strtolower((string) ($incident['status'] ?? 'submitted')) === strtolower((string) $externalStatus);
-    }));
-}
-
-if (!empty($search)) {
-    $searchLower = strtolower($search);
-    $incidents = array_values(array_filter($incidents, function ($incident) use ($searchLower, $studentMap, $getReporterName) {
-        $student = $studentMap[(string) ($incident['studentId'] ?? '')] ?? [];
-        $studentName = trim((($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')));
-        $reporter = $getReporterName($incident);
-        return str_contains(strtolower((string) ($incident['title'] ?? '')), $searchLower)
-            || str_contains(strtolower((string) ($incident['type'] ?? '')), $searchLower)
-            || str_contains(strtolower((string) ($incident['description'] ?? '')), $searchLower)
-            || str_contains(strtolower($studentName), $searchLower)
-            || str_contains(strtolower($reporter), $searchLower);
-    }));
-}
-
-if (!empty($dateFrom)) {
-    $incidents = array_values(array_filter($incidents, fn($incident) => strtotime((string) ($incident['createdAt'] ?? '')) >= strtotime($dateFrom)));
-}
-
-if (!empty($dateTo)) {
-    $incidents = array_values(array_filter($incidents, fn($incident) => strtotime((string) ($incident['createdAt'] ?? '')) <= strtotime($dateTo) + 86400));
-}
-
-if (!empty($severity)) {
-    $incidents = array_values(array_filter($incidents, fn($incident) => ($incident['priority'] ?? $incident['severity'] ?? '') === $severity));
-}
-
-if (!empty($status)) {
-    $incidents = array_values(array_filter($incidents, fn($incident) => ($incident['status'] ?? '') === $status));
 }
 
 $openCount = count(array_filter($incidents, fn($incident) => ($incident['status'] ?? 'open') === 'open'));
@@ -226,69 +183,11 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
-        <!-- Filter Bar -->
-        <div class="card stat-card shadow-sm mb-4 border-0">
-            <div class="card-body p-3">
-                <form method="GET" class="row g-2 align-items-end">
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold">Search</label>
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                            <input type="text" name="search" class="form-control form-control-sm" placeholder="Title, student, reporter..." value="<?= e($search) ?>">
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small fw-semibold">Date From</label>
-                        <input type="date" name="dateFrom" class="form-control form-control-sm" value="<?= e($dateFrom) ?>">
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small fw-semibold">Date To</label>
-                        <input type="date" name="dateTo" class="form-control form-control-sm" value="<?= e($dateTo) ?>">
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small fw-semibold">Severity</label>
-                        <select name="severity" class="form-select form-select-sm">
-                            <option value="">All</option>
-                            <option value="low" <?= $severity === 'low' ? 'selected' : '' ?>>Low</option>
-                            <option value="medium" <?= $severity === 'medium' ? 'selected' : '' ?>>Medium</option>
-                            <option value="high" <?= $severity === 'high' ? 'selected' : '' ?>>High</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small fw-semibold">Status</label>
-                        <select name="status" class="form-select form-select-sm">
-                            <option value="">All</option>
-                            <option value="open" <?= $status === 'open' ? 'selected' : '' ?>>Open</option>
-                            <option value="investigating" <?= $status === 'investigating' ? 'selected' : '' ?>>Investigating</option>
-                            <option value="resolved" <?= $status === 'resolved' ? 'selected' : '' ?>>Resolved</option>
-                        </select>
-                    </div>
-                    <div class="col-md-1 d-flex gap-1">
-                        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i></button>
-                        <a href="<?= url('views/house-master/incidents/index/index.php') ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-lg"></i></a>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         <div class="card stat-card shadow-sm border-0 mb-4">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-file-earmark-arrow-up me-2"></i>External Incident Records</h6>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <small class="text-muted">Showing <?= e((string) count($externalIncidents)) ?> uploaded forms</small>
-                    <form method="GET" class="d-flex gap-2 align-items-center">
-                        <input type="hidden" name="search" value="<?= e($search) ?>">
-                        <input type="hidden" name="dateFrom" value="<?= e($dateFrom) ?>">
-                        <input type="hidden" name="dateTo" value="<?= e($dateTo) ?>">
-                        <input type="hidden" name="severity" value="<?= e($severity) ?>">
-                        <input type="hidden" name="status" value="<?= e($status) ?>">
-                        <select name="externalStatus" class="form-select form-select-sm" onchange="this.form.submit()">
-                            <option value="">All statuses</option>
-                            <option value="submitted" <?= $externalStatus === 'submitted' ? 'selected' : '' ?>>Submitted</option>
-                            <option value="reviewed" <?= $externalStatus === 'reviewed' ? 'selected' : '' ?>>Reviewed</option>
-                            <option value="resolved" <?= $externalStatus === 'resolved' ? 'selected' : '' ?>>Resolved</option>
-                        </select>
-                    </form>
                 </div>
             </div>
             <div class="card-body p-0">
@@ -401,7 +300,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No incidents matching your filters.</td>
+                                <td colspan="7" class="text-center text-muted py-4"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No incidents found.</td>
                             </tr>
                         <?php endif; ?>
                     </tbody>
@@ -409,7 +308,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
-        <?php require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
+        <?php
+        $baseUrl = url('views/house-master/incidents/index/index.php');
+        require APP_ROOT . '/app/views/components/pagination/pagination.php';
+        ?>
     </div>
 </div>
 <?php foreach ($incidents as $incident): ?>
