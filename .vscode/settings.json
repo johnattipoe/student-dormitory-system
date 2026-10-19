@@ -11,5 +11,6 @@
     "intelephense.files.exclude": [
         "**/vendor/**",
         "**/*.example.php"
-    ]
+    ],
+    "python.terminal.useEnvFile": true
 }
