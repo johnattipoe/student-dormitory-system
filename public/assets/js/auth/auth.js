@@ -1,25 +1,5 @@
 // auth.js - auth page UX: password visibility toggle and caps-lock warning.
 document.addEventListener('DOMContentLoaded', function () {
-  const startupLoader = document.getElementById('startupLoader');
-  if (startupLoader) {
-    const startedAt = Date.now();
-    const hideStartupLoader = function () {
-      const remaining = Math.max(0, 900 - (Date.now() - startedAt));
-      window.setTimeout(function () {
-        startupLoader.classList.add('is-hidden');
-        window.setTimeout(function () {
-          startupLoader.remove();
-        }, 500);
-      }, remaining);
-    };
-
-    if (document.readyState === 'complete') {
-      hideStartupLoader();
-    } else {
-      window.addEventListener('load', hideStartupLoader, { once: true });
-    }
-  }
-
   const passwordInputs = document.querySelectorAll('input[type="password"]');
 
   passwordInputs.forEach(function (passwordInput) {
@@ -81,12 +61,61 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
-  document.querySelectorAll('form[action="/login.php"]').forEach(function (form) {
-    form.addEventListener('submit', function () {
-      const loader = document.createElement('div');
-      loader.className = 'startup-loader';
-      loader.innerHTML = '<div class="startup-loader-card"><div class="startup-logo"><i class="bi bi-shield-lock"></i></div><div class="startup-loader-title">Signing you in</div><div class="startup-loader-text">Checking your account securely...</div><div class="startup-progress" aria-hidden="true"><span></span></div></div>';
-      document.body.appendChild(loader);
+  const authButtonStates = new WeakMap();
+  const restoreAuthButton = function (button) {
+    const state = authButtonStates.get(button);
+    if (!state) return;
+
+    button.innerHTML = state.html;
+    button.disabled = state.disabled;
+    if (state.ariaBusy === null) {
+      button.removeAttribute('aria-busy');
+    } else {
+      button.setAttribute('aria-busy', state.ariaBusy);
+    }
+    button.removeAttribute('data-auth-loading');
+    authButtonStates.delete(button);
+  };
+
+  document.querySelectorAll('form').forEach(function (form) {
+    form.addEventListener('submit', function (event) {
+      const button = event.submitter instanceof HTMLButtonElement
+        ? event.submitter
+        : form.querySelector('button[type="submit"], button:not([type])');
+      if (!(button instanceof HTMLButtonElement) || button.disabled || authButtonStates.has(button)) {
+        return;
+      }
+
+      authButtonStates.set(button, {
+        html: button.innerHTML,
+        disabled: button.disabled,
+        ariaBusy: button.getAttribute('aria-busy'),
+      });
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.setAttribute('data-auth-loading', 'true');
+      button.innerHTML = '<span class="startup-spinner startup-button-spinner me-1" aria-hidden="true"></span> ' + button.textContent.trim();
+
+      queueMicrotask(function () {
+        if (event.defaultPrevented) {
+          restoreAuthButton(button);
+          return;
+        }
+
+        const actionUrl = new URL(form.action, window.location.href);
+        if (actionUrl.pathname.toLowerCase().endsWith('/login.php')) {
+          const loader = document.getElementById('sessionTransitionLoader');
+          const message = loader && loader.querySelector('[data-session-transition-message]');
+          if (message) message.textContent = 'Signing in...';
+          if (loader) loader.hidden = false;
+        }
+      });
     });
+  });
+
+  window.addEventListener('pageshow', function () {
+    document.querySelectorAll('button[data-auth-loading]').forEach(restoreAuthButton);
+    const loader = document.getElementById('sessionTransitionLoader');
+    if (loader) loader.hidden = true;
   });
 });

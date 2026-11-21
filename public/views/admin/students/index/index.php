@@ -18,10 +18,61 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\HouseService;
 use App\Services\RoomService;
 use App\Services\StudentService;
+use App\Services\FirebaseService;
 
 $pageTitle = 'Students';
 $houseId = current_role() === ROLE_ADMIN ? null : current_user()['houseId'] ?? null;
-$students = StudentService::allRecords($houseId);
+$createStudentOld = $_SESSION['_admin_student_create_old'] ?? [];
+$createStudentErrors = $_SESSION['_admin_student_create_errors'] ?? [];
+unset($_SESSION['_admin_student_create_old'], $_SESSION['_admin_student_create_errors']);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create_student') {
+    $formValue = sanitize($_POST['form'] ?? $_POST['level'] ?? '');
+    $studentData = [
+        'firstName' => sanitize($_POST['firstName'] ?? ''),
+        'lastName' => sanitize($_POST['lastName'] ?? ''),
+        'admissionNo' => sanitize($_POST['admissionNo'] ?? ''),
+        'class' => sanitize($_POST['class'] ?? ''),
+        'form' => $formValue,
+        'level' => $formValue,
+        'gender' => sanitize($_POST['gender'] ?? ''),
+        'nhisNumber' => sanitize($_POST['nhisNumber'] ?? ''),
+        'course' => sanitize($_POST['course'] ?? ''),
+        'houseId' => sanitize($_POST['houseId'] ?? ''),
+        'roomId' => sanitize($_POST['roomId'] ?? ''),
+        'residenceType' => sanitize($_POST['residenceType'] ?? 'boarding'),
+        'status' => sanitize($_POST['status'] ?? 'active'),
+        'guardianName' => sanitize($_POST['guardianName'] ?? ''),
+        'guardianPhone' => sanitize($_POST['guardianPhone'] ?? ''),
+        'guardianEmail' => sanitize($_POST['guardianEmail'] ?? ''),
+    ];
+    $createStudentErrors = validate_required($studentData, ['firstName', 'lastName']);
+    if ($studentData['guardianEmail'] !== '' && !validate_email($studentData['guardianEmail'])) {
+        $createStudentErrors['guardianEmail'] = 'Guardian email is invalid.';
+    }
+
+    if (empty($createStudentErrors)) {
+        try {
+            StudentService::create($studentData);
+            flash('success', 'Student created successfully.');
+            redirect(url('views/admin/students/index/index.php?created=1'));
+        } catch (Throwable $e) {
+            $createStudentErrors['general'] = 'Unable to create student: ' . $e->getMessage();
+        }
+    }
+
+    $_SESSION['_admin_student_create_old'] = $studentData;
+    $_SESSION['_admin_student_create_errors'] = $createStudentErrors;
+    flash('error', 'Please correct the student details and try again.');
+    redirect(url('views/admin/students/index/index.php?openAddStudent=1'));
+}
+
+$allStudents = StudentService::allRecords($houseId);
+$showGraduated = sanitize($_GET['show'] ?? '') === 'graduated';
+$studentListUrl = base_url(
+    'index.php?route=' . urlencode('/views/admin/students/index/index.php')
+    . ($showGraduated ? '' : '&show=graduated')
+);
 $roomNumbers = [];
 foreach (RoomService::all($houseId, 150) as $room) {
     $roomId = trim((string) ($room['id'] ?? ''));
@@ -29,16 +80,22 @@ foreach (RoomService::all($houseId, 150) as $room) {
         $roomNumbers[$roomId] = (string) ($room['roomNumber'] ?? '');
     }
 }
-$totalStudents = count($students);
 $studentSummary = [
-    'total' => $totalStudents,
+    'total' => 0,
     'active' => 0,
     'inactive' => 0,
     'suspended' => 0,
     'assigned' => 0,
+    'graduated' => 0,
 ];
-foreach ($students as $student) {
+foreach ($allStudents as $student) {
     $status = strtolower((string) ($student['status'] ?? 'active'));
+    if ($status === 'graduated') {
+        $studentSummary['graduated']++;
+        continue;
+    }
+
+    $studentSummary['total']++;
     if (isset($studentSummary[$status])) {
         $studentSummary[$status]++;
     }
@@ -46,12 +103,28 @@ foreach ($students as $student) {
         $studentSummary['assigned']++;
     }
 }
+$students = array_values(array_filter(
+    $allStudents,
+    static fn(array $student): bool => (strtolower((string) ($student['status'] ?? 'active')) === 'graduated') === $showGraduated
+));
 $houses = [];
 foreach (HouseService::all() as $house) {
     if (!empty($house['id'])) {
         $houses[trim((string) $house['id'])] = (string) ($house['name'] ?? $house['id']);
     }
 }
+$classRecords = FirebaseService::getInstance()->getCollection('classes', [], 500);
+$studentClassOptions = array_values(array_unique(array_filter(array_map(
+    static fn(array $class): string => (string) ($class['className'] ?? ''),
+    array_filter($classRecords, static fn(array $class): bool => ($class['status'] ?? 'active') === 'active')
+))));
+if (empty($studentClassOptions)) {
+    $studentClassOptions = ['SHS 1', 'SHS 2', 'SHS 3'];
+}
+$studentCourseOptions = array_values(array_unique(array_filter(array_map(
+    static fn(array $class): string => trim((string) ($class['classCode'] ?? '')),
+    $classRecords
+))));
 $resolveHouseName = static function ($houseId) use (&$houses): string {
     $normalizedId = trim((string) $houseId);
     if ($normalizedId === '') {
@@ -97,20 +170,32 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <div class="content-wrapper">
 
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">Students</h5>
+            <h5 class="mb-0"><?= $showGraduated ? 'Graduated Students / Alumni' : 'Students' ?></h5>
             <?php if (can('students', 'own') || current_role() !== ROLE_STUDENT): ?>
-                <div><a href="<?= url('views/admin/students/bulk-import/bulk-import.php') ?>" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-arrow-up"></i> Upload CSV/Excel</a> <a href="<?= url('views/admin/students/create/create.php') ?>" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Student</a></div>
+                <div class="d-flex flex-wrap gap-2">
+                    <?php if (current_role() === ROLE_ADMIN): ?>
+                        <a href="<?= url('views/admin/students/promotion/index.php') ?>" class="btn btn-outline-primary btn-sm"><i class="bi bi-arrow-up-circle me-1"></i> Promote Students</a>
+                        <a href="<?= e($studentListUrl) ?>" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-archive me-1"></i><?= $showGraduated ? 'Current Students' : 'Graduated / Alumni (' . e((string) $studentSummary['graduated']) . ')' ?>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (current_role() === ROLE_ADMIN): ?>
+                        <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#studentImportModal"><i class="bi bi-file-earmark-arrow-up"></i> Upload CSV/Excel</button>
+                    <?php endif; ?>
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#studentCreateModal"><i class="bi bi-plus-lg"></i> Add Student</button>
+                </div>
             <?php endif; ?>
         </div>
 
+        <?php if (!$showGraduated): ?>
         <div class="row g-3 mb-3">
             <div class="col-sm-6 col-xl-3">
                 <div class="card stat-card h-100 p-3 border-0 shadow-sm">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <p class="text-muted text-uppercase small fw-semibold mb-1">Total Students</p>
+                            <p class="text-muted text-uppercase small fw-semibold mb-1">Current Students</p>
                             <h3 class="mb-1"><?= $studentSummary['total'] ?></h3>
-                            <small class="text-muted">All registered students</small>
+                            <small class="text-muted">Excludes graduated alumni</small>
                         </div>
                         <span class="text-primary fs-3"><i class="bi bi-people-fill"></i></span>
                     </div>
@@ -153,6 +238,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </div>
             </div>
         </div>
+        <?php endif; ?>
        
         <div class="card stat-card p-3">
             <table class="table table-hover data-table w-100" data-no-copy-export="true" data-export-exclude-last-column="true">
@@ -161,6 +247,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <th>Admission No.</th>
                     <th>Name</th>
                     <th>Class</th>
+                    <th>Form / Level</th>
                     <th>Class Code</th>
                     <th>House</th>
                     <th>Residence Type</th>
@@ -174,6 +261,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <td><?= e($s['admissionNo'] ?? '') ?></td>
                         <td><?= e(trim(($s['firstName'] ?? '') . ' ' . ($s['lastName'] ?? ''))) ?></td>
                         <td><?= e($s['class'] ?? ($s['form'] ?? $s['level'] ?? '—')) ?></td>
+                        <td><?= e($s['form'] ?? ($s['level'] ?? '—')) ?></td>
                         <td><?= e($s['course'] ?? '') ?></td>
                         <td><?= e($resolveHouseName($s['houseId'] ?? '')) ?></td>
                         <td><span class="badge bg-warning text-dark"><?= e(strtolower((string) ($s['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></span></td>
@@ -263,7 +351,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <div class="modal fade" id="studentEditModal-<?= e($studentId) ?>" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
             <div class="modal-content student-edit-modal">
-                <form method="POST" action="<?= url('views/admin/students/edit/edit.php?id=' . urlencode($studentId)) ?>">
+                <form method="POST" action="<?= url('views/admin/students/edit/edit.php?id=' . urlencode($studentId)) ?>" class="student-modal-form">
                     <div class="modal-header student-modal-header">
                         <span class="student-modal-icon student-edit-icon"><i class="bi bi-pencil-square"></i></span>
                         <div class="student-modal-heading">
@@ -336,6 +424,72 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 <?php endforeach; ?>
+
+<div class="modal fade" id="studentCreateModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openAddStudent']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/admin/students/index/index.php') ?>" class="student-modal-form">
+                <input type="hidden" name="action" value="create_student">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Student</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <?php if (!empty($createStudentErrors['general'])): ?><div class="alert alert-danger"><?= e($createStudentErrors['general']) ?></div><?php endif; ?>
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">First Name <span class="text-danger">*</span></label><input name="firstName" class="form-control" value="<?= e($createStudentOld['firstName'] ?? '') ?>" required></div>
+                        <div class="col-md-6"><label class="form-label">Last Name <span class="text-danger">*</span></label><input name="lastName" class="form-control" value="<?= e($createStudentOld['lastName'] ?? '') ?>" required></div>
+                        <div class="col-md-6"><label class="form-label">Admission No.</label><input name="admissionNo" class="form-control" value="<?= e($createStudentOld['admissionNo'] ?? '') ?>"></div>
+                        <div class="col-md-6"><label class="form-label">Gender</label><select name="gender" class="form-select"><option value="">Select Gender</option><?php foreach (['male' => 'Male', 'female' => 'Female', 'other' => 'Other'] as $value => $label): ?><option value="<?= e($value) ?>" <?= strtolower((string) ($createStudentOld['gender'] ?? '')) === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-md-6"><label class="form-label">Class</label><select name="class" class="form-select"><option value="">Select Class</option><?php foreach ($studentClassOptions as $classOption): ?><option value="<?= e($classOption) ?>" <?= ($createStudentOld['class'] ?? '') === $classOption ? 'selected' : '' ?>><?= e($classOption) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-md-6"><label class="form-label">Form / Level</label><select name="form" class="form-select"><option value="">Select Form</option><?php foreach (['Form 1', 'Form 2', 'Form 3', 'Form 4'] as $formOption): ?><option value="<?= e($formOption) ?>" <?= ($createStudentOld['form'] ?? $createStudentOld['level'] ?? '') === $formOption ? 'selected' : '' ?>><?= e($formOption) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-md-6"><label class="form-label">Class Code</label><select name="course" class="form-select"><option value="">Select Class Code</option><?php foreach ($studentCourseOptions as $courseOption): ?><option value="<?= e($courseOption) ?>" <?= ($createStudentOld['course'] ?? '') === $courseOption ? 'selected' : '' ?>><?= e($courseOption) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-md-6"><label class="form-label">NHIS Number</label><input name="nhisNumber" class="form-control" value="<?= e($createStudentOld['nhisNumber'] ?? '') ?>"></div>
+                        <div class="col-md-6"><label class="form-label">House</label><select name="houseId" class="form-select"><option value="">— Unassigned —</option><?php foreach ($houses as $houseOptionId => $houseOptionName): ?><option value="<?= e($houseOptionId) ?>" <?= ($createStudentOld['houseId'] ?? '') === $houseOptionId ? 'selected' : '' ?>><?= e($houseOptionName) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-md-6"><label class="form-label">Residence Type</label><select name="residenceType" class="form-select"><option value="boarding" <?= ($createStudentOld['residenceType'] ?? 'boarding') === 'boarding' ? 'selected' : '' ?>>Boarding</option><option value="day" <?= ($createStudentOld['residenceType'] ?? '') === 'day' ? 'selected' : '' ?>>Day</option></select></div>
+                        <div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><?php foreach (['active' => 'Active', 'inactive' => 'Inactive', 'suspended' => 'Suspended', 'graduated' => 'Graduated'] as $value => $label): ?><option value="<?= e($value) ?>" <?= ($createStudentOld['status'] ?? 'active') === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-md-6"><label class="form-label">Guardian Name</label><input name="guardianName" class="form-control" value="<?= e($createStudentOld['guardianName'] ?? '') ?>"></div>
+                        <div class="col-md-6"><label class="form-label">Guardian Phone</label><input name="guardianPhone" class="form-control" value="<?= e($createStudentOld['guardianPhone'] ?? '') ?>"></div>
+                        <div class="col-12"><label class="form-label">Guardian Email</label><input type="email" name="guardianEmail" class="form-control" value="<?= e($createStudentOld['guardianEmail'] ?? '') ?>"><?php if (!empty($createStudentErrors['guardianEmail'])): ?><div class="text-danger small mt-1"><?= e($createStudentErrors['guardianEmail']) ?></div><?php endif; ?></div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i>Add Student</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="studentImportModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openImport']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" enctype="multipart/form-data" action="<?= url('views/admin/students/bulk-import/bulk-import.php') ?>" class="student-modal-form">
+                <input type="hidden" name="action" value="import_students">
+                <input type="hidden" name="returnToStudents" value="1">
+                <div class="modal-header"><h5 class="modal-title">Import Students</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <p class="text-muted">Upload a CSV or Excel file using the student import template.</p>
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">House <span class="text-danger">*</span></label><select name="houseId" class="form-select" required><option value="">Select House</option><?php foreach ($houses as $houseOptionId => $houseOptionName): ?><option value="<?= e($houseOptionId) ?>"><?= e($houseOptionName) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-md-6"><label class="form-label">Residence Type</label><select name="residenceType" class="form-select"><option value="boarding">Boarding</option><option value="day">Day</option></select></div>
+                        <div class="col-12"><label class="form-label">Student file</label><input type="file" name="students_file" class="form-control" accept=".csv,.xlsx" required></div>
+                        <div class="col-12 form-check ms-2"><input class="form-check-input" type="checkbox" name="createAccounts" id="studentImportCreateAccounts" value="1"><label class="form-check-label" for="studentImportCreateAccounts">Create login accounts for imported students</label></div>
+                        <div class="col-12"><label class="form-label">Temporary password (optional)</label><input type="text" name="temporaryPassword" class="form-control" autocomplete="off"></div>
+                    </div>
+                    <a href="<?= url('views/admin/students/bulk-import/bulk-import.php?download_template=1') ?>" class="btn btn-outline-success btn-sm mt-3"><i class="bi bi-download me-1"></i>Download template CSV</a>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-success"><i class="bi bi-upload me-1"></i>Import Students</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.modal[data-open-on-load="true"]').forEach(function (modalElement) {
+        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    });
+});
+</script>
 
 <?php require APP_ROOT . '/app/views/components/modal/modal.php'; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -103,7 +103,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
-                    <a class="btn btn-primary btn-sm" href="<?= url('views/house-master/students/edit/edit.php?studentId=' . urlencode($studentId)) ?>">
+                    <a class="btn btn-primary btn-sm" href="<?= url('views/house-master/students/index/index.php?editStudent=' . urlencode($studentId)) ?>">
                         <i class="bi bi-pencil me-1"></i>Edit Student
                     </a>
                     <a class="btn btn-outline-info btn-sm" href="<?= url('views/gallery/index.php?houseId=' . urlencode((string) ($student['houseId'] ?? '')) . '&studentId=' . urlencode((string) $studentId)) ?>">
@@ -232,7 +232,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 <strong><?= e($student['guardianEmail'] ?? '—') ?></strong>
                             </div>
                             <div class="pt-3 border-top">
-                                <a class="btn btn-outline-primary btn-sm w-100" href="<?= url('views/house-master/students/edit/edit.php?studentId=' . urlencode($studentId)) ?>">
+                                <a class="btn btn-outline-primary btn-sm w-100" href="<?= url('views/house-master/students/index/index.php?editStudent=' . urlencode($studentId)) ?>">
                                     <i class="bi bi-pencil me-1"></i>Update Information
                                 </a>
                             </div>

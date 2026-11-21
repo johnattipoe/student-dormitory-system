@@ -19,6 +19,38 @@ use App\Services\RoomService;
 use App\Services\StudentService;
 
 $houseId = current_user()['houseId'] ?? null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = sanitize($_POST['action'] ?? '');
+    if ($action === 'create_room') {
+        if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
+            flash('error', 'The form expired. Please refresh the page and try again.');
+            redirect(url('views/house-master/rooms/index/index.php'));
+        }
+        $roomNumber = trim(sanitize($_POST['roomNumber'] ?? ''));
+        $capacity = (int) ($_POST['capacity'] ?? 1);
+        $type = sanitize($_POST['type'] ?? 'standard');
+        if ($roomNumber === '' || !$houseId || $capacity < 1) {
+            flash('error', 'Room number and a positive capacity are required.');
+        } else {
+            try {
+                RoomService::create([
+                    'roomNumber' => $roomNumber,
+                    'capacity' => $capacity,
+                    'type' => $type,
+                    'status' => sanitize($_POST['status'] ?? 'available'),
+                    'houseId' => $houseId,
+                ]);
+                flash('success', 'Room created successfully.');
+            } catch (Throwable $e) {
+                error_log('Unable to create house room: ' . $e->getMessage());
+                flash('error', 'Unable to create room. Please try again.');
+            }
+        }
+        redirect(url('views/house-master/rooms/index/index.php'));
+    }
+}
+
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 $allRooms = RoomService::all($houseId);
@@ -61,12 +93,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <a href="<?= url('views/house-master/rooms/allocation/allocation.php') ?>" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-diagram-3 me-1"></i> Allocation Matrix
                 </a>
-                <a href="<?= url('views/house-master/reports/export/export.php?type=rooms') ?>" class="btn btn-outline-success btn-sm">
+                <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#houseExportRoomsModal">
                     <i class="bi bi-filetype-csv me-1"></i> CSV
-                </a>
-                <a href="<?= url('views/house-master/rooms/create/create.php') ?>" class="btn btn-primary btn-sm">
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#houseCreateRoomModal">
                     <i class="bi bi-plus-lg me-1"></i> Add Room
-                </a>
+                </button>
             </div>
         </div>
 
@@ -198,4 +230,92 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <div class="modal fade" id="houseRoomEditModal-<?= e($modalRoomId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="<?= url('views/house-master/rooms/edit/edit.php?id=' . urlencode($modalRoomId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Room</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalRoomId) ?>"><label class="form-label">Room Number</label><input name="roomNumber" class="form-control mb-3" value="<?= e($room['roomNumber'] ?? '') ?>" required><label class="form-label">Capacity</label><input type="number" min="1" name="capacity" class="form-control mb-3" value="<?= e((string) ($room['capacity'] ?? 1)) ?>" required><label class="form-label">Type</label><input name="type" class="form-control mb-3" value="<?= e($room['type'] ?? 'standard') ?>"><label class="form-label">Status</label><select name="status" class="form-select"><option value="available" <?= $modalRoomStatus === 'available' ? 'selected' : '' ?>>Available</option><option value="occupied" <?= $modalRoomStatus === 'occupied' ? 'selected' : '' ?>>Occupied</option><option value="maintenance" <?= $modalRoomStatus === 'maintenance' ? 'selected' : '' ?>>Maintenance</option></select></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
     <div class="modal fade" id="houseRoomDeleteModal-<?= e($modalRoomId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Room</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete room <strong><?= e($room['roomNumber'] ?? 'this room') ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/rooms/delete/delete.php?id=' . urlencode($modalRoomId)) ?>"><input type="hidden" name="id" value="<?= e($modalRoomId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
 <?php endforeach; ?>
+<div class="modal fade" id="houseExportRoomsModal" tabindex="-1" aria-labelledby="houseExportRoomsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="houseExportRoomsModalLabel">Export house rooms</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Download a CSV containing room numbers, type, capacity, occupancy, and status for this house.
+                <div id="houseExportRoomsError" class="alert alert-danger mt-3 mb-0 d-none" role="alert"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="houseExportRoomsDownload" class="btn btn-success" data-export-url="<?= e(url('views/house-master/reports/export/export.php?type=rooms')) ?>" data-filename="house-rooms-<?= e(date('Y-m-d')) ?>.csv">
+                    <i class="bi bi-download me-1"></i>Download CSV
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseCreateRoomModal" tabindex="-1" aria-labelledby="houseCreateRoomModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/rooms/index/index.php') ?>">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="houseCreateRoomModalLabel">Add room</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="create_room">
+                    <label class="form-label" for="houseRoomNumber">Room number</label>
+                    <input id="houseRoomNumber" name="roomNumber" class="form-control mb-3" placeholder="e.g. A101 or Room 5" required>
+                    <label class="form-label" for="houseRoomCapacity">Bed capacity</label>
+                    <input id="houseRoomCapacity" type="number" name="capacity" class="form-control mb-3" min="1" value="4" required>
+                    <label class="form-label" for="houseRoomType">Room type</label>
+                    <input id="houseRoomType" name="type" class="form-control mb-3" value="standard" placeholder="e.g. standard, prefect">
+                    <label class="form-label" for="houseRoomStatus">Status</label>
+                    <select id="houseRoomStatus" name="status" class="form-select">
+                        <option value="available">Available</option>
+                        <option value="occupied">Occupied</option>
+                        <option value="maintenance">Maintenance</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Create room</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.querySelectorAll('#houseExportRoomsModal, #houseCreateRoomModal').forEach(function (modal) {
+    modal.dataset.disableLoading = 'true';
+    document.body.appendChild(modal);
+});
+
+document.getElementById('houseExportRoomsDownload').addEventListener('click', async function () {
+    const button = this;
+    const errorMessage = document.getElementById('houseExportRoomsError');
+    SDS.showButtonLoading(button);
+    errorMessage.classList.add('d-none');
+    errorMessage.textContent = '';
+    try {
+        const response = await fetch(button.dataset.exportUrl, {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (!response.ok || !(response.headers.get('content-type') || '').includes('text/csv')) {
+            throw new Error('The room export could not be downloaded. Please try again.');
+        }
+        const downloadUrl = URL.createObjectURL(await response.blob());
+        const downloadLink = document.createElement('a');
+        downloadLink.href = downloadUrl;
+        downloadLink.download = button.dataset.filename;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        downloadLink.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(downloadUrl); }, 1000);
+    } catch (error) {
+        errorMessage.textContent = error instanceof Error ? error.message : 'The room export could not be downloaded. Please try again.';
+        errorMessage.classList.remove('d-none');
+    } finally {
+        SDS.hideButtonLoading(button);
+    }
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

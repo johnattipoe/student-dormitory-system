@@ -24,6 +24,7 @@ class ExeatService
 
             return $records;
         } catch (\Throwable $e) {
+            error_log('Unable to load exeat records: ' . $e->getMessage());
             return [];
         }
     }
@@ -45,7 +46,7 @@ class ExeatService
     {
         $studentId = trim((string) ($data['studentId'] ?? ''));
         $exeatType = strtolower(trim((string) ($data['exeatType'] ?? $data['type'] ?? 'external')));
-        if (!in_array($exeatType, ['internal', 'external'], true)) {
+        if (!in_array($exeatType, ['internal', 'external', 'vacation'], true)) {
             $exeatType = 'external';
         }
 
@@ -54,11 +55,17 @@ class ExeatService
         $startTime = trim((string) ($data['startTime'] ?? ''));
         $closeTime = trim((string) ($data['closeTime'] ?? $data['endTime'] ?? ''));
         $destination = trim((string) ($data['destination'] ?? ''));
-        $reason = trim((string) ($data['reason'] ?? ''));
+        $reason = $exeatType === 'vacation' ? 'Vacation' : trim((string) ($data['reason'] ?? ''));
 
         if ($studentId === '') {
             return ['success' => false, 'message' => 'Student profile was not found for this account.'];
         }
+
+        $typeLabel = match ($exeatType) {
+            'internal' => 'Internal',
+            'vacation' => 'Vacation',
+            default => 'External',
+        };
 
         if ($exeatType === 'internal') {
             if ($startDate === '' || $startTime === '' || $closeTime === '' || $reason === '') {
@@ -67,7 +74,7 @@ class ExeatService
             $endDate = $startDate;
         } else {
             if ($startDate === '' || $endDate === '' || $reason === '') {
-                return ['success' => false, 'message' => 'Start date, end date, and reason are required for external exeat.'];
+                return ['success' => false, 'message' => 'Start date, end date, and reason are required for ' . strtolower($typeLabel) . '.'];
             }
             if ($endDate < $startDate) {
                 return ['success' => false, 'message' => 'End date cannot be before the start date.'];
@@ -113,10 +120,9 @@ class ExeatService
             }
             $id = $this->firebase->addDocument($this->collection, $recordData);
 
-            $typeLabel = $exeatType === 'internal' ? 'Internal' : 'External';
             $message = $staffIssued
-                ? $typeLabel . ' exeat issued and marked as departed.'
-                : $typeLabel . ' exeat request submitted successfully.';
+                ? $typeLabel . ($exeatType === 'vacation' ? ' created successfully and marked as departed.' : ' exeat issued and marked as departed.')
+                : $typeLabel . ($exeatType === 'vacation' ? ' request submitted successfully.' : ' exeat request submitted successfully.');
             return ['success' => true, 'message' => $message, 'id' => $id];
         } catch (\Throwable $e) {
             return ['success' => false, 'message' => 'Unable to submit exeat request: ' . $e->getMessage()];
@@ -135,7 +141,7 @@ class ExeatService
         }
 
         $exeatType = strtolower(trim((string) ($data['exeatType'] ?? $data['type'] ?? $record['exeatType'] ?? 'external')));
-        if (!in_array($exeatType, ['internal', 'external'], true)) {
+        if (!in_array($exeatType, ['internal', 'external', 'vacation'], true)) {
             $exeatType = 'external';
         }
 
@@ -144,7 +150,15 @@ class ExeatService
         $startTime = trim((string) ($data['startTime'] ?? $record['startTime'] ?? ''));
         $closeTime = trim((string) ($data['closeTime'] ?? $data['endTime'] ?? $record['closeTime'] ?? ''));
         $destination = trim((string) ($data['destination'] ?? $record['destination'] ?? ''));
-        $reason = trim((string) ($data['reason'] ?? $record['reason'] ?? ''));
+        $reason = $exeatType === 'vacation'
+            ? 'Vacation'
+            : trim((string) ($data['reason'] ?? $record['reason'] ?? ''));
+
+        $typeLabel = match ($exeatType) {
+            'internal' => 'Internal',
+            'vacation' => 'Vacation',
+            default => 'External',
+        };
 
         if ($exeatType === 'internal') {
             if ($startDate === '' || $startTime === '' || $closeTime === '' || $reason === '') {
@@ -153,7 +167,7 @@ class ExeatService
             $endDate = $startDate;
         } else {
             if ($startDate === '' || $endDate === '' || $reason === '') {
-                return ['success' => false, 'message' => 'Start date, end date, and reason are required for external exeat.'];
+                return ['success' => false, 'message' => 'Start date, end date, and reason are required for ' . strtolower($typeLabel) . '.'];
             }
             if ($endDate < $startDate) {
                 return ['success' => false, 'message' => 'End date cannot be before the start date.'];
@@ -328,6 +342,7 @@ class ExeatService
 
                 return $records;
             } catch (\Throwable $e) {
+                error_log('Unable to load house exeat records: ' . $e->getMessage());
                 return [];
             }
         }

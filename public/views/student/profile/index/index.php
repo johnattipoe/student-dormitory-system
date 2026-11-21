@@ -99,9 +99,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </div>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-primary btn-sm" href="<?= url('views/student/profile/edit/edit.php') ?>">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#studentProfileEditModal">
                     <i class="bi bi-pencil me-1"></i>Edit Profile
-                </a>
+                </button>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/student/profile/security/security.php') ?>">
                     <i class="bi bi-shield-lock me-1"></i>Security
                 </a>
@@ -218,9 +218,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <strong><?= e($student['guardianEmail'] ?? 'Not provided') ?></strong>
                         </div>
                         <div class="pt-3 border-top">
-                            <a class="btn btn-outline-primary btn-sm w-100" href="<?= url('views/student/profile/edit/edit.php') ?>">
+                            <button type="button" class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#studentProfileEditModal">
                                 <i class="bi bi-pencil me-1"></i>Update Contact Information
-                            </a>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -228,4 +228,5 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php require __DIR__ . '/../../components/profile-edit-modal.php'; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

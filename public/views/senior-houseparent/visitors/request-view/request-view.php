@@ -80,15 +80,18 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </dl>
             <?php if (($request['status'] ?? 'pending') === 'pending'): ?>
                 <div class="d-flex gap-2 mt-4">
-                    <form method="POST" action="<?= url('views/senior-houseparent/visitors/requests/requests.php') ?>">
-                        <input type="hidden" name="action" value="approve_request">
-                        <input type="hidden" name="requestId" value="<?= e($id) ?>">
-                        <button class="btn btn-success"><i class="bi bi-check-lg me-1"></i> Approve Request</button>
-                    </form>
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#seniorApproveVisitorRequest"><i class="bi bi-check-lg me-1"></i> Approve Request</button>
                     <a class="btn btn-outline-danger" href="<?= url('views/senior-houseparent/visitors/requests/requests.php') ?>">Reject from Request List</a>
                 </div>
             <?php endif; ?>
         </div>
     </div>
 </div>
+<?php if (($request['status'] ?? 'pending') === 'pending'): ?>
+<div class="modal fade" id="seniorApproveVisitorRequest" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Approve Visitor Request</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+    <div class="modal-body">Approve the visit request for <strong><?= e($request['visitorName'] ?? 'this visitor') ?></strong>?</div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/senior-houseparent/visitors/requests/requests.php') ?>"><input type="hidden" name="action" value="approve_request"><input type="hidden" name="requestId" value="<?= e($id) ?>"><button class="btn btn-success">Approve Request</button></form></div>
+</div></div></div>
+<?php endif; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -19,8 +19,12 @@ use App\Services\MedicalService;
 use App\Services\StudentService;
 
 $records = (new MedicalService())->incidents();
+$nurseMedicalStudents = StudentService::all();
+$nurseMedicalModalId = 'nurseMedicalRecordCreate';
+$nurseMedicalReturnTo = 'medicalIncidents';
+$nurseMedicalSelectedStudentId = '';
 $students = [];
-foreach (StudentService::all() as $student) {
+foreach ($nurseMedicalStudents as $student) {
     $studentId = (string) ($student['id'] ?? '');
     if ($studentId !== '') {
         $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
@@ -88,9 +92,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Track severe, critical, emergency, and explicitly flagged health incidents</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-danger btn-sm" href="<?= url('views/nurse/create-record/create-record.php') ?>">
+                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#nurseMedicalRecordCreate">
                     <i class="bi bi-plus-circle me-1"></i>New Medical Record
-                </a>
+                </button>
             </div>
         </div>
 
@@ -223,15 +227,17 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php require __DIR__ . '/../components/medical-record-modal.php'; ?>
 <?php foreach ($filteredRecords as $record): ?>
     <?php
     $modalRecordId = (string) ($record['id'] ?? '');
     if ($modalRecordId === '') continue;
     ?>
     <div class="modal fade" id="nurseIncidentEdit-<?= e($modalRecordId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" action="<?= url('views/nurse/edit-record/edit-record.php?id=' . urlencode($modalRecordId)) ?>">
+                    <input type="hidden" name="returnToNursePage" value="medicalIncidents">
                     <div class="modal-header">
                         <h5 class="modal-title">Edit Incident Record</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

@@ -124,9 +124,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Track and manage incidents reported in your assigned house</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-danger btn-sm" href="<?= url('views/senior-houseparent/incidents/create/create.php') ?>">
+                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#seniorCreateIncidentModal">
                     <i class="bi bi-plus-circle me-1"></i>Report Incident
-                </a>
+                </button>
             </div>
         </div>
 
@@ -292,4 +292,45 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <?php $modalExternalFile = (string) ($external['fileName'] ?? ''); if ($modalExternalFile === '') continue; ?>
     <div class="modal fade" id="seniorExternalIncidentView-<?= e(md5($modalExternalFile)) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">External Incident Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e($external['studentName'] ?? 'Unknown Student') ?></dd><dt class="col-sm-5">Type</dt><dd class="col-sm-7"><?= e($external['incidentType'] ?? 'External Incident') ?></dd><dt class="col-sm-5">Date</dt><dd class="col-sm-7"><?= e($external['incidentDate'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e($external['status'] ?? 'submitted') ?></dd></dl></div><div class="modal-footer"><a class="btn btn-outline-success" href="<?= url('uploads/external-incidents/' . rawurlencode($modalExternalFile)) ?>" target="_blank" rel="noopener">Open file</a><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
 <?php endforeach; ?>
+<div class="modal fade" id="seniorCreateIncidentModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openCreateIncident']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/senior-houseparent/incidents/create/create.php') ?>">
+                <div class="modal-header"><h5 class="modal-title">Report Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Student Involved</label>
+                            <select name="studentId" class="form-select" required>
+                                <option value="">Select student</option>
+                                <?php foreach ($students as $studentOption): ?>
+                                    <option value="<?= e((string) ($studentOption['id'] ?? '')) ?>"><?= e(trim(($studentOption['firstName'] ?? '') . ' ' . ($studentOption['lastName'] ?? ''))) ?> (<?= e($studentOption['admissionNo'] ?? 'No ID') ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Incident Category</label>
+                            <select name="incidentType" class="form-select">
+                                <option value="conduct">Conduct &amp; Discipline</option><option value="curfew">Curfew / Unauthorized Absence</option><option value="damage">Property / Dorm Damage</option><option value="altercation">Physical Altercation / Bullying</option><option value="noise">Noise / Lights-Out Disturbance</option><option value="other">Other Incident</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8"><label class="form-label">Incident Title</label><input name="title" class="form-control" required></div>
+                        <div class="col-md-4">
+                            <label class="form-label">Priority</label>
+                            <select name="priority" class="form-select"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select>
+                        </div>
+                        <div class="col-12"><label class="form-label">Location / Room Number</label><input name="location" class="form-control" placeholder="e.g. Block B, Room 14 / Common Room"></div>
+                        <div class="col-12"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="5" required></textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger"><i class="bi bi-send me-1"></i>Submit Incident</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.querySelectorAll('.modal[data-open-on-load="true"]').forEach(function (modalElement) {
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

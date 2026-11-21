@@ -32,20 +32,25 @@ foreach ($insideVisitors as $visitor) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $visitorId = sanitize($_POST['visitorId'] ?? '');
+    $returnTo = !empty($_POST['returnToVisitors'])
+        ? url('views/security/visitors/visitors/visitors.php')
+        : (!empty($_POST['returnToVisitorView'])
+            ? url('views/security/visitors/view/view.php?id=' . urlencode($visitorId))
+            : url('views/security/visitor-check-out/visitor-check-out.php'));
     if ($visitorId === '') {
         flash('error', 'Visitor ID is required.');
-        redirect(base_url('index.php?route=/views/security/visitor-check-out/visitor-check-out.php'));
+        redirect($returnTo);
     }
 
     $visitor = FirebaseService::getInstance()->getDocument(COL_VISITORS, $visitorId);
     if (!$visitor || ($visitor['status'] ?? '') !== 'inside') {
         flash('error', 'Visitor was not found or is not currently inside.');
-        redirect(base_url('index.php?route=/views/security/visitor-check-out/visitor-check-out.php'));
+        redirect($returnTo);
     }
 
     $result = (new VisitorService())->checkOut($visitorId, current_user()['uid'] ?? current_user()['id'] ?? null);
     flash($result['success'] ? 'success' : 'error', $result['message']);
-    redirect(base_url('index.php?route=/views/security/visitors/visitors/visitors.php'));
+    redirect($returnTo);
 }
 
 $pageTitle = 'Visitor Check-Out';

@@ -11,7 +11,6 @@
     <?php $advancedConfig = $appConfig['advanced'] ?? []; ?>
     <style>
         :root { --app-primary: <?= e($advancedConfig['primary_color'] ?? '#1f6feb') ?>; }
-        .portal-startup-loader[hidden] { display: none !important; }
     </style>
 
     <!-- CSS libraries -->
@@ -51,28 +50,10 @@
     <link rel="stylesheet" href="<?= asset('css/responsive.css') ?>">
 </head>
 <body>
-<?= $legacyLoadingMarkup ?? '' ?>
-<?php
-$portalLoaderName = 'Student Dormitory System';
-if (str_contains($currentScript, '/views/admin/')) {
-    $portalLoaderName = 'Admin Portal';
-} elseif (str_contains($currentScript, '/views/student/')) {
-    $portalLoaderName = 'Student Portal';
-} elseif (str_contains($currentScript, '/views/house-master/')) {
-    $portalLoaderName = (function_exists('current_role') && current_role() === ROLE_HOUSE_MISTRESS) ? 'House Mistress Portal' : 'House Master Portal';
-} elseif (str_contains($currentScript, '/views/senior-houseparent/')) {
-    $portalLoaderName = 'Senior Houseparent Portal';
-} elseif (str_contains($currentScript, '/views/security/')) {
-    $portalLoaderName = 'Security Portal';
-} elseif (str_contains($currentScript, '/views/nurse/')) {
-    $portalLoaderName = 'Nurse Portal';
-}
-?>
-<div id="portalStartupLoader" class="portal-startup-loader is-hidden" hidden role="status" aria-live="polite" aria-label="Loading portal">
-    <div class="portal-startup-card">
-        <div class="portal-startup-title"><?= e($portalLoaderName) ?></div>
-        <div class="portal-startup-text">Loading page resources...</div>
-        <div class="portal-startup-progress" aria-hidden="true"><span></span></div>
+<div id="sessionTransitionLoader" class="session-transition-overlay" hidden role="status" aria-live="polite" aria-label="Session transition">
+    <div class="session-transition-card">
+        <span class="sds-circle-spinner session-transition-spinner" aria-hidden="true"></span>
+        <span data-session-transition-message>Working...</span>
     </div>
 </div>
 <div class="app-shell d-flex">

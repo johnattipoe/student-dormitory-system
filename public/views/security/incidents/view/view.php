@@ -54,9 +54,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <a class="btn btn-light" href="<?= url('views/security/incidents/incidents/incidents.php') ?>">
                     <i class="bi bi-arrow-left"></i> Back
                 </a>
-                <a class="btn btn-warning" href="<?= url('views/security/incidents/edit/edit.php?id=' . urlencode($id)) ?>">
+                <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#securityIncidentDetailEdit">
                     <i class="bi bi-pencil-square"></i> Edit
-                </a>
+                </button>
             </div>
         </section>
 
@@ -101,8 +101,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <div class="security-side-card">
                     <h3>Response actions</h3>
                     <div class="d-grid gap-2">
-                        <a class="btn btn-outline-primary" href="<?= url('views/security/incidents/edit/edit.php?id=' . urlencode($id)) ?>">Update incident</a>
-                        <a class="btn btn-outline-danger" href="<?= url('views/security/incidents/delete/delete.php?id=' . urlencode($id)) ?>">Delete incident</a>
+                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#securityIncidentDetailEdit">Update incident</button>
+                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#securityIncidentDetailDelete">Delete incident</button>
                     </div>
                 </div>
                 <div class="security-side-card mt-4">
@@ -112,5 +112,32 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
     </div>
+</div>
+<div class="modal fade" id="securityIncidentDetailEdit" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/security/incidents/edit/edit.php?id=' . urlencode($id)) ?>" class="security-modal-form">
+                <input type="hidden" name="id" value="<?= e($id) ?>">
+                <input type="hidden" name="returnToIncidentView" value="1">
+                <div class="modal-header"><h5 class="modal-title">Edit Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($incident['title'] ?? '') ?>" required>
+                    <label class="form-label">Priority</label>
+                    <select name="priority" class="form-select mb-3"><?php foreach (['low', 'medium', 'high'] as $option): ?><option value="<?= e($option) ?>" <?= $priority === $option ? 'selected' : '' ?>><?= e(ucfirst($option)) ?></option><?php endforeach; ?></select>
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select mb-3"><?php foreach (['open', 'investigating', 'resolved'] as $option): ?><option value="<?= e($option) ?>" <?= $status === $option ? 'selected' : '' ?>><?= e(ucfirst($option)) ?></option><?php endforeach; ?></select>
+                    <label class="form-label">Description</label><textarea name="description" class="form-control" rows="5"><?= e($incident['description'] ?? '') ?></textarea>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="securityIncidentDetailDelete" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title text-danger">Delete Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body">Delete <strong><?= e($incident['title'] ?? 'this incident') ?></strong> from the incident records?</div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/security/incidents/delete/delete.php?id=' . urlencode($id)) ?>"><input type="hidden" name="id" value="<?= e($id) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div>
+    </div></div>
 </div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

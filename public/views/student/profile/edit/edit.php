@@ -37,6 +37,11 @@ if (!$student) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
+        flash('error', 'The form expired. Please refresh the page and try again.');
+        redirect(url('views/student/profile/index/index.php'));
+    }
+
     $data = [
         'phone' => sanitize($_POST['phone'] ?? ''),
         'guardianName' => sanitize($_POST['guardianName'] ?? ''),
@@ -77,6 +82,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
 
             <form method="POST">
+                <?= csrf_field() ?>
                 <div class="row g-3">
                     <div class="col-md-12">
                         <label class="form-label">Student Contact Phone</label>

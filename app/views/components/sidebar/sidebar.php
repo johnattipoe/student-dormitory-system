@@ -97,6 +97,13 @@ $navItems = $navItems ?? [];
                     'activePath' => '/views/admin/finance/',
                 ],
                 [
+                    'icon' => 'bi-arrow-up-circle',
+                    'label' => 'Promote Students',
+                    'href' => url('views/admin/students/promotion/index.php'),
+                    'section' => 'Management',
+                    'activePath' => '/views/admin/students/promotion/',
+                ],
+                [
                     'icon' => 'bi-database-down',
                     'label' => 'Backup & Restore',
                     'href' => url('views/admin/backup-restore/index.php'),

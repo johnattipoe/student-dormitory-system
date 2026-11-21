@@ -99,6 +99,61 @@ $studentsForHouse = static function (string $houseId) use ($assignedHouses, $stu
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $selectedHouseId = sanitize($_POST['houseId'] ?? $assignedHouseId);
+    if (($_POST['action'] ?? '') === 'mark_bulk_attendance') {
+        $eligibleStudents = $studentsForHouse($selectedHouseId);
+        $eligibleStudentIds = array_fill_keys(array_filter(array_map($studentRecordId, $eligibleStudents)), true);
+        $studentIds = array_values(array_unique(array_filter(array_map(
+            static fn($studentId): string => sanitize((string) $studentId),
+            (array) ($_POST['studentIds'] ?? [])
+        ))));
+
+        if (!array_key_exists($selectedHouseId, $assignedHouses)) {
+            flash('error', 'Please select one of your assigned houses.');
+            redirect(base_url('index.php?route=/views/house-master/attendance/index/index.php'));
+        }
+
+        if (empty($studentIds)) {
+            flash('error', 'Please select at least one student.');
+            redirect(base_url('index.php?route=/views/house-master/attendance/index/index.php'));
+        }
+
+        $invalidStudentIds = array_values(array_filter(
+            $studentIds,
+            static fn(string $studentId): bool => !isset($eligibleStudentIds[$studentId])
+        ));
+        if (!empty($invalidStudentIds)) {
+            flash('error', 'One or more selected students are not assigned to your house.');
+            redirect(base_url('index.php?route=/views/house-master/attendance/index/index.php'));
+        }
+
+        $status = sanitize($_POST['status'] ?? 'present');
+        $date = sanitize($_POST['date'] ?? date('Y-m-d'));
+        $successCount = 0;
+        $failureMessages = [];
+        foreach ($studentIds as $studentId) {
+            $result = AttendanceService::mark(
+                $studentId,
+                $status,
+                $date,
+                $selectedHouseId,
+                (string) ($user['uid'] ?? $user['id'] ?? 'house-master')
+            );
+            if (!empty($result['success'])) {
+                $successCount++;
+            } else {
+                $failureMessages[] = (string) ($result['message'] ?? 'Attendance could not be saved.');
+            }
+        }
+
+        if ($successCount > 0) {
+            flash('success', 'Marked attendance for ' . $successCount . ' student(s).');
+        }
+        if (!empty($failureMessages)) {
+            flash('error', 'Attendance could not be marked for ' . count($failureMessages) . ' student(s): ' . $failureMessages[0]);
+        }
+        redirect(base_url('index.php?route=/views/house-master/attendance/index/index.php'));
+    }
+
     $studentId = sanitize($_POST['studentId'] ?? '');
     $eligibleStudents = $studentsForHouse($selectedHouseId);
     $studentIds = array_map($studentRecordId, $eligibleStudents);
@@ -184,17 +239,35 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Track daily night roll calls and resident accountability for your assigned house</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="<?= url('views/house-master/attendance/mark-attendance/mark-attendance.php') ?>" class="btn btn-success btn-sm">
+                <?php if (count($assignedHouses) > 1): ?>
+                    <form method="GET" action="<?= e(base_url('index.php')) ?>" class="d-flex align-items-center">
+                        <input type="hidden" name="route" value="/views/house-master/attendance/index/index.php">
+                        <input type="hidden" name="date" value="<?= e($date) ?>">
+                        <label for="attendanceHouseFilter" class="visually-hidden">Dormitory House</label>
+                        <select id="attendanceHouseFilter" name="houseId" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <?php foreach ($assignedHouses as $houseId => $house): ?>
+                                <option value="<?= e($houseId) ?>" <?= $selectedHouseId === $houseId ? 'selected' : '' ?>><?= e($house['name'] ?? $houseId) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </form>
+                <?php endif; ?>
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#houseQuickAttendanceModal">
+                    <i class="bi bi-pencil-square me-1"></i> Individual Roll Call
+                </button>
+                <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#houseBulkAttendanceModal">
                     <i class="bi bi-check2-square me-1"></i> Bulk Roll Call
-                </a>
+                </button>
                 <a href="<?= url('views/house-master/attendance/history/history.php') ?>" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-clock-history me-1"></i> History
                 </a>
-                <a href="<?= url('views/house-master/reports/export/export.php?type=attendance&date=' . urlencode($date)) ?>" class="btn btn-outline-success btn-sm">
+                <button type="button" class="btn btn-outline-success btn-sm" id="houseAttendanceExportButton"
+                    data-export-url="<?= e(url('views/house-master/reports/export/export.php') . '&type=attendance&date=' . urlencode($date)) ?>"
+                    data-filename="house-attendance-<?= e($date) ?>.csv">
                     <i class="bi bi-filetype-csv me-1"></i> Export CSV
-                </a>
+                </button>
             </div>
         </div>
+        <div id="houseAttendanceExportError" class="alert alert-danger d-none" role="alert"></div>
 
         <!-- KPI Stats Cards -->
         <div class="row g-3 mb-4">
@@ -235,58 +308,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <div class="rounded-3 bg-warning bg-opacity-10 p-2 text-warning"><i class="bi bi-clock-history fs-4"></i></div>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Quick Mark Roll Call Form -->
-        <div class="card stat-card shadow-sm border-0 mb-4">
-            <div class="card-header bg-white py-3">
-                <h6 class="mb-0 fw-bold"><i class="bi bi-pencil-square me-2 text-success"></i>Quick Individual Roll Call</h6>
-            </div>
-            <div class="card-body p-4">
-                <form method="POST" action="<?= url('views/house-master/attendance/index/index.php') ?>" class="row g-3 align-items-end">
-                    <div class="col-md-3">
-                        <label class="form-label fw-semibold">Dormitory House</label>
-                        <select name="houseId" class="form-select" required onchange="window.location.href='<?= url('views/house-master/attendance/index/index.php') ?>?houseId=' + encodeURIComponent(this.value)">
-                            <option value="">-- Choose House --</option>
-                            <?php foreach ($assignedHouses as $houseId => $house): ?>
-                                <option value="<?= e($houseId) ?>" <?= $selectedHouseId === $houseId ? 'selected' : '' ?>><?= e($house['name'] ?? $houseId) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-semibold">Resident Student</label>
-                        <select name="studentId" class="form-select select2" required <?= empty($students) ? 'disabled' : '' ?>>
-                            <option value=""><?= empty($students) ? 'No students in this house' : 'Select student' ?></option>
-                            <?php foreach ($students as $student): ?>
-                                <?php
-                                $optionStudentId = $studentRecordId($student);
-                                $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
-                                $studentLabel = trim($studentName . ' (' . ($student['admissionNo'] ?? $student['studentId'] ?? $optionStudentId) . ')');
-                                ?>
-                                <?php if ($optionStudentId !== ''): ?>
-                                    <option value="<?= e($optionStudentId) ?>"><?= e($studentLabel) ?></option>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label fw-semibold">Roll Call Date</label>
-                        <input type="date" name="date" class="form-control" value="<?= e($date) ?>" required>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label fw-semibold">Status</label>
-                        <select name="status" class="form-select">
-                            <option value="present">Present</option>
-                            <option value="absent">Absent</option>
-                            <option value="excused">Excused</option>
-                            <option value="late">Late</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <button class="btn btn-primary w-100"><i class="bi bi-check-lg me-1"></i> Save</button>
-                    </div>
-                </form>
             </div>
         </div>
 
@@ -359,10 +380,175 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
     </div>
 </div>
+<div class="modal fade" id="houseQuickAttendanceModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openQuickAttendance']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/attendance/index/index.php') ?>" data-disable-loading="true">
+                <input type="hidden" name="houseId" value="<?= e($selectedHouseId) ?>">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil-square me-2 text-success"></i>Individual Roll Call</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Dormitory House</label>
+                            <input type="text" class="form-control" value="<?= e($assignedHouses[$selectedHouseId]['name'] ?? 'Assigned house') ?>" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Resident Student</label>
+                            <select name="studentId" class="form-select" required <?= empty($students) ? 'disabled' : '' ?>>
+                                <option value=""><?= empty($students) ? 'No students in this house' : 'Select student' ?></option>
+                                <?php foreach ($students as $student): ?>
+                                    <?php
+                                    $optionStudentId = $studentRecordId($student);
+                                    $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
+                                    $studentLabel = trim($studentName . ' (' . ($student['admissionNo'] ?? $student['studentId'] ?? $optionStudentId) . ')');
+                                    ?>
+                                    <?php if ($optionStudentId !== ''): ?>
+                                        <option value="<?= e($optionStudentId) ?>"><?= e($studentLabel) ?></option>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Roll Call Date</label>
+                            <input type="date" name="date" class="form-control" value="<?= e($date) ?>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="present">Present</option>
+                                <option value="absent">Absent</option>
+                                <option value="excused">Excused</option>
+                                <option value="late">Late</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" <?= empty($students) ? 'disabled' : '' ?>><i class="bi bi-check-lg me-1"></i>Save Attendance</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseBulkAttendanceModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openBulkAttendance']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/attendance/index/index.php') ?>" data-disable-loading="true">
+                <input type="hidden" name="action" value="mark_bulk_attendance">
+                <input type="hidden" name="houseId" value="<?= e($selectedHouseId) ?>">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-check2-square me-2 text-success"></i>Bulk Roll Call</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Dormitory House</label>
+                            <input type="text" class="form-control" value="<?= e($assignedHouses[$selectedHouseId]['name'] ?? 'Assigned house') ?>" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Attendance Date</label>
+                            <input type="date" name="date" class="form-control" value="<?= e($date) ?>" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Mark Status As</label>
+                            <select name="status" class="form-select" required>
+                                <option value="present">Present</option>
+                                <option value="absent">Absent</option>
+                                <option value="late">Late</option>
+                                <option value="excused">Excused / Exeat</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-responsive border rounded" style="max-height: 55vh; overflow-y: auto;">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th class="text-center" style="width: 48px;"><input type="checkbox" id="selectAllHouseAttendanceStudents" class="form-check-input" aria-label="Select all students"></th>
+                                    <th>Student</th>
+                                    <th>Admission No.</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($students)): ?>
+                                    <tr><td colspan="3" class="text-center text-muted py-4">No students are assigned to this house.</td></tr>
+                                <?php else: ?>
+                                    <?php foreach ($students as $student): ?>
+                                        <?php $bulkStudentId = $studentRecordId($student); ?>
+                                        <?php if ($bulkStudentId === '') continue; ?>
+                                        <tr>
+                                            <td class="text-center"><input type="checkbox" name="studentIds[]" value="<?= e($bulkStudentId) ?>" class="form-check-input house-attendance-student-checkbox" aria-label="Select <?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?>"></td>
+                                            <td><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?></td>
+                                            <td><?= e($student['admissionNo'] ?? '—') ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" <?= empty($students) ? 'disabled' : '' ?>><i class="bi bi-check2-circle me-1"></i>Save Attendance Records</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 <?php foreach ($attendance as $record): ?>
     <?php $modalAttendanceId = (string) ($record['id'] ?? ''); $modalAttendanceStudent = $studentRecordId($students[array_search((string) ($record['studentId'] ?? ''), array_map($studentRecordId, $students))] ?? []); $modalAttendanceStudentRecord = null; foreach ($students as $candidateStudent) { if ($studentRecordId($candidateStudent) === (string) ($record['studentId'] ?? '')) { $modalAttendanceStudentRecord = $candidateStudent; break; } } $modalAttendanceStatus = (string) ($record['status'] ?? 'present'); ?>
     <div class="modal fade" id="houseAttendanceViewModal-<?= e($modalAttendanceId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Attendance Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e(trim(($modalAttendanceStudentRecord['firstName'] ?? '') . ' ' . ($modalAttendanceStudentRecord['lastName'] ?? '')) ?: ($record['studentId'] ?? '—')) ?></dd><dt class="col-sm-5">Date</dt><dd class="col-sm-7"><?= e($record['date'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst($modalAttendanceStatus)) ?></dd><dt class="col-sm-5">Marked By</dt><dd class="col-sm-7"><?= e($markedByNames[(string) ($record['markedBy'] ?? '')] ?? ($record['markedBy'] ?? '—')) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
     <div class="modal fade" id="houseAttendanceEditModal-<?= e($modalAttendanceId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="<?= url('views/house-master/attendance/edit/edit.php?id=' . urlencode($modalAttendanceId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Attendance</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalAttendanceId) ?>"><label class="form-label">Date</label><input type="date" name="date" class="form-control mb-3" value="<?= e($record['date'] ?? date('Y-m-d')) ?>"><label class="form-label">Status</label><select name="status" class="form-select"><option value="present" <?= $modalAttendanceStatus === 'present' ? 'selected' : '' ?>>Present</option><option value="absent" <?= $modalAttendanceStatus === 'absent' ? 'selected' : '' ?>>Absent</option><option value="late" <?= $modalAttendanceStatus === 'late' ? 'selected' : '' ?>>Late</option><option value="excused" <?= $modalAttendanceStatus === 'excused' ? 'selected' : '' ?>>Excused</option></select></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
     <div class="modal fade" id="houseAttendanceDeleteModal-<?= e($modalAttendanceId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Attendance</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete the attendance record for <strong><?= e(trim(($modalAttendanceStudentRecord['firstName'] ?? '') . ' ' . ($modalAttendanceStudentRecord['lastName'] ?? '')) ?: ($record['studentId'] ?? 'Student')) ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/attendance/delete/delete.php?id=' . urlencode($modalAttendanceId)) ?>"><input type="hidden" name="id" value="<?= e($modalAttendanceId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
 <?php endforeach; ?>
+<script>
+document.querySelectorAll('#houseQuickAttendanceModal, #houseBulkAttendanceModal').forEach(function (modal) {
+    modal.dataset.disableLoading = 'true';
+    document.body.appendChild(modal);
+});
+
+document.querySelectorAll('.modal[data-open-on-load="true"]').forEach(function (modalElement) {
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+});
+
+document.getElementById('selectAllHouseAttendanceStudents').addEventListener('change', function () {
+    document.querySelectorAll('.house-attendance-student-checkbox').forEach(function (checkbox) {
+        checkbox.checked = this.checked;
+    }, this);
+});
+
+document.getElementById('houseAttendanceExportButton').addEventListener('click', async function () {
+    const button = this;
+    const errorMessage = document.getElementById('houseAttendanceExportError');
+    SDS.showButtonLoading(button);
+    errorMessage.classList.add('d-none');
+    errorMessage.textContent = '';
+    try {
+        const response = await fetch(button.dataset.exportUrl, {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (!response.ok || !(response.headers.get('content-type') || '').includes('text/csv')) {
+            throw new Error('The attendance export could not be downloaded. Please try again.');
+        }
+        const downloadUrl = URL.createObjectURL(await response.blob());
+        const downloadLink = document.createElement('a');
+        downloadLink.href = downloadUrl;
+        downloadLink.download = button.dataset.filename;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        downloadLink.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(downloadUrl); }, 1000);
+    } catch (error) {
+        errorMessage.textContent = error instanceof Error ? error.message : 'The attendance export could not be downloaded. Please try again.';
+        errorMessage.classList.remove('d-none');
+    } finally {
+        SDS.hideButtonLoading(button);
+    }
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

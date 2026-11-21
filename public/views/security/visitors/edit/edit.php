@@ -34,7 +34,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'purpose' => sanitize($_POST['purpose'] ?? ''),
     ]);
     flash('success', 'Visitor updated.');
-    redirect(url('views/security/visitors/view/view.php?id=' . urlencode($id)));
+    redirect(!empty($_POST['returnToVisitors'])
+        ? url('views/security/visitors/visitors/visitors.php')
+        : url('views/security/visitors/view/view.php?id=' . urlencode($id)));
 }
 
 $pageTitle = 'Edit Visitor';

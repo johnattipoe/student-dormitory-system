@@ -64,9 +64,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
-                    <a class="btn btn-light btn-sm" href="<?= url('views/admin/profile/edit/edit.php') ?>">
+                    <button type="button" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#adminEditProfileModal">
                         <i class="bi bi-pencil me-1"></i> Edit Profile
-                    </a>
+                    </button>
                     <a class="btn btn-outline-light btn-sm" href="<?= url('views/admin/profile/security/security.php') ?>">
                         <i class="bi bi-shield-lock me-1"></i> Security & Password
                     </a>
@@ -136,10 +136,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <div class="card stat-card p-4 h-100">
                     <h6 class="fw-bold mb-3"><i class="bi bi-gear me-2 text-primary"></i> Quick Shortcuts</h6>
                     <div class="list-group list-group-flush">
-                        <a href="<?= url('views/admin/profile/edit/edit.php') ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3">
+                        <button type="button" data-bs-toggle="modal" data-bs-target="#adminEditProfileModal" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3 text-start">
                             <div><i class="bi bi-pencil-square me-2 text-primary"></i> <strong>Edit Contact Info</strong></div>
                             <i class="bi bi-chevron-right text-muted"></i>
-                        </a>
+                        </button>
                         <a href="<?= url('views/admin/profile/security/security.php') ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3">
                             <div><i class="bi bi-shield-lock me-2 text-success"></i> <strong>Security & Password</strong></div>
                             <i class="bi bi-chevron-right text-muted"></i>
@@ -153,6 +153,19 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
     </div>
+</div>
+<div class="modal fade" id="adminEditProfileModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <form method="POST" action="<?= url('views/admin/profile/edit/edit.php') ?>">
+            <div class="modal-header"><h5 class="modal-title">Edit Administrator Profile</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">Full Name</label><input name="name" class="form-control" value="<?= e($fullName) ?>" required></div>
+                <div class="mb-3"><label class="form-label">Email Address</label><input class="form-control bg-light" value="<?= e($user['email'] ?? '—') ?>" readonly disabled><div class="form-text">Email is linked to root administrative credentials.</div></div>
+                <div><label class="form-label">Phone Number</label><input name="phone" class="form-control" value="<?= e($user['phone'] ?? '') ?>" placeholder="e.g. +233 24 000 0000"></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1"></i>Save Changes</button></div>
+        </form>
+    </div></div>
 </div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>
 

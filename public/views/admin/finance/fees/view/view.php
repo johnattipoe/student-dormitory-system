@@ -75,7 +75,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
             <div class="d-flex gap-2">
                 <a href="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php'))) ?>" class="btn btn-outline-secondary">Back</a>
-                <a href="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/edit/edit.php') . '&id=' . urlencode($id))) ?>" class="btn btn-primary">Edit</a>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#adminEditFeeModal">Edit</button>
             </div>
         </div>
 
@@ -109,5 +109,19 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
     </div>
+</div>
+<div class="modal fade" id="adminEditFeeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/edit/edit.php') . '&id=' . urlencode($id))) ?>">
+            <input type="hidden" name="id" value="<?= e($id) ?>">
+            <div class="modal-header"><h5 class="modal-title">Edit Fee Category</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body row g-3">
+                <div class="col-12"><label class="form-label">Fee Name</label><input name="name" class="form-control" value="<?= e((string) ($fee['name'] ?? '')) ?>" required></div>
+                <div class="col-md-6"><label class="form-label">Amount</label><input type="number" name="amount" step="0.01" min="0.01" class="form-control" value="<?= e((string) ($fee['amount'] ?? '0')) ?>" required></div>
+                <div class="col-md-6"><label class="form-label">Period</label><?php $selectedPeriod = (string) ($fee['period'] ?? 'Monthly'); ?><select name="period" class="form-select"><option value="Monthly" <?= $selectedPeriod === 'Monthly' ? 'selected' : '' ?>>Monthly</option><option value="Termly" <?= $selectedPeriod === 'Termly' ? 'selected' : '' ?>>Termly</option><option value="Yearly" <?= $selectedPeriod === 'Yearly' ? 'selected' : '' ?>>Yearly</option></select></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+        </form>
+    </div></div>
 </div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

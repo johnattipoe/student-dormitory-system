@@ -117,6 +117,7 @@ return [
     'project_id' => $_ENV['FIREBASE_PROJECT_ID'] ?? getenv('FIREBASE_PROJECT_ID') ?? '',
     'credentials_path' => $credentialsPath,
     'firebase_enabled' => filter_var($_ENV['FIREBASE_ENABLED'] ?? false, FILTER_VALIDATE_BOOLEAN),
+    'read_diagnostics' => filter_var($_ENV['FIREBASE_READ_DIAGNOSTICS'] ?? getenv('FIREBASE_READ_DIAGNOSTICS') ?? false, FILTER_VALIDATE_BOOLEAN),
     'api_key' => $_ENV['FIREBASE_API_KEY'] ?? getenv('FIREBASE_API_KEY') ?? '',
     'r2_endpoint' => $_ENV['R2_ENDPOINT'] ?? getenv('R2_ENDPOINT') ?? '',
     'r2_bucket' => $_ENV['R2_BUCKET'] ?? getenv('R2_BUCKET') ?? '',

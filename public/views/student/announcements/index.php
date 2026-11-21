@@ -228,7 +228,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     $modalFormattedDate = $modalRawDate !== '' ? (date('M d, Y h:i A', strtotime($modalRawDate)) ?: $modalRawDate) : 'Recently';
     ?>
     <div class="modal fade" id="studentAnnouncementView-<?= e($modalAnnId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Notice Details</h5>

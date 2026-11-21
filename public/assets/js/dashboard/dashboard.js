@@ -24,10 +24,18 @@ document.addEventListener('DOMContentLoaded', function () {
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
     })
         .then(function (response) {
-            if (!response.ok) {
-                throw new Error('Failed to load dashboard metrics');
-            }
-            return response.json();
+            return response.text().then(function (body) {
+                var data;
+                try {
+                    data = JSON.parse(body);
+                } catch (error) {
+                    throw new Error('Dashboard metrics endpoint returned invalid JSON: ' + body.slice(0, 200));
+                }
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to load dashboard metrics (HTTP ' + response.status + ')');
+                }
+                return data;
+            });
         })
         .then(function (data) {
             var metrics = data.metrics || (data.data && data.data.metrics);

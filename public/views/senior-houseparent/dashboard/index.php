@@ -94,12 +94,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <a href="<?= url('views/senior-houseparent/attendance/index/index.php') ?>" class="btn btn-primary btn-sm">
-                    <i class="bi bi-check2-circle me-1"></i> Mark Roll Call
+                    <i class="bi bi-check2-circle me-1"></i> Review Attendance
                 </a>
-                <a href="<?= url('views/senior-houseparent/announcements/create/create.php') ?>" class="btn btn-outline-primary btn-sm">
+                <a href="<?= url('views/senior-houseparent/announcements/index.php?openCreateAnnouncement=1') ?>" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-megaphone me-1"></i> Post Announcement
                 </a>
-                <a href="<?= url('views/senior-houseparent/emergency-alerts/broadcast/broadcast.php') ?>" class="btn btn-outline-danger btn-sm">
+                <a href="<?= url('views/senior-houseparent/emergency-alerts/index.php?openBroadcastModal=1') ?>" class="btn btn-outline-danger btn-sm">
                     <i class="bi bi-broadcast me-1"></i> Emergency Alert
                 </a>
             </div>
@@ -378,7 +378,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 </a>
                             </div>
                             <div class="col-6">
-                                <a href="<?= url('views/senior-houseparent/incidents/create/create.php') ?>" class="btn btn-outline-danger w-100 p-3 text-center h-100 d-flex flex-column align-items-center justify-content-center">
+                                <a href="<?= url('views/senior-houseparent/incidents/index/index.php?openCreateIncident=1') ?>" class="btn btn-outline-danger w-100 p-3 text-center h-100 d-flex flex-column align-items-center justify-content-center">
                                     <i class="bi bi-shield-exclamation fs-3 mb-1"></i>
                                     <span class="small fw-bold">Report Incident</span>
                                 </a>
@@ -390,7 +390,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 </a>
                             </div>
                             <div class="col-6">
-                                <a href="<?= url('views/senior-houseparent/activity-logs/index.php') ?>" class="btn btn-outline-dark w-100 p-3 text-center h-100 d-flex flex-column align-items-center justify-content-center">
+                                <a href="<?= url('views/senior-houseparent/activity-logs/index.php?openLogModal=1') ?>" class="btn btn-outline-dark w-100 p-3 text-center h-100 d-flex flex-column align-items-center justify-content-center">
                                     <i class="bi bi-clock-history fs-3 mb-1"></i>
                                     <span class="small fw-bold">Activity Logs</span>
                                 </a>

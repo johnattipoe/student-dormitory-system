@@ -16,8 +16,13 @@ $allowedRoles = [ROLE_SENIOR_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\NotificationService;
+use App\Services\UserService;
 
 $notificationService = new NotificationService();
+$allowedRecipientRoles = ['house_master', 'student', 'nurse', 'security'];
+$sendableUsers = array_values(array_filter((new UserService())->all(), static function ($user) use ($allowedRecipientRoles) {
+    return in_array((string) ($user['role'] ?? ''), $allowedRecipientRoles, true);
+}));
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $currentUser = current_user();
     $currentUserId = $currentUser['uid'] ?? $currentUser['id'] ?? null;
@@ -87,7 +92,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <span class="badge bg-secondary bg-opacity-10 text-secondary"><?= $notificationCount ?> items</span>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <a href="<?= url('views/senior-houseparent/notifications/send/send.php') ?>" class="btn btn-primary btn-sm"><i class="bi bi-send me-1" aria-hidden="true"></i> Send message</a>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#seniorSendNotificationModal"><i class="bi bi-send me-1" aria-hidden="true"></i> Send message</button>
                 <?php if ($unreadCount > 0): ?>
                     <form method="POST" class="d-inline">
                         <input type="hidden" name="action" value="mark_all_read">
@@ -206,4 +211,27 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <div class="modal fade" id="seniorNotificationEdit-<?= e($modalNotificationId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><form method="POST" action="<?= url('views/senior-houseparent/notifications/edit/edit.php?id=' . urlencode($modalNotificationId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Notification</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalNotificationId) ?>"><label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($note['title'] ?? '') ?>" required><label class="form-label">Type</label><select name="type" class="form-select mb-3"><option value="info" <?= $modalNotificationType === 'info' ? 'selected' : '' ?>>Info</option><option value="success" <?= $modalNotificationType === 'success' ? 'selected' : '' ?>>Success</option><option value="warning" <?= $modalNotificationType === 'warning' ? 'selected' : '' ?>>Warning</option><option value="danger" <?= $modalNotificationType === 'danger' ? 'selected' : '' ?>>Danger</option></select><label class="form-label">Message</label><textarea name="message" class="form-control" rows="4" required><?= e($note['message'] ?? '') ?></textarea></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
     <div class="modal fade" id="seniorNotificationDelete-<?= e($modalNotificationId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Notification</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">Delete <strong><?= e($note['title'] ?? 'this notification') ?></strong>?</div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/senior-houseparent/notifications/delete/delete.php?id=' . urlencode($modalNotificationId)) ?>"><input type="hidden" name="id" value="<?= e($modalNotificationId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
 <?php endforeach; ?>
+<div class="modal fade" id="seniorSendNotificationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+        <form method="POST" action="<?= url('views/senior-houseparent/notifications/send/send.php') ?>">
+            <div class="modal-header"><h5 class="modal-title">Send Notification</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <p class="text-muted">Send a normal in-system notification to one person.</p>
+                <label class="form-label">Recipient</label>
+                <select name="userId" class="form-select mb-3" required>
+                    <option value="">Select person</option>
+                    <?php foreach ($sendableUsers as $recipient): ?>
+                        <?php $recipientId = (string) ($recipient['uid'] ?? $recipient['id'] ?? ''); ?>
+                        <option value="<?= e($recipientId) ?>"><?= e($recipient['name'] ?? $recipient['email'] ?? 'Unknown') ?> (<?= e(ucwords(str_replace('_', ' ', $recipient['role'] ?? ''))) ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+                <label class="form-label">Type</label>
+                <select name="type" class="form-select mb-3"><?php foreach (['info', 'success', 'warning', 'danger'] as $type): ?><option value="<?= e($type) ?>"><?= ucfirst($type) ?></option><?php endforeach; ?></select>
+                <label class="form-label">Title</label><input name="title" class="form-control mb-3" required>
+                <label class="form-label">Message</label><textarea name="message" class="form-control" rows="5" required></textarea>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i>Send notification</button></div>
+        </form>
+    </div></div>
+</div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

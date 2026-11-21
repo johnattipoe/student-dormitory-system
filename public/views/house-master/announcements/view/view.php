@@ -31,6 +31,11 @@ if (!$announcement) {
     redirect(url('views/house-master/announcements/index.php'));
 }
 
+$currentHouseId = (string) (current_user()['houseId'] ?? current_user()['house_id'] ?? '');
+$canManageAnnouncement = $currentHouseId !== ''
+    && ($announcement['audience'] ?? '') === 'house'
+    && (string) ($announcement['targetHouseId'] ?? '') === $currentHouseId;
+
 $author = (string) ($announcement['createdByName'] ?? $announcement['author'] ?? '');
 $authorId = (string) ($announcement['createdBy'] ?? '');
 if ($authorId === 'default-admin' || $author === 'default-admin') {
@@ -74,12 +79,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/announcements/index.php') ?>">
                     <i class="bi bi-arrow-left me-1"></i>Back
                 </a>
-                <a class="btn btn-warning btn-sm" href="<?= url('views/house-master/announcements/edit/edit.php?id=' . urlencode($id)) ?>">
-                    <i class="bi bi-pencil me-1"></i>Edit
-                </a>
-                <a class="btn btn-outline-danger btn-sm" href="<?= url('views/house-master/announcements/delete/delete.php?id=' . urlencode($id)) ?>">
-                    <i class="bi bi-trash me-1"></i>Delete
-                </a>
+                <?php if ($canManageAnnouncement): ?>
+                    <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#houseAnnouncementEditModal"><i class="bi bi-pencil me-1"></i>Edit</button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#houseAnnouncementDeleteModal"><i class="bi bi-trash me-1"></i>Delete</button>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -113,4 +116,47 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php if ($canManageAnnouncement): ?>
+<div class="modal fade" id="houseAnnouncementEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/announcements/index.php') ?>">
+                <input type="hidden" name="action" value="update_announcement"><input type="hidden" name="id" value="<?= e($id) ?>">
+                <div class="modal-header"><h5 class="modal-title">Edit Announcement</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($announcement['title'] ?? '') ?>" required>
+                    <label class="form-label">Type</label>
+                    <select name="type" class="form-select mb-3">
+                        <option value="info" <?= $type === 'info' ? 'selected' : '' ?>>Info</option>
+                        <option value="success" <?= $type === 'success' ? 'selected' : '' ?>>Success</option>
+                        <option value="warning" <?= $type === 'warning' ? 'selected' : '' ?>>Warning</option>
+                        <option value="danger" <?= $type === 'danger' ? 'selected' : '' ?>>Urgent</option>
+                    </select>
+                    <label class="form-label">Message</label><textarea name="message" class="form-control mb-3" rows="6" required><?= e($announcement['message'] ?? $announcement['content'] ?? '') ?></textarea>
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select mb-3">
+                        <option value="published" <?= ($announcement['status'] ?? 'published') === 'published' ? 'selected' : '' ?>>Published</option>
+                        <option value="draft" <?= ($announcement['status'] ?? '') === 'draft' ? 'selected' : '' ?>>Draft</option>
+                        <option value="archived" <?= ($announcement['status'] ?? '') === 'archived' ? 'selected' : '' ?>>Archived</option>
+                    </select>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" name="isUrgent" id="houseAnnouncementUrgent" value="1" <?= !empty($announcement['isUrgent']) ? 'checked' : '' ?>><label class="form-check-label" for="houseAnnouncementUrgent">Mark as urgent</label></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseAnnouncementDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Announcement</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">Delete <strong><?= e($announcement['title'] ?? 'this announcement') ?></strong>?</div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="<?= url('views/house-master/announcements/index.php') ?>"><input type="hidden" name="action" value="delete_announcement"><input type="hidden" name="id" value="<?= e($id) ?>"><button type="submit" class="btn btn-danger">Delete</button></form>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

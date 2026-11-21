@@ -36,6 +36,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ]);
     flash($result['success'] ? 'success' : 'error', $result['message']);
     if ($result['success']) {
+        redirect(!empty($_POST['returnToIncidents'])
+            ? url('views/security/incidents/incidents/incidents.php')
+            : url('views/security/incidents/view/view.php?id=' . urlencode($id)));
+    }
+    if (!empty($_POST['returnToIncidents'])) {
+        redirect(url('views/security/incidents/incidents/incidents.php'));
+    }
+    if (!empty($_POST['returnToIncidentView'])) {
         redirect(url('views/security/incidents/view/view.php?id=' . urlencode($id)));
     }
 }

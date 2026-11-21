@@ -18,13 +18,131 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\StudentService;
 use App\Services\NotificationService;
 use App\Services\RoomService;
+use App\Services\HouseService;
+use App\Services\FirebaseService;
 
 // Handle batch email/notification
 $errors = [];
+$createStudentOld = $_SESSION['_house_student_create_old'] ?? [];
+$createStudentErrors = $_SESSION['_house_student_create_errors'] ?? [];
+$editStudentOld = $_SESSION['_house_student_edit_old'] ?? [];
+$editStudentOldId = (string) ($_SESSION['_house_student_edit_old_id'] ?? '');
+unset(
+    $_SESSION['_house_student_create_old'],
+    $_SESSION['_house_student_create_errors'],
+    $_SESSION['_house_student_edit_old'],
+    $_SESSION['_house_student_edit_old_id']
+);
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['action'])) {
     $action = sanitize($_POST['action']);
     
-    if ($action === 'bulk_email' && !empty($_POST['studentIds']) && !empty($_POST['subject']) && !empty($_POST['message'])) {
+    if ($action === 'create_student') {
+        $houseId = (string) (current_user()['houseId'] ?? current_user()['house_id'] ?? '');
+        $house = $houseId !== '' ? HouseService::find($houseId) : null;
+        $formValue = sanitize($_POST['form'] ?? $_POST['level'] ?? 'Form 1');
+        $studentData = [
+            'firstName' => sanitize($_POST['firstName'] ?? ''),
+            'lastName' => sanitize($_POST['lastName'] ?? ''),
+            'class' => sanitize($_POST['class'] ?? ''),
+            'form' => $formValue,
+            'level' => $formValue,
+            'gender' => sanitize($_POST['gender'] ?? 'Male'),
+            'nhisNumber' => sanitize($_POST['nhisNumber'] ?? ''),
+            'admissionNo' => sanitize($_POST['admissionNo'] ?? ''),
+            'course' => sanitize($_POST['course'] ?? ''),
+            'phone' => sanitize($_POST['phone'] ?? ''),
+            'houseId' => $houseId,
+            'residenceType' => sanitize($_POST['residenceType'] ?? 'boarding'),
+            'guardianName' => sanitize($_POST['guardianName'] ?? ''),
+            'guardianPhone' => sanitize($_POST['guardianPhone'] ?? ''),
+            'guardianEmail' => sanitize($_POST['guardianEmail'] ?? ''),
+            'status' => sanitize($_POST['status'] ?? 'active'),
+        ];
+        $createStudentErrors = validate_required($studentData, ['firstName', 'lastName', 'admissionNo']);
+        if ($studentData['guardianEmail'] !== '' && !validate_email($studentData['guardianEmail'])) {
+            $createStudentErrors['guardianEmail'] = 'Guardian email is invalid.';
+        }
+
+        if (!$house) {
+            $createStudentErrors['general'] = 'Your account must have an assigned house to add students.';
+        } elseif (empty($createStudentErrors)) {
+            try {
+                StudentService::create($studentData);
+                flash('success', 'Student added to ' . ($house['name'] ?? 'your house') . '.');
+                redirect(url('views/house-master/students/index/index.php'));
+            } catch (Throwable $e) {
+                $createStudentErrors['general'] = 'Unable to create student: ' . $e->getMessage();
+            }
+        }
+
+        $_SESSION['_house_student_create_old'] = $studentData;
+        $_SESSION['_house_student_create_errors'] = $createStudentErrors;
+        flash('error', 'Please correct the student details and try again.');
+        redirect(url('views/house-master/students/index/index.php?openAddStudent=1'));
+    } elseif ($action === 'update_student') {
+        $studentId = trim((string) sanitize($_POST['studentId'] ?? ''));
+        $houseId = (string) (current_user()['houseId'] ?? current_user()['house_id'] ?? '');
+        $studentRecord = $studentId !== '' ? StudentService::find($studentId) : null;
+        if (!$studentRecord || (string) ($studentRecord['houseId'] ?? '') !== $houseId) {
+            flash('error', 'Student not found in your assigned house.');
+            redirect(url('views/house-master/students/index/index.php'));
+        }
+
+        $formValue = sanitize($_POST['form'] ?? $_POST['level'] ?? ($studentRecord['form'] ?? $studentRecord['level'] ?? 'Form 1'));
+        $studentData = [
+            'firstName' => sanitize($_POST['firstName'] ?? ''),
+            'lastName' => sanitize($_POST['lastName'] ?? ''),
+            'class' => sanitize($_POST['class'] ?? ''),
+            'form' => $formValue,
+            'level' => $formValue,
+            'nhisNumber' => sanitize($_POST['nhisNumber'] ?? ''),
+            'admissionNo' => sanitize($_POST['admissionNo'] ?? ''),
+            'course' => sanitize($_POST['course'] ?? ''),
+            'gender' => sanitize($_POST['gender'] ?? 'Male'),
+            'phone' => sanitize($_POST['phone'] ?? ''),
+            'residenceType' => sanitize($_POST['residenceType'] ?? 'boarding'),
+            'status' => sanitize($_POST['status'] ?? 'active'),
+            'guardianName' => sanitize($_POST['guardianName'] ?? ''),
+            'guardianPhone' => sanitize($_POST['guardianPhone'] ?? ''),
+            'guardianEmail' => sanitize($_POST['guardianEmail'] ?? ''),
+        ];
+        $studentErrors = validate_required($studentData, ['firstName', 'lastName', 'admissionNo']);
+        if ($studentData['guardianEmail'] !== '' && !validate_email($studentData['guardianEmail'])) {
+            $studentErrors['guardianEmail'] = 'Guardian email is invalid.';
+        }
+
+        if (empty($studentErrors)) {
+            try {
+                StudentService::update($studentId, $studentData);
+                flash('success', 'Student profile updated successfully.');
+                redirect(url('views/house-master/students/index/index.php'));
+            } catch (Throwable $e) {
+                $studentErrors['general'] = 'Unable to update student: ' . $e->getMessage();
+            }
+        }
+        if (empty($studentErrors['general'])) {
+            $studentErrors['general'] = 'Please correct the student details and try again.';
+        }
+        $studentData['general'] = $studentErrors['general'];
+        if (!empty($studentErrors['guardianEmail'])) {
+            $studentData['guardianEmailError'] = $studentErrors['guardianEmail'];
+        }
+        $_SESSION['_house_student_edit_old'] = $studentData;
+        $_SESSION['_house_student_edit_old_id'] = $studentId;
+        flash('error', 'Please correct the student details and try again.');
+        redirect(url('views/house-master/students/index/index.php?editStudent=' . urlencode($studentId)));
+    } elseif ($action === 'delete_student') {
+        $studentId = trim((string) sanitize($_POST['studentId'] ?? ''));
+        $houseId = (string) (current_user()['houseId'] ?? current_user()['house_id'] ?? '');
+        $studentRecord = $studentId !== '' ? StudentService::find($studentId) : null;
+        if (!$studentRecord || (string) ($studentRecord['houseId'] ?? '') !== $houseId) {
+            flash('error', 'Student not found in your assigned house.');
+            redirect(url('views/house-master/students/index/index.php'));
+        }
+        StudentService::delete($studentId);
+        flash('success', 'Student deleted successfully.');
+        redirect(url('views/house-master/students/index/index.php'));
+    } elseif ($action === 'bulk_email' && !empty($_POST['studentIds']) && !empty($_POST['subject']) && !empty($_POST['message'])) {
         $studentIds = (array) $_POST['studentIds'];
         $subject = sanitize($_POST['subject']);
         $message = sanitize($_POST['message']);
@@ -50,8 +168,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['action'])) {
 }
 
 $houseId = current_user()['houseId'] ?? null;
+$house = $houseId ? HouseService::find((string) $houseId) : null;
 $students = StudentService::all($houseId);
 $rooms = RoomService::all($houseId);
+$classRecords = FirebaseService::getInstance()->getCollection('classes', [], 500);
+$studentClassOptions = array_values(array_unique(array_filter(array_map(
+    static function (array $class): string {
+        $code = trim((string) ($class['classCode'] ?? ''));
+        return $code !== '' ? $code : trim((string) ($class['className'] ?? ''));
+    },
+    array_filter($classRecords, static fn(array $class): bool => ($class['status'] ?? 'active') === 'active')
+))));
+if (empty($studentClassOptions)) {
+    $studentClassOptions = ['SHS 1A', 'SHS 1B', 'SHS 2A', 'SHS 2B', 'SHS 3A', 'SHS 3B'];
+}
+$studentCourseOptions = [
+    'General Science',
+    'General Arts',
+    'Business',
+    'Home Economics',
+    'Visual Arts',
+    'Agricultural Science',
+    'Technical',
+];
 $roomMap = [];
 foreach ($rooms as $room) {
     $roomMap[(string) ($room['id'] ?? '')] = (string) ($room['roomNumber'] ?? $room['id'] ?? '');
@@ -82,6 +221,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 <div class="main-content">
     <?php require APP_ROOT . '/app/views/components/navbar/navbar.php'; ?>
     <?php require APP_ROOT . '/app/views/components/alerts/alerts.php'; ?>
+    <?php if (!empty($errors)): ?>
+        <div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div>
+    <?php endif; ?>
     
     <div class="content-wrapper">
 
@@ -97,9 +239,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#bulkEmailModal">
                     <i class="bi bi-envelope me-1"></i> Broadcast Notice
                 </button>
-                <a href="<?= url('views/house-master/students/create/create.php') ?>" class="btn btn-primary btn-sm">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#houseStudentCreateModal" <?= !$house ? 'disabled title="Assign a house to this account first"' : '' ?>>
                     <i class="bi bi-plus-lg me-1"></i> Add Student
-                </a>
+                </button>
             </div>
         </div>
 
@@ -227,12 +369,131 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 
+    <div class="modal fade" id="houseStudentCreateModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openAddStudent']) ? 'true' : 'false' ?>">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <form method="POST" action="<?= url('views/house-master/students/index/index.php') ?>" class="student-modal-form">
+                    <input type="hidden" name="action" value="create_student">
+                    <div class="modal-header"><h5 class="modal-title">Add Student to <?= e($house['name'] ?? 'Your House') ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body">
+                        <?php if (!empty($createStudentErrors['general'])): ?><div class="alert alert-danger"><?= e($createStudentErrors['general']) ?></div><?php endif; ?>
+                        <div class="row g-3">
+                            <div class="col-md-6"><label class="form-label">First Name <span class="text-danger">*</span></label><input name="firstName" class="form-control" value="<?= e($createStudentOld['firstName'] ?? '') ?>" required></div>
+                            <div class="col-md-6"><label class="form-label">Last Name <span class="text-danger">*</span></label><input name="lastName" class="form-control" value="<?= e($createStudentOld['lastName'] ?? '') ?>" required></div>
+                            <div class="col-md-6"><label class="form-label">Admission No. <span class="text-danger">*</span></label><input name="admissionNo" class="form-control" value="<?= e($createStudentOld['admissionNo'] ?? '') ?>" required></div>
+                            <div class="col-md-6"><label class="form-label">Gender</label><select name="gender" class="form-select"><option value="Male" <?= ($createStudentOld['gender'] ?? 'Male') === 'Male' ? 'selected' : '' ?>>Male</option><option value="Female" <?= ($createStudentOld['gender'] ?? '') === 'Female' ? 'selected' : '' ?>>Female</option></select></div>
+                            <div class="col-md-6"><label class="form-label">Form / Level</label><select name="form" class="form-select"><?php foreach (['Form 1', 'Form 2', 'Form 3', 'Form 4'] as $formOption): ?><option value="<?= e($formOption) ?>" <?= ($createStudentOld['form'] ?? 'Form 1') === $formOption ? 'selected' : '' ?>><?= e($formOption) ?></option><?php endforeach; ?></select></div>
+                            <div class="col-md-6"><label class="form-label">Class / Section</label><select name="class" class="form-select"><option value="">Select Class / Section</option><?php foreach ($studentClassOptions as $classOption): ?><option value="<?= e($classOption) ?>" <?= ($createStudentOld['class'] ?? '') === $classOption ? 'selected' : '' ?>><?= e($classOption) ?></option><?php endforeach; ?></select></div>
+                            <div class="col-md-6"><label class="form-label">Course / Programme</label><select name="course" class="form-select"><option value="">Select Programme</option><?php foreach ($studentCourseOptions as $courseOption): ?><option value="<?= e($courseOption) ?>" <?= ($createStudentOld['course'] ?? '') === $courseOption ? 'selected' : '' ?>><?= e($courseOption) ?></option><?php endforeach; ?></select></div>
+                            <div class="col-md-6"><label class="form-label">NHIS Number</label><input name="nhisNumber" class="form-control" value="<?= e($createStudentOld['nhisNumber'] ?? '') ?>"></div>
+                            <div class="col-md-6"><label class="form-label">Student Phone</label><input name="phone" class="form-control" value="<?= e($createStudentOld['phone'] ?? '') ?>"></div>
+                            <div class="col-md-6"><label class="form-label">Residence Type</label><select name="residenceType" class="form-select"><option value="boarding" <?= ($createStudentOld['residenceType'] ?? 'boarding') === 'boarding' ? 'selected' : '' ?>>Boarding</option><option value="day" <?= ($createStudentOld['residenceType'] ?? '') === 'day' ? 'selected' : '' ?>>Day</option></select></div>
+                            <div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><?php foreach (['active' => 'Active', 'inactive' => 'Inactive', 'suspended' => 'Suspended'] as $value => $label): ?><option value="<?= e($value) ?>" <?= ($createStudentOld['status'] ?? 'active') === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?></select></div>
+                            <div class="col-md-6"><label class="form-label">Guardian Name</label><input name="guardianName" class="form-control" value="<?= e($createStudentOld['guardianName'] ?? '') ?>"></div>
+                            <div class="col-md-6"><label class="form-label">Guardian Phone</label><input name="guardianPhone" class="form-control" value="<?= e($createStudentOld['guardianPhone'] ?? '') ?>"></div>
+                            <div class="col-12"><label class="form-label">Guardian Email</label><input type="email" name="guardianEmail" class="form-control" value="<?= e($createStudentOld['guardianEmail'] ?? '') ?>"><?php if (!empty($createStudentErrors['guardianEmail'])): ?><div class="text-danger small mt-1"><?= e($createStudentErrors['guardianEmail']) ?></div><?php endif; ?></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i>Add Student</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <?php foreach ($students as $student): ?>
-        <?php $modalStudentId = (string) ($student['id'] ?? ''); $modalStudentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')); ?>
-        <div class="modal fade" id="houseStudentViewModal-<?= e($modalStudentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Student Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Name</dt><dd class="col-sm-7"><?= e($modalStudentName ?: 'Student') ?></dd><dt class="col-sm-5">Admission No.</dt><dd class="col-sm-7"><?= e($student['admissionNo'] ?? '—') ?></dd><dt class="col-sm-5">Class</dt><dd class="col-sm-7"><?= e($student['class'] ?? '—') ?></dd><dt class="col-sm-5">Form</dt><dd class="col-sm-7"><?= e($student['form'] ?? $student['level'] ?? '—') ?></dd><dt class="col-sm-5">Room</dt><dd class="col-sm-7"><?= e($roomMap[(string) ($student['roomId'] ?? '')] ?? ($student['roomId'] ?? '—')) ?></dd><dt class="col-sm-5">Residence Type</dt><dd class="col-sm-7"><?= e(strtolower((string) ($student['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst((string) ($student['status'] ?? 'active'))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
-        <div class="modal fade" id="houseStudentEditModal-<?= e($modalStudentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><form method="POST" action="<?= url('views/house-master/students/edit/edit.php?studentId=' . urlencode($modalStudentId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Student</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" name="studentId" value="<?= e($modalStudentId) ?>"><div class="row g-3"><div class="col-md-6"><label class="form-label">First Name</label><input name="firstName" class="form-control" value="<?= e($student['firstName'] ?? '') ?>" required></div><div class="col-md-6"><label class="form-label">Last Name</label><input name="lastName" class="form-control" value="<?= e($student['lastName'] ?? '') ?>" required></div><div class="col-md-6"><label class="form-label">Admission No.</label><input name="admissionNo" class="form-control" value="<?= e($student['admissionNo'] ?? '') ?>" required></div><div class="col-md-6"><label class="form-label">Phone</label><input name="phone" class="form-control" value="<?= e($student['phone'] ?? '') ?>"></div><div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><option value="active" <?= ($student['status'] ?? 'active') === 'active' ? 'selected' : '' ?>>Active</option><option value="inactive" <?= ($student['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Inactive</option><option value="suspended" <?= ($student['status'] ?? '') === 'suspended' ? 'selected' : '' ?>>Suspended</option></select></div><div class="col-md-6"><label class="form-label">Course</label><input name="course" class="form-control" value="<?= e($student['course'] ?? '') ?>"></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
-        <div class="modal fade" id="houseStudentDeleteModal-<?= e($modalStudentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Student</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete <strong><?= e($modalStudentName ?: 'this student') ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/students/delete/delete.php?id=' . urlencode($modalStudentId)) ?>"><input type="hidden" name="id" value="<?= e($modalStudentId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
+        <?php
+        $modalStudentId = (string) ($student['id'] ?? '');
+        $modalStudentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
+        $modalStudentValues = $editStudentOldId === $modalStudentId ? array_merge($student, $editStudentOld) : $student;
+        $modalClassOptions = $studentClassOptions;
+        $modalStudentClass = (string) ($modalStudentValues['class'] ?? '');
+        if ($modalStudentClass !== '' && !in_array($modalStudentClass, $modalClassOptions, true)) {
+            $modalClassOptions[] = $modalStudentClass;
+        }
+        $modalCourseOptions = $studentCourseOptions;
+        $modalStudentCourse = (string) ($modalStudentValues['course'] ?? '');
+        if ($modalStudentCourse !== '' && !in_array($modalStudentCourse, $modalCourseOptions, true)) {
+            $modalCourseOptions[] = $modalStudentCourse;
+        }
+        $modalFormOptions = ['Form 1', 'Form 2', 'Form 3', 'Form 4'];
+        $modalStudentForm = (string) ($modalStudentValues['form'] ?? $modalStudentValues['level'] ?? '');
+        if ($modalStudentForm !== '' && !in_array($modalStudentForm, $modalFormOptions, true)) {
+            $modalFormOptions[] = $modalStudentForm;
+        }
+        ?>
+        <div class="modal fade" id="houseStudentViewModal-<?= e($modalStudentId) ?>" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header"><h5 class="modal-title">Student Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">Name</dt><dd class="col-sm-7"><?= e($modalStudentName ?: 'Student') ?></dd>
+                            <dt class="col-sm-5">Admission No.</dt><dd class="col-sm-7"><?= e($student['admissionNo'] ?? '—') ?></dd>
+                            <dt class="col-sm-5">Gender</dt><dd class="col-sm-7"><?= e($student['gender'] ?? '—') ?></dd>
+                            <dt class="col-sm-5">Class</dt><dd class="col-sm-7"><?= e($student['class'] ?? '—') ?></dd>
+                            <dt class="col-sm-5">Form</dt><dd class="col-sm-7"><?= e($student['form'] ?? $student['level'] ?? '—') ?></dd>
+                            <dt class="col-sm-5">Course</dt><dd class="col-sm-7"><?= e($student['course'] ?? '—') ?></dd>
+                            <dt class="col-sm-5">NHIS Number</dt><dd class="col-sm-7"><?= e($student['nhisNumber'] ?? '—') ?></dd>
+                            <dt class="col-sm-5">Phone</dt><dd class="col-sm-7"><?= e($student['phone'] ?? '—') ?></dd>
+                            <dt class="col-sm-5">Room</dt><dd class="col-sm-7"><?= e($roomMap[(string) ($student['roomId'] ?? '')] ?? ($student['roomId'] ?? '—')) ?></dd>
+                            <dt class="col-sm-5">Residence Type</dt><dd class="col-sm-7"><?= e(strtolower((string) ($student['residenceType'] ?? 'boarding')) === 'day' ? 'Day' : 'Boarding') ?></dd>
+                            <dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucfirst((string) ($student['status'] ?? 'active'))) ?></dd>
+                            <dt class="col-sm-5">Guardian</dt><dd class="col-sm-7"><?= e($student['guardianName'] ?? '—') ?></dd>
+                            <dt class="col-sm-5">Guardian Phone</dt><dd class="col-sm-7"><?= e($student['guardianPhone'] ?? '—') ?></dd>
+                            <dt class="col-sm-5">Guardian Email</dt><dd class="col-sm-7"><?= e($student['guardianEmail'] ?? '—') ?></dd>
+                        </dl>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade" id="houseStudentEditModal-<?= e($modalStudentId) ?>" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['editStudent']) && (string) $_GET['editStudent'] === $modalStudentId ? 'true' : 'false' ?>">
+            <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <form method="POST" action="<?= url('views/house-master/students/index/index.php') ?>" class="student-modal-form">
+                        <input type="hidden" name="action" value="update_student">
+                        <input type="hidden" name="studentId" value="<?= e($modalStudentId) ?>">
+                        <div class="modal-header"><h5 class="modal-title">Edit <?= e($modalStudentName ?: 'Student') ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                        <div class="modal-body">
+                            <?php if ($editStudentOldId === $modalStudentId && !empty($editStudentOld['general'])): ?><div class="alert alert-danger"><?= e($editStudentOld['general']) ?></div><?php endif; ?>
+                            <div class="row g-3">
+                                <div class="col-md-6"><label class="form-label">First Name <span class="text-danger">*</span></label><input name="firstName" class="form-control" value="<?= e($modalStudentValues['firstName'] ?? '') ?>" required></div>
+                                <div class="col-md-6"><label class="form-label">Last Name <span class="text-danger">*</span></label><input name="lastName" class="form-control" value="<?= e($modalStudentValues['lastName'] ?? '') ?>" required></div>
+                                <div class="col-md-6"><label class="form-label">Admission No. <span class="text-danger">*</span></label><input name="admissionNo" class="form-control" value="<?= e($modalStudentValues['admissionNo'] ?? '') ?>" required></div>
+                                <div class="col-md-6"><label class="form-label">Gender</label><select name="gender" class="form-select"><option value="Male" <?= strtolower((string) ($modalStudentValues['gender'] ?? 'Male')) === 'male' ? 'selected' : '' ?>>Male</option><option value="Female" <?= strtolower((string) ($modalStudentValues['gender'] ?? '')) === 'female' ? 'selected' : '' ?>>Female</option></select></div>
+                                <div class="col-md-6"><label class="form-label">Form / Level</label><select name="form" class="form-select"><?php foreach ($modalFormOptions as $formOption): ?><option value="<?= e($formOption) ?>" <?= ($modalStudentForm ?: 'Form 1') === $formOption ? 'selected' : '' ?>><?= e($formOption) ?></option><?php endforeach; ?></select></div>
+                                <div class="col-md-6"><label class="form-label">Class / Section</label><select name="class" class="form-select"><option value="">Select Class / Section</option><?php foreach ($modalClassOptions as $classOption): ?><option value="<?= e($classOption) ?>" <?= $modalStudentClass === $classOption ? 'selected' : '' ?>><?= e($classOption) ?></option><?php endforeach; ?></select></div>
+                                <div class="col-md-6"><label class="form-label">Course / Programme</label><select name="course" class="form-select"><option value="">Select Programme</option><?php foreach ($modalCourseOptions as $courseOption): ?><option value="<?= e($courseOption) ?>" <?= $modalStudentCourse === $courseOption ? 'selected' : '' ?>><?= e($courseOption) ?></option><?php endforeach; ?></select></div>
+                                <div class="col-md-6"><label class="form-label">NHIS Number</label><input name="nhisNumber" class="form-control" value="<?= e($modalStudentValues['nhisNumber'] ?? '') ?>"></div>
+                                <div class="col-md-6"><label class="form-label">Student Phone</label><input name="phone" class="form-control" value="<?= e($modalStudentValues['phone'] ?? '') ?>"></div>
+                                <div class="col-md-6"><label class="form-label">Residence Type</label><select name="residenceType" class="form-select"><option value="boarding" <?= strtolower((string) ($modalStudentValues['residenceType'] ?? 'boarding')) === 'boarding' ? 'selected' : '' ?>>Boarding</option><option value="day" <?= strtolower((string) ($modalStudentValues['residenceType'] ?? '')) === 'day' ? 'selected' : '' ?>>Day</option></select></div>
+                                <div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><?php foreach (['active' => 'Active', 'inactive' => 'Inactive', 'suspended' => 'Suspended'] as $value => $label): ?><option value="<?= e($value) ?>" <?= ($modalStudentValues['status'] ?? 'active') === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?></select></div>
+                                <div class="col-md-6"><label class="form-label">Guardian Name</label><input name="guardianName" class="form-control" value="<?= e($modalStudentValues['guardianName'] ?? '') ?>"></div>
+                                <div class="col-md-6"><label class="form-label">Guardian Phone</label><input name="guardianPhone" class="form-control" value="<?= e($modalStudentValues['guardianPhone'] ?? '') ?>"></div>
+                                <div class="col-12"><label class="form-label">Guardian Email</label><input type="email" name="guardianEmail" class="form-control" value="<?= e($modalStudentValues['guardianEmail'] ?? '') ?>"><?php if ($editStudentOldId === $modalStudentId && !empty($editStudentOld['guardianEmailError'])): ?><div class="text-danger small mt-1"><?= e($editStudentOld['guardianEmailError']) ?></div><?php endif; ?></div>
+                            </div>
+                        </div>
+                        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade" id="houseStudentDeleteModal-<?= e($modalStudentId) ?>" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+                <div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Student</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body"><p class="mb-0">Delete <strong><?= e($modalStudentName ?: 'this student') ?></strong>?</p></div>
+                <div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/students/index/index.php') ?>"><input type="hidden" name="action" value="delete_student"><input type="hidden" name="studentId" value="<?= e($modalStudentId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div>
+            </div></div>
+        </div>
     <?php endforeach; ?>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.modal[data-open-on-load="true"]').forEach(function (modalElement) {
+            bootstrap.Modal.getOrCreateInstance(modalElement).show();
+        });
+    });
+    </script>
 
     <!-- Bulk Message Modal -->
     <div class="modal fade" id="bulkEmailModal" tabindex="-1">

@@ -72,9 +72,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
-                    <a class="btn btn-primary btn-sm" href="<?= url('views/senior-houseparent/profile/edit/edit.php') ?>">
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#seniorProfileEditModal">
                         <i class="bi bi-pencil me-1"></i> Edit Profile
-                    </a>
+                    </button>
                     <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/senior-houseparent/profile/security/security.php') ?>">
                         <i class="bi bi-shield-lock me-1"></i> Security & Password
                     </a>
@@ -123,7 +123,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <div class="card stat-card p-4 h-100">
                     <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
                         <h6 class="mb-0 fw-bold"><i class="bi bi-person-lines-fill me-2 text-primary"></i> Personal & Staff Details</h6>
-                        <a href="<?= url('views/senior-houseparent/profile/edit/edit.php') ?>" class="small text-decoration-none">Edit</a>
+                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" data-bs-toggle="modal" data-bs-target="#seniorProfileEditModal">Edit</button>
                     </div>
                     <dl class="row mb-0">
                         <dt class="col-sm-4 text-muted">Full Name</dt>
@@ -186,7 +186,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <div>
                             <h6 class="mb-1 fw-bold">Edit Profile</h6>
                             <p class="text-muted small mb-1">Update contact phone, bio, and office details.</p>
-                            <a href="<?= url('views/senior-houseparent/profile/edit/edit.php') ?>" class="small fw-semibold text-decoration-none">Modify Details &rarr;</a>
+                            <button type="button" class="btn btn-link btn-sm p-0 fw-semibold text-decoration-none" data-bs-toggle="modal" data-bs-target="#seniorProfileEditModal">Modify Details &rarr;</button>
                         </div>
                     </div>
                 </div>
@@ -215,6 +215,36 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="seniorProfileEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/senior-houseparent/profile/edit/edit.php') ?>">
+                <?= csrf_field() ?>
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Senior Houseparent Profile</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label" for="seniorProfileName">Full Name</label><input id="seniorProfileName" name="name" class="form-control" value="<?= e($user['name'] ?? $user['fullName'] ?? '') ?>" required></div>
+                        <div class="col-md-6"><label class="form-label" for="seniorProfileEmail">Staff Email</label><input id="seniorProfileEmail" class="form-control bg-light" value="<?= e($user['email'] ?? 'Not set') ?>" disabled readonly></div>
+                        <div class="col-md-6"><label class="form-label" for="seniorProfilePhone">Primary Phone</label><input id="seniorProfilePhone" name="phone" class="form-control" value="<?= e($user['phone'] ?? '') ?>"></div>
+                        <div class="col-md-6"><label class="form-label" for="seniorProfileAltPhone">Alternative / Emergency Phone</label><input id="seniorProfileAltPhone" name="altPhone" class="form-control" value="<?= e($user['altPhone'] ?? $user['emergencyPhone'] ?? '') ?>"></div>
+                        <div class="col-md-6"><label class="form-label" for="seniorProfileOffice">Office Location / Room</label><input id="seniorProfileOffice" name="officeRoom" class="form-control" value="<?= e($user['officeRoom'] ?? 'Senior Houseparent Office') ?>"></div>
+                        <div class="col-md-6"><label class="form-label" for="seniorProfileHours">Available Office Hours</label><input id="seniorProfileHours" name="officeHours" class="form-control" value="<?= e($user['officeHours'] ?? 'Monday – Friday (8:00 AM – 5:00 PM)') ?>"></div>
+                        <div class="col-md-6"><label class="form-label" for="seniorProfileHouse">Assigned House</label><input id="seniorProfileHouse" class="form-control bg-light" value="<?= e($houseName) ?>" disabled readonly></div>
+                        <div class="col-md-6"><label class="form-label" for="seniorProfileRole">System Role</label><input id="seniorProfileRole" class="form-control bg-light" value="Senior Houseparent" disabled readonly></div>
+                        <div class="col-12"><label class="form-label" for="seniorProfileBio">Bio & Operational Notes</label><textarea id="seniorProfileBio" name="bio" class="form-control" rows="3"><?= e($user['bio'] ?? '') ?></textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

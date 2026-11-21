@@ -111,12 +111,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/attendance/history/history.php') ?>">
                     <i class="bi bi-arrow-left me-1"></i>Back
                 </a>
-                <a class="btn btn-warning btn-sm" href="<?= url('views/house-master/attendance/edit/edit.php?id=' . urlencode($id)) ?>">
+                <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#houseAttendanceEditModal">
                     <i class="bi bi-pencil me-1"></i>Edit
-                </a>
-                <a class="btn btn-outline-danger btn-sm" href="<?= url('views/house-master/attendance/delete/delete.php?id=' . urlencode($id)) ?>">
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#houseAttendanceDeleteModal">
                     <i class="bi bi-trash me-1"></i>Delete
-                </a>
+                </button>
             </div>
         </div>
 
@@ -165,10 +165,43 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/attendance/history/history.php') ?>">
                         Back to History
                     </a>
-                    <a class="btn btn-primary btn-sm" href="<?= url('views/house-master/attendance/edit/edit.php?id=' . urlencode($id)) ?>">
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#houseAttendanceEditModal">
                         <i class="bi bi-pencil me-1"></i>Edit Record
-                    </a>
+                    </button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseAttendanceEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/attendance/edit/edit.php?id=' . urlencode($id)) ?>">
+                <div class="modal-header"><h5 class="modal-title">Edit Attendance</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" value="<?= e($id) ?>">
+                    <label class="form-label">Attendance Date</label><input type="date" name="date" class="form-control mb-3" value="<?= e($entry['date'] ?? date('Y-m-d')) ?>" required>
+                    <label class="form-label">Attendance Status</label>
+                    <select name="status" class="form-select" required>
+                        <option value="present" <?= $status === 'present' ? 'selected' : '' ?>>Present</option>
+                        <option value="absent" <?= $status === 'absent' ? 'selected' : '' ?>>Absent</option>
+                        <option value="late" <?= $status === 'late' ? 'selected' : '' ?>>Late</option>
+                        <option value="excused" <?= $status === 'excused' ? 'selected' : '' ?>>Excused</option>
+                    </select>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseAttendanceDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Attendance</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">Delete this attendance record for <strong><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: 'this student') ?></strong>?</div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="<?= url('views/house-master/attendance/delete/delete.php?id=' . urlencode($id)) ?>"><input type="hidden" name="id" value="<?= e($id) ?>"><button type="submit" class="btn btn-danger">Delete</button></form>
             </div>
         </div>
     </div>

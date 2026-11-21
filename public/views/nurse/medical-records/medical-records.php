@@ -19,10 +19,14 @@ use App\Services\MedicalService;
 use App\Services\StudentService;
 
 $records = (new MedicalService())->all();
+$nurseMedicalStudents = StudentService::all();
+$nurseMedicalModalId = 'nurseMedicalRecordCreate';
+$nurseMedicalReturnTo = 'records';
+$nurseMedicalSelectedStudentId = '';
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 $students = [];
-foreach (StudentService::all() as $student) {
+foreach ($nurseMedicalStudents as $student) {
     $studentId = (string) ($student['id'] ?? '');
     if ($studentId !== '') {
         $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
@@ -75,12 +79,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Track diagnoses, prescriptions, treatment progress, and severity classifications</p>
             </div>
             <div class="d-flex flex-wrap gap-2">
-                <a href="<?= url('views/nurse/medical-records/bulk-import.php') ?>" class="btn btn-outline-success btn-sm">
+                <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#nurseMedicalRecordImport">
                     <i class="bi bi-file-earmark-arrow-up me-1"></i> Upload CSV/Excel
-                </a>
-                <a href="<?= url('views/nurse/create-record/create-record.php') ?>" class="btn btn-danger btn-sm">
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#nurseMedicalRecordCreate">
                     <i class="bi bi-plus-lg me-1"></i> New Health Record
-                </a>
+                </button>
             </div>
         </div>
 
@@ -201,13 +205,40 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
     </div>
 </div>
+<?php require __DIR__ . '/../components/medical-record-modal.php'; ?>
+<div class="modal fade" id="nurseMedicalRecordImport" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openImportModal']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" enctype="multipart/form-data" action="<?= url('views/nurse/medical-records/bulk-import.php') ?>" class="nurse-modal-form">
+                <input type="hidden" name="action" value="import_records">
+                <input type="hidden" name="returnToMedicalRecords" value="1">
+                <div class="modal-header"><h5 class="modal-title">Import Medical Records</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <p class="text-muted">Upload a CSV or XLSX file with StudentId, Diagnosis, Treatment, Notes, and Severity columns.</p>
+                    <label class="form-label">CSV or XLSX file</label>
+                    <input type="file" name="records_file" class="form-control" accept=".csv,.xlsx" required>
+                    <a class="btn btn-link px-0 mt-2" href="<?= url('views/nurse/medical-records/bulk-import.php?download_template=1') ?>"><i class="bi bi-download me-1"></i>Download import template</a>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-success"><i class="bi bi-cloud-arrow-up me-1"></i>Upload and import</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('nurseMedicalRecordImport');
+    if (modal && modal.dataset.openOnLoad === 'true') {
+        bootstrap.Modal.getOrCreateInstance(modal).show();
+    }
+});
+</script>
 <?php foreach ($records as $record): ?>
     <?php
     $modalRecordId = (string) ($record['id'] ?? '');
     if ($modalRecordId === '') continue;
     ?>
     <div class="modal fade" id="nurseRecordEdit-<?= e($modalRecordId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" action="<?= url('views/nurse/edit-record/edit-record.php?id=' . urlencode($modalRecordId)) ?>">
                     <div class="modal-header">

@@ -68,10 +68,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
             }
 
             flash('success', "Imported {$success} medical record(s).");
-            redirect(url('views/nurse/medical-records/bulk-import.php'));
+            redirect(!empty($_POST['returnToMedicalRecords'])
+                ? url('views/nurse/medical-records/medical-records.php')
+                : url('views/nurse/medical-records/bulk-import.php'));
         } catch (Throwable $e) {
             $errors[] = 'Import failed: ' . $e->getMessage();
         }
+    }
+
+    if (!empty($_POST['returnToMedicalRecords'])) {
+        flash('error', $errors[0] ?? 'Select a valid CSV or XLSX file.');
+        redirect(url('views/nurse/medical-records/medical-records.php?openImportModal=1'));
     }
 }
 

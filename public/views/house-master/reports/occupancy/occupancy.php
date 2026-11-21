@@ -48,9 +48,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Dormitory capacity, occupancy rates, and vacant bed tracking.</p>
             </div>
             <div class="d-flex gap-2">
-                <a class="btn btn-outline-success btn-sm" href="<?= url('views/house-master/reports/export/export.php?type=occupancy') ?>">
-                    <i class="bi bi-filetype-csv me-1"></i> Export Occupancy CSV
-                </a>
+                <?php
+                $reportType = 'occupancy';
+                $reportExportBaseUrl = url('views/house-master/reports/export/export.php');
+                $reportExportFormats = ['csv' => 'CSV'];
+                $reportDownloadButtonLabel = 'Export Occupancy CSV';
+                $reportDownloadWrapperClass = '';
+                require APP_ROOT . '/app/views/components/report-downloads/report-downloads.php';
+                ?>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/reports/index/index.php') ?>">
                     <i class="bi bi-arrow-left me-1"></i> Reports Overview
                 </a>

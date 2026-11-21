@@ -138,9 +138,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <a href="<?= url('views/student/beds/index.php') ?>" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-grid-3x3-gap me-1"></i>My Bed
                 </a>
-                <a href="<?= url('views/student/incidents/create/create.php') ?>" class="btn btn-danger btn-sm">
+                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#studentIncidentReport">
                     <i class="bi bi-flag me-1"></i>Report Room Issue
-                </a>
+                </button>
             </div>
         </div>
 
@@ -362,4 +362,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <?php endif; ?>
     </div>
 </div>
+<?php
+$studentIncidentModalId = 'studentIncidentReport';
+$studentIncidentReturnTo = 'room';
+require __DIR__ . '/../components/incident-report-modal.php';
+?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

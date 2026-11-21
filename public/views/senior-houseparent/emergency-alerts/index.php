@@ -13,6 +13,7 @@ $allowedRoles = [ROLE_SENIOR_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\FirebaseService;
+use App\Services\StudentService;
 
 $firebase = FirebaseService::getInstance();
 $user = current_user() ?? [];
@@ -38,6 +39,8 @@ if (empty($allContacts)) {
 }
 
 $contacts = array_values(array_filter($allContacts, static fn($c) => ($c['status'] ?? 'active') === 'active'));
+$houseId = (string) ($user['houseId'] ?? $user['house_id'] ?? '');
+$students = StudentService::all($houseId);
 
 usort($contacts, static function ($a, $b) {
     $weights = ['critical' => 0, 'high' => 1, 'normal' => 2];
@@ -76,15 +79,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Emergency directory, broadcast dispatch, and incident call logging for dormitory security.</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-danger btn-sm" href="<?= url('views/senior-houseparent/emergency-alerts/broadcast/broadcast.php') ?>">
+                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#seniorBroadcastEmergencyModal">
                     <i class="bi bi-broadcast me-1"></i> Broadcast Emergency Alert
-                </a>
-                <a class="btn btn-primary btn-sm" href="<?= url('views/senior-houseparent/emergency-alerts/contacts/add/add.php') ?>">
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#seniorAddEmergencyContactModal">
                     <i class="bi bi-plus-circle me-1"></i> Add Contact
-                </a>
-                <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/senior-houseparent/emergency-alerts/log/create.php') ?>">
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#seniorLogEmergencyCallModal">
                     <i class="bi bi-journal-plus me-1"></i> Log Emergency Call
-                </a>
+                </button>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/senior-houseparent/emergency-alerts/export/export.php') ?>">
                     <i class="bi bi-download me-1"></i> Export Directory & Logs
                 </a>
@@ -149,9 +152,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             </div>
                         <?php endif; ?>
                         <div class="d-flex justify-content-between align-items-center mt-auto pt-2 border-top">
-                            <a class="btn btn-sm btn-outline-secondary" href="<?= url('views/senior-houseparent/emergency-alerts/log/create.php?contactId=' . urlencode($contactId)) ?>" title="Log Emergency Call">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#seniorLogEmergencyCallModal" data-contact-name="<?= e($contact['name'] ?? '') ?>" data-contact-phone="<?= e($contact['phone'] ?? '') ?>" title="Log Emergency Call">
                                 <i class="bi bi-journal-plus me-1"></i> Log Call
-                            </a>
+                            </button>
                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#seniorContactEdit-<?= e($contactId) ?>" title="Edit Contact">
                                 <i class="bi bi-pencil"></i>
                             </button>
@@ -165,9 +168,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="card stat-card p-4">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                 <h6 class="fw-bold mb-0"><i class="bi bi-clock-history me-2 text-primary"></i> Recent Emergency Dispatch & Call Logs</h6>
-                <a class="btn btn-outline-primary btn-sm" href="<?= url('views/senior-houseparent/emergency-alerts/log/create.php') ?>">
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#seniorLogEmergencyCallModal">
                     <i class="bi bi-plus-circle me-1"></i> Record New Call
-                </a>
+                </button>
             </div>
 
             <?php if (empty($incidents)): ?>
@@ -220,4 +223,67 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <?php $modalEmergencyLogId = (string) ($inc['id'] ?? ''); ?>
     <div class="modal fade" id="seniorEmergencyLogView-<?= e($modalEmergencyLogId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Emergency Call Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Contact</dt><dd class="col-sm-7"><?= e($inc['contactName'] ?? '—') ?></dd><dt class="col-sm-5">Phone</dt><dd class="col-sm-7"><?= e($inc['contactPhone'] ?? '—') ?></dd><dt class="col-sm-5">Time</dt><dd class="col-sm-7"><?= e($inc['triggeredAt'] ?? '—') ?></dd><dt class="col-sm-5">Logged By</dt><dd class="col-sm-7"><?= e($inc['triggeredByName'] ?? 'Staff') ?></dd><dt class="col-sm-5">Notes</dt><dd class="col-sm-7"><?= e($inc['notes'] ?? '—') ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
 <?php endforeach; ?>
+<div class="modal fade" id="seniorBroadcastEmergencyModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openBroadcastModal']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg"><div class="modal-content">
+        <form method="POST" action="<?= url('views/senior-houseparent/emergency-alerts/broadcast/broadcast.php') ?>" onsubmit="return confirm('Are you sure you want to broadcast this urgent emergency alert across the dormitory system?')">
+            <div class="modal-header"><h5 class="modal-title text-danger"><i class="bi bi-broadcast me-2"></i>Broadcast Emergency Alert</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body"><div class="row g-3">
+                <div class="col-md-8"><label class="form-label">Alert Title</label><input name="title" class="form-control" required></div>
+                <div class="col-md-4"><label class="form-label">Emergency Category</label><select name="emergencyType" class="form-select"><option value="fire">Fire &amp; Evacuation</option><option value="medical">Medical Emergency</option><option value="security">Security &amp; Lockdown</option><option value="weather">Severe Weather</option><option value="power">Utility / Power Outage</option></select></div>
+                <div class="col-md-6"><label class="form-label">Broadcast Audience</label><select name="audience" class="form-select"><option value="all">Entire Dormitory</option><option value="house_master">House Masters &amp; Mistresses Only</option></select></div>
+                <div class="col-md-6"><label class="form-label">Severity Level</label><select name="severity" class="form-select"><option value="critical">Critical</option><option value="high">High Alert</option></select></div>
+                <div class="col-12"><label class="form-label">Emergency Instructions &amp; Protocol Details</label><textarea name="message" class="form-control" rows="6" required></textarea></div>
+            </div></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger"><i class="bi bi-broadcast me-1"></i>Trigger Broadcast</button></div>
+        </form>
+    </div></div>
+</div>
+<div class="modal fade" id="seniorAddEmergencyContactModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg"><div class="modal-content">
+    <form method="POST" action="<?= url('views/senior-houseparent/emergency-alerts/contacts/add/add.php') ?>">
+        <div class="modal-header"><h5 class="modal-title">Add Emergency Contact / Responder</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body"><div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Organization / Service Name</label><input name="name" class="form-control" required></div>
+            <div class="col-md-6"><label class="form-label">Department / Role Title</label><input name="roleTitle" class="form-control"></div>
+            <div class="col-md-6"><label class="form-label">Emergency Hotline / Phone</label><input name="phone" class="form-control" required></div>
+            <div class="col-md-6"><label class="form-label">Alternative Phone</label><input name="altPhone" class="form-control"></div>
+            <div class="col-md-6"><label class="form-label">Emergency Email</label><input name="email" type="email" class="form-control"></div>
+            <div class="col-md-6"><label class="form-label">Priority Classification</label><select name="priority" class="form-select"><option value="critical">Critical</option><option value="high">High Priority</option><option value="normal" selected>Normal Support Service</option></select></div>
+            <div class="col-12"><label class="form-label">Location / Station Address</label><input name="location" class="form-control"></div>
+        </div></div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Save Emergency Contact</button></div>
+    </form>
+</div></div></div>
+<div class="modal fade" id="seniorLogEmergencyCallModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg"><div class="modal-content">
+    <form method="POST" action="<?= url('views/senior-houseparent/emergency-alerts/log/create.php') ?>">
+        <div class="modal-header"><h5 class="modal-title">Log Emergency Call &amp; Incident Response</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body"><div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Quick Select Agency / Contact</label><select class="form-select" id="seniorEmergencyContactSelect"><option value="">Select from Directory or type below</option><?php foreach ($contacts as $contactOption): ?><option value="<?= e($contactOption['phone'] ?? '') ?>" data-name="<?= e($contactOption['name'] ?? '') ?>"><?= e($contactOption['name'] ?? 'Contact') ?> (<?= e($contactOption['phone'] ?? '') ?>)</option><?php endforeach; ?></select></div>
+            <div class="col-md-6"><label class="form-label">Involved Student (Optional)</label><select name="studentId" class="form-select"><option value="">None / Dormitory-Wide Incident</option><?php foreach ($students as $studentOption): ?><option value="<?= e((string) ($studentOption['id'] ?? '')) ?>"><?= e(trim(($studentOption['firstName'] ?? '') . ' ' . ($studentOption['lastName'] ?? ''))) ?><?= !empty($studentOption['admissionNo']) ? ' [' . e($studentOption['admissionNo']) . ']' : '' ?></option><?php endforeach; ?></select></div>
+            <div class="col-md-6"><label class="form-label">Agency / Responder Contacted</label><input id="seniorEmergencyContactName" name="contactName" class="form-control" required></div>
+            <div class="col-md-6"><label class="form-label">Phone Number Called</label><input id="seniorEmergencyContactPhone" name="contactPhone" class="form-control"></div>
+            <div class="col-12"><label class="form-label">Incident Reason / Emergency Type</label><input name="reason" class="form-control"></div>
+            <div class="col-12"><label class="form-label">Call Summary &amp; Discussion</label><textarea name="notes" class="form-control" rows="4" required></textarea></div>
+            <div class="col-12"><label class="form-label">Immediate Action Taken on the Ground</label><textarea name="actionTaken" class="form-control" rows="2"></textarea></div>
+        </div></div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-journal-check me-1"></i>Save Emergency Log</button></div>
+    </form>
+</div></div></div>
+<script>
+document.getElementById('seniorEmergencyContactSelect').addEventListener('change', function () {
+    const option = this.options[this.selectedIndex];
+    if (this.value) {
+        document.getElementById('seniorEmergencyContactPhone').value = this.value;
+        document.getElementById('seniorEmergencyContactName').value = option.getAttribute('data-name') || '';
+    }
+});
+document.querySelectorAll('[data-bs-target="#seniorLogEmergencyCallModal"][data-contact-name]').forEach(function (button) {
+    button.addEventListener('click', function () {
+        document.getElementById('seniorEmergencyContactName').value = this.getAttribute('data-contact-name') || '';
+        document.getElementById('seniorEmergencyContactPhone').value = this.getAttribute('data-contact-phone') || '';
+    });
+});
+document.querySelectorAll('.modal[data-open-on-load="true"]').forEach(function (modalElement) {
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

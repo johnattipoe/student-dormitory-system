@@ -34,6 +34,12 @@ if (!$incident) {
     redirect(url('views/student/incidents/index/index.php'));
 }
 
+$editIncidentId = (string) ($_SESSION['_student_incident_edit_id'] ?? '');
+$editIncidentOld = $_SESSION['_student_incident_edit_old'] ?? [];
+$editIncidentErrors = $_SESSION['_student_incident_edit_errors'] ?? [];
+$editValues = $editIncidentId === $id ? array_merge($incident, $editIncidentOld) : $incident;
+unset($_SESSION['_student_incident_edit_id'], $_SESSION['_student_incident_edit_old'], $_SESSION['_student_incident_edit_errors']);
+
 $student = StudentService::find((string) $studentId);
 $studentName = $student ? trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) : (current_user()['name'] ?? 'My account');
 if ($student && !empty($student['admissionNo'])) {
@@ -86,12 +92,46 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </dl>
             <div class="mt-4">
                 <?php if (($incident['status'] ?? 'open') === 'open'): ?>
-                    <a class="btn btn-primary" href="<?= url('views/student/incidents/edit/edit.php?id=' . urlencode($id)) ?>"><i class="bi bi-pencil me-1"></i> Edit</a>
-                    <a class="btn btn-outline-danger ms-1" href="<?= url('views/student/incidents/delete/delete.php?id=' . urlencode($id)) ?>"><i class="bi bi-trash me-1"></i> Delete</a>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#studentIncidentDetailEdit"><i class="bi bi-pencil me-1"></i> Edit</button>
+                    <button type="button" class="btn btn-outline-danger ms-1" data-bs-toggle="modal" data-bs-target="#studentIncidentDetailDelete"><i class="bi bi-trash me-1"></i> Delete</button>
                 <?php endif; ?>
                 <a class="btn btn-outline-secondary ms-1" href="<?= url('views/student/incidents/index/index.php') ?>">Back to list</a>
             </div>
         </div>
     </div>
 </div>
+<?php if (($incident['status'] ?? 'open') === 'open'): ?>
+    <div class="modal fade" id="studentIncidentDetailEdit" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable"><div class="modal-content">
+            <form method="POST" action="<?= url('views/student/incidents/edit/edit.php?id=' . urlencode($id)) ?>" class="student-modal-form" data-open-on-load="<?= !empty($_GET['openEditModal']) ? 'true' : 'false' ?>">
+                <input type="hidden" name="id" value="<?= e($id) ?>">
+                <input type="hidden" name="returnToIncidentView" value="1">
+                <div class="modal-header"><h5 class="modal-title">Edit Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <?php if ($editIncidentId === $id && !empty($editIncidentErrors['general'])): ?><div class="alert alert-danger"><?= e($editIncidentErrors['general']) ?></div><?php endif; ?>
+                    <label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($editValues['title'] ?? '') ?>" required>
+                    <label class="form-label">Category</label><select name="type" class="form-select mb-3"><?php foreach (['discipline', 'medical', 'safety', 'property', 'other'] as $type): ?><option value="<?= e($type) ?>" <?= ($editValues['type'] ?? 'other') === $type ? 'selected' : '' ?>><?= e(ucfirst($type)) ?></option><?php endforeach; ?></select>
+                    <label class="form-label">Priority</label><select name="priority" class="form-select mb-3"><?php foreach (['low', 'medium', 'high'] as $priority): ?><option value="<?= e($priority) ?>" <?= ($editValues['priority'] ?? 'medium') === $priority ? 'selected' : '' ?>><?= e(ucfirst($priority)) ?></option><?php endforeach; ?></select>
+                    <label class="form-label">Description</label><textarea name="description" class="form-control" rows="5" required><?= e($editValues['description'] ?? $editValues['notes'] ?? '') ?></textarea>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
+            </form>
+        </div></div>
+    </div>
+    <div class="modal fade" id="studentIncidentDetailDelete" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title text-danger">Delete Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">Delete <strong><?= e($incident['title'] ?? $incident['type'] ?? 'this incident') ?></strong>?</div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/student/incidents/delete/delete.php') ?>"><input type="hidden" name="id" value="<?= e($id) ?>"><button type="submit" class="btn btn-danger">Delete Incident</button></form></div>
+        </div></div>
+    </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.querySelector('#studentIncidentDetailEdit form[data-open-on-load="true"]');
+        if (form) {
+            bootstrap.Modal.getOrCreateInstance(form.closest('.modal')).show();
+        }
+    });
+    </script>
+<?php endif; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

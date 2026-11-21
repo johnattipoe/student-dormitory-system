@@ -30,7 +30,20 @@ if (!$request || (string) ($request['studentId'] ?? '') !== (string) $studentId 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $firebase->deleteDocument(COL_VISITOR_REQUESTS, $id);
     flash('success', 'Visitor request deleted.');
-    redirect(url('views/student/visitors/index/index.php'));
+    $returnUrl = url('views/student/visitors/index/index.php');
+    if (!empty($_POST['returnToStudentVisitors'])) {
+        $returnParams = [
+            'search' => sanitize($_POST['returnSearch'] ?? ''),
+            'dateFrom' => sanitize($_POST['returnDateFrom'] ?? ''),
+            'dateTo' => sanitize($_POST['returnDateTo'] ?? ''),
+            'status' => sanitize($_POST['returnStatus'] ?? ''),
+            'page' => max(1, (int) ($_POST['returnPage'] ?? 1)),
+            'limit' => max(1, min(150, (int) ($_POST['returnLimit'] ?? app_config()['pagination_per_page'] ?? 25))),
+        ];
+        $returnQuery = http_build_query(array_filter($returnParams, static fn($value): bool => $value !== ''));
+        $returnUrl = url('views/student/visitors/index/index.php' . ($returnQuery !== '' ? '?' . $returnQuery : ''));
+    }
+    redirect($returnUrl);
 }
 
 $pageTitle = 'Delete Visitor Request';

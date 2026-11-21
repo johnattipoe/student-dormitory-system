@@ -11,7 +11,6 @@ function runWhenIdle(callback, timeout) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-  SDS.hidePortalStartupLoader();
   SDS.enhancePageChrome();
 
   document.querySelectorAll('form[data-live-search]').forEach(form => {
@@ -209,7 +208,10 @@ document.addEventListener('DOMContentLoaded', function () {
       e.preventDefault();
       const action = this.dataset.action;
       const message = this.dataset.message || 'This action cannot be undone.';
-      SDS.confirmThen(message, () => SDS.submitAction(action));
+      SDS.confirmThen(message, () => {
+        SDS.showButtonLoading(btn);
+        SDS.submitAction(action);
+      });
     });
   });
 
@@ -227,16 +229,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Prevent double-submit on any form with a submit button (spinner + disable)
   document.querySelectorAll('form').forEach(form => {
-    form.addEventListener('submit', function () {
-      if (!form.closest('[data-disable-loading]')) {
-        SDS.showLoading();
-      }
-      const btn = form.querySelector('button[type="submit"], button:not([type])');
+    form.addEventListener('submit', function (event) {
+      const btn = event.submitter instanceof HTMLButtonElement
+        ? event.submitter
+        : form.querySelector('button[type="submit"], button:not([type])');
       if (btn && !btn.disabled) {
-        btn.dataset.originalHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> ' + btn.textContent.trim();
+        SDS.showButtonLoading(btn);
       }
+
+      queueMicrotask(() => {
+        if (event.defaultPrevented) {
+          SDS.hideButtonLoading(btn);
+        }
+      });
     });
   });
 
@@ -246,7 +251,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   document.querySelectorAll('a[href]:not([target]):not([download])').forEach(link => {
-    link.addEventListener('click', function () {
+    link.addEventListener('click', function (event) {
       const href = link.getAttribute('href') || '';
       if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:')) {
         return;
@@ -254,15 +259,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
       const url = new URL(href, window.location.href);
       if (url.origin === window.location.origin) {
-        SDS.showPortalStartupLoader('Opening page...');
+        const isLogout = /\/logout\.php$/i.test(url.pathname);
+        const isLogin = /\/login\.php$/i.test(url.pathname);
+        const isSessionTransition = isLogin || isLogout;
+        if (isSessionTransition) {
+          SDS.showSessionTransitionLoader(isLogout ? 'Signing out...' : 'Opening sign in...');
+        }
+        if (link.matches('.btn, [role="button"]') && !link.hasAttribute('data-confirm')) {
+          SDS.showButtonLoading(link);
+        }
+        queueMicrotask(() => {
+          if (event.defaultPrevented) {
+            SDS.hideButtonLoading(link);
+            if (isSessionTransition) {
+              SDS.hideSessionTransitionLoader();
+            }
+          }
+        });
       }
     });
   });
 });
 
 window.addEventListener('pageshow', function () {
-  SDS.hidePortalStartupLoader();
-  SDS.hideLoading();
+  document.querySelectorAll('button[aria-busy="true"], a[aria-busy="true"]').forEach(button => {
+    SDS.hideButtonLoading(button);
+  });
+  SDS.hideSessionTransitionLoader();
 });
 
 /** Show a confirm dialog (SweetAlert2 if available, else native confirm) then run a callback. */
@@ -313,56 +336,75 @@ SDS.submitAction = function (action, fields) {
   form.submit();
 };
 
-SDS.showLoading = function (message) {
-  const spinner = document.getElementById('loadingSpinner');
-  if (!spinner) return;
-  
-  // Update loading message if provided
-  if (message) {
-    const msgEl = spinner.querySelector('.small.text-muted');
-    if (msgEl) msgEl.textContent = message;
+const sdsButtonLoadingStates = new WeakMap();
+
+SDS.showButtonLoading = function (button) {
+  const isButton = button instanceof HTMLButtonElement;
+  const isLink = button instanceof HTMLAnchorElement;
+  if ((!isButton && !isLink)
+    || (isButton && button.disabled)
+    || (isLink && button.getAttribute('aria-disabled') === 'true')
+    || sdsButtonLoadingStates.has(button)) {
+    return false;
   }
-  
-  spinner.hidden = false;
-  spinner.classList.remove('d-none');
-  spinner.classList.add('d-flex');
-  spinner.style.setProperty('display', 'flex', 'important');
-  document.body.style.overflow = 'hidden'; // Prevent scrolling during loading
+
+  sdsButtonLoadingStates.set(button, {
+    html: button.innerHTML,
+    ariaBusy: button.getAttribute('aria-busy'),
+    ariaDisabled: button.getAttribute('aria-disabled'),
+    disabled: isButton ? button.disabled : null,
+    pointerEvents: isLink ? button.style.pointerEvents : null,
+  });
+  if (isButton) {
+    button.disabled = true;
+  } else {
+    button.setAttribute('aria-disabled', 'true');
+    button.style.pointerEvents = 'none';
+  }
+  button.setAttribute('aria-busy', 'true');
+  button.innerHTML = '<span class="sds-circle-spinner sds-button-spinner me-1" aria-hidden="true"></span> ' + button.textContent.trim();
+  return true;
 };
 
-SDS.hideLoading = function () {
-  const spinner = document.getElementById('loadingSpinner');
-  if (spinner) {
-    spinner.hidden = true;
-    spinner.classList.add('d-none');
-    spinner.classList.remove('d-flex');
-    spinner.style.setProperty('display', 'none', 'important');
+SDS.hideButtonLoading = function (button) {
+  const state = button instanceof HTMLButtonElement || button instanceof HTMLAnchorElement
+    ? sdsButtonLoadingStates.get(button)
+    : null;
+  if (!state) return;
+
+  button.innerHTML = state.html;
+  if (button instanceof HTMLButtonElement) {
+    button.disabled = state.disabled;
+  } else {
+    button.style.pointerEvents = state.pointerEvents;
   }
-  document.body.style.overflow = 'auto'; // Restore scrolling
+  if (state.ariaBusy === null) {
+    button.removeAttribute('aria-busy');
+  } else {
+    button.setAttribute('aria-busy', state.ariaBusy);
+  }
+  if (state.ariaDisabled === null) {
+    button.removeAttribute('aria-disabled');
+  } else {
+    button.setAttribute('aria-disabled', state.ariaDisabled);
+  }
+  sdsButtonLoadingStates.delete(button);
 };
 
-SDS.showPortalStartupLoader = function (message) {
-  const loader = document.getElementById('portalStartupLoader');
+SDS.showSessionTransitionLoader = function (message) {
+  const loader = document.getElementById('sessionTransitionLoader');
   if (!loader) return;
-  const text = loader.querySelector('.portal-startup-text');
-  if (text && message) text.textContent = message;
-  loader.classList.remove('is-hidden');
+
+  const messageElement = loader.querySelector('[data-session-transition-message]');
+  if (messageElement && message) {
+    messageElement.textContent = message;
+  }
   loader.hidden = false;
 };
 
-SDS.hidePortalStartupLoader = function () {
-  const loader = document.getElementById('portalStartupLoader');
-  if (!loader) return;
-  const startedAt = Number(loader.dataset.startedAt || Date.now());
-  if (!loader.dataset.startedAt) loader.dataset.startedAt = String(startedAt);
-  const remaining = Math.max(0, 650 - (Date.now() - startedAt));
-
-  window.setTimeout(function () {
-    loader.classList.add('is-hidden');
-    window.setTimeout(function () {
-      loader.hidden = true;
-    }, 450);
-  }, remaining);
+SDS.hideSessionTransitionLoader = function () {
+  const loader = document.getElementById('sessionTransitionLoader');
+  if (loader) loader.hidden = true;
 };
 
 /** Toast helper — SweetAlert2 toast if available, else a lightweight Bootstrap-style fallback. */
@@ -380,48 +422,24 @@ SDS.toast = function (type, message) {
 };
 
 /** Small fetch wrapper: JSON in, JSON out, same-origin credentials, basic error handling. */
-SDS.postJSON = async function (url, data, options) {
-  options = options || {};
-  const showSpinner = options.showLoading !== false; // Default true
-  
-  if (showSpinner) SDS.showLoading(options.loadingMessage);
-  
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-      body: JSON.stringify(data || {}),
-    });
-    if (!res.ok) throw new Error('Request failed: ' + res.status);
-    const result = await res.json();
-    if (showSpinner) SDS.hideLoading();
-    return result;
-  } catch (e) {
-    if (showSpinner) SDS.hideLoading();
-    throw e;
-  }
+SDS.postJSON = async function (url, data) {
+  const res = await fetch(url, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    body: JSON.stringify(data || {}),
+  });
+  if (!res.ok) throw new Error('Request failed: ' + res.status);
+  return res.json();
 };
 
-SDS.getJSON = async function (url, options) {
-  options = options || {};
-  const showSpinner = options.showLoading !== false; // Default true
-  
-  if (showSpinner) SDS.showLoading(options.loadingMessage);
-  
-  try {
-    const res = await fetch(url, { 
-      credentials: 'same-origin', 
-      headers: { 'X-Requested-With': 'XMLHttpRequest' } 
-    });
-    if (!res.ok) throw new Error('Request failed: ' + res.status);
-    const result = await res.json();
-    if (showSpinner) SDS.hideLoading();
-    return result;
-  } catch (e) {
-    if (showSpinner) SDS.hideLoading();
-    throw e;
-  }
+SDS.getJSON = async function (url) {
+  const res = await fetch(url, {
+    credentials: 'same-origin',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  });
+  if (!res.ok) throw new Error('Request failed: ' + res.status);
+  return res.json();
 };
 
 SDS.enhancePageChrome = function () {

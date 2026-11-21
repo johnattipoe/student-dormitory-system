@@ -83,12 +83,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/senior-houseparent/announcements/index.php') ?>">
                     <i class="bi bi-arrow-left me-1"></i> Back to List
                 </a>
-                <a class="btn btn-outline-primary btn-sm" href="<?= url('views/senior-houseparent/announcements/edit/edit.php?id=' . urlencode($id)) ?>">
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#seniorEditAnnouncementModal">
                     <i class="bi bi-pencil me-1"></i> Edit
-                </a>
-                <a class="btn btn-outline-danger btn-sm" href="<?= url('views/senior-houseparent/announcements/delete/delete.php?id=' . urlencode($id)) ?>">
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#seniorDeleteAnnouncementModal">
                     <i class="bi bi-trash me-1"></i> Delete
-                </a>
+                </button>
             </div>
         </div>
 
@@ -129,5 +129,26 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<div class="modal fade" id="seniorEditAnnouncementModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg"><div class="modal-content">
+    <form method="POST" action="<?= url('views/senior-houseparent/announcements/edit/edit.php?id=' . urlencode($id)) ?>">
+        <div class="modal-header"><h5 class="modal-title">Edit Announcement</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body"><input type="hidden" name="id" value="<?= e($id) ?>">
+            <label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($announcement['title'] ?? '') ?>" required>
+            <label class="form-label">Message</label><textarea name="message" class="form-control mb-3" rows="6" required><?= e($announcement['message'] ?? '') ?></textarea>
+            <div class="row g-3">
+                <div class="col-md-6"><label class="form-label">Target Audience</label><select name="audience" class="form-select"><option value="all" <?= $audience !== 'role' ? 'selected' : '' ?>>All Dormitory</option><option value="house_master" <?= $audience === 'role' && $targetRole !== ROLE_STUDENT ? 'selected' : '' ?>>House Masters &amp; Mistresses</option><option value="student" <?= $targetRole === ROLE_STUDENT ? 'selected' : '' ?>>Dormitory Students</option></select></div>
+                <div class="col-md-6"><label class="form-label">Category / Priority</label><select name="type" class="form-select"><?php foreach (['info', 'warning', 'danger', 'success'] as $announcementType): ?><option value="<?= e($announcementType) ?>" <?= $type === $announcementType ? 'selected' : '' ?>><?= ucfirst($announcementType) ?></option><?php endforeach; ?></select></div>
+                <div class="col-md-6"><label class="form-label">Publication Status</label><select name="status" class="form-select"><?php foreach (['published', 'draft', 'archived'] as $status): ?><option value="<?= e($status) ?>" <?= ($announcement['status'] ?? 'published') === $status ? 'selected' : '' ?>><?= ucfirst($status) ?></option><?php endforeach; ?></select></div>
+                <div class="col-md-6 d-flex align-items-center"><div class="form-check form-switch mt-4"><input class="form-check-input" type="checkbox" name="isUrgent" value="1" id="seniorEditAnnouncementUrgent" <?= !empty($announcement['isUrgent']) ? 'checked' : '' ?>><label class="form-check-label text-danger" for="seniorEditAnnouncementUrgent">Mark as urgent</label></div></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+    </form>
+</div></div></div>
+<div class="modal fade" id="seniorDeleteAnnouncementModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title text-danger">Delete Announcement</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+    <div class="modal-body"><p>Are you sure you want to permanently delete <strong><?= e($announcement['title'] ?? 'this announcement') ?></strong>?</p><p class="mb-0 text-muted"><?= e(mb_strimwidth((string) ($announcement['message'] ?? ''), 0, 150, '...')) ?></p></div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/senior-houseparent/announcements/delete/delete.php?id=' . urlencode($id)) ?>"><input type="hidden" name="id" value="<?= e($id) ?>"><button type="submit" class="btn btn-danger"><i class="bi bi-trash me-1"></i>Confirm Delete</button></form></div>
+</div></div></div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>
 

@@ -171,12 +171,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">System-wide transactional logs, user actions, and administrative records.</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-primary btn-sm" href="<?= url('views/admin/activity-logs/create/create.php') ?>">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#adminCreateActivityLogModal">
                     <i class="bi bi-plus-circle me-1"></i> Log System Note
-                </a>
-                <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/activity-logs/export/export.php') ?>">
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#adminActivityLogExportModal">
                     <i class="bi bi-download me-1"></i> Export Full CSV
-                </a>
+                </button>
             </div>
         </div>
 
@@ -347,4 +347,58 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 <?php endforeach; ?>
+<div class="modal fade" id="adminCreateActivityLogModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg"><div class="modal-content">
+        <form method="POST" action="<?= url('views/admin/activity-logs/create/create.php') ?>">
+            <div class="modal-header"><h5 class="modal-title">Record Administrative Audit Log</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-8"><label class="form-label">Directive / Action Type</label><input class="form-control" name="event" placeholder="e.g. System Configuration Audit" required></div>
+                    <div class="col-md-4"><label class="form-label">Priority</label><select class="form-select" name="priority"><option value="normal">Normal</option><option value="important">Important</option><option value="urgent">Urgent / Critical</option></select></div>
+                    <div class="col-md-6"><label class="form-label">Target Role</label><select class="form-select" name="targetRole"><option value="all">All roles / system-wide</option><?php foreach (ALL_ROLES as $role): ?><option value="<?= e((string) $role) ?>"><?= e(ucwords(str_replace(['_', '-'], ' ', (string) $role))) ?></option><?php endforeach; ?></select></div>
+                    <div class="col-12"><label class="form-label">Details &amp; Notes</label><textarea class="form-control" name="details" rows="5" required></textarea></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1"></i>Save to Audit Log</button></div>
+        </form>
+    </div></div>
+</div>
+<div class="modal fade" id="adminActivityLogExportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Export System Activity Logs</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body"><p>Download the complete system audit log as a CSV without leaving this page.</p><div class="alert alert-danger d-none mb-0" data-admin-log-export-error role="alert"></div></div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" data-admin-log-export-url="<?= e(url('views/admin/activity-logs/export/export.php')) ?>"><i class="bi bi-download me-1"></i>Download CSV</button></div>
+    </div></div>
+</div>
+<script>
+document.querySelectorAll('[data-admin-log-export-url]').forEach(function (button) {
+    button.addEventListener('click', async function () {
+        const errorBox = document.querySelector('[data-admin-log-export-error]');
+        errorBox.classList.add('d-none');
+        SDS.showButtonLoading(button);
+        try {
+            const response = await fetch(button.dataset.adminLogExportUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            const contentType = response.headers.get('content-type') || '';
+            if (!response.ok || !contentType.includes('text/csv')) {
+                throw new Error('The activity log CSV could not be generated. Please try again.');
+            }
+            const blob = await response.blob();
+            const disposition = response.headers.get('content-disposition') || '';
+            const match = disposition.match(/filename="?([^";]+)"?/i);
+            const download = document.createElement('a');
+            download.href = URL.createObjectURL(blob);
+            download.download = match ? match[1] : 'system-activity-logs.csv';
+            document.body.appendChild(download);
+            download.click();
+            download.remove();
+            setTimeout(function () { URL.revokeObjectURL(download.href); }, 1000);
+        } catch (error) {
+            errorBox.textContent = error.message || 'The activity log CSV could not be generated.';
+            errorBox.classList.remove('d-none');
+        } finally {
+            SDS.hideButtonLoading(button);
+        }
+    });
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

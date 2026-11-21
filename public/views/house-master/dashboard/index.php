@@ -92,10 +92,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </p>
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                <a href="<?= url('views/house-master/attendance/index/index.php') ?>" class="btn btn-primary btn-sm">
+                <a href="<?= url('views/house-master/attendance/index/index.php?openQuickAttendance=1') ?>" class="btn btn-primary btn-sm">
                     <i class="bi bi-check2-circle me-1"></i> Verify Attendance
                 </a>
-                <a href="<?= url('views/house-master/incidents/create/create.php') ?>" class="btn btn-outline-danger btn-sm">
+                <a href="<?= url('views/house-master/incidents/index/index.php?openCreateIncident=1') ?>" class="btn btn-outline-danger btn-sm">
                     <i class="bi bi-shield-exclamation me-1"></i> Log Incident
                 </a>
                 <a href="<?= url('views/house-master/emergency-alerts/index.php') ?>" class="btn btn-outline-secondary btn-sm">
@@ -378,7 +378,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 </a>
                             </div>
                             <div class="col-6">
-                                <a href="<?= url('views/house-master/incidents/create/create.php') ?>" class="btn btn-outline-danger w-100 p-3 text-center h-100 d-flex flex-column align-items-center justify-content-center">
+                                <a href="<?= url('views/house-master/incidents/index/index.php?openCreateIncident=1') ?>" class="btn btn-outline-danger w-100 p-3 text-center h-100 d-flex flex-column align-items-center justify-content-center">
                                     <i class="bi bi-flag fs-3 mb-1"></i>
                                     <span class="small fw-bold">Log Incident</span>
                                 </a>
@@ -390,7 +390,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 </a>
                             </div>
                             <div class="col-6">
-                                <a href="<?= url('views/house-master/activity-logs/index.php') ?>" class="btn btn-outline-dark w-100 p-3 text-center h-100 d-flex flex-column align-items-center justify-content-center">
+                                <a href="<?= url('views/house-master/activity-logs/index.php?openLogModal=1') ?>" class="btn btn-outline-dark w-100 p-3 text-center h-100 d-flex flex-column align-items-center justify-content-center">
                                     <i class="bi bi-clock-history fs-3 mb-1"></i>
                                     <span class="small fw-bold">Activity Logs</span>
                                 </a>

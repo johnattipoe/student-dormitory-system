@@ -64,7 +64,10 @@ $recStudentId = (string) ($exeat['studentId'] ?? '');
 $student = $role !== ROLE_ADMIN && $recStudentId !== '' ? StudentService::find($recStudentId) : null;
 $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: ($exeat['studentName'] ?? 'Student');
 $admissionNo = $student['admissionNo'] ?? $student['studentId'] ?? $recStudentId;
-$isInternal = ($exeat['exeatType'] ?? $exeat['type'] ?? '') === 'internal';
+$exeatType = strtolower((string) ($exeat['exeatType'] ?? $exeat['type'] ?? 'external'));
+$isInternal = $exeatType === 'internal';
+$typeLabel = $isInternal ? 'Internal' : ($exeatType === 'vacation' ? 'Vacation' : 'External');
+$typeBadgeClass = $isInternal ? 'info' : ($exeatType === 'vacation' ? 'success' : 'primary');
 
 $dashboardHref = match ($role) {
     ROLE_ADMIN => 'views/admin/dashboard.php',
@@ -105,7 +108,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </div>
                         <div class="d-flex justify-content-between mb-2">
                             <span class="text-muted small">Type:</span>
-                            <span class="badge bg-<?= $isInternal ? 'info' : 'primary' ?>"><?= $isInternal ? 'Internal' : 'External' ?></span>
+                            <span class="badge bg-<?= e($typeBadgeClass) ?>"><?= e($typeLabel) ?></span>
                         </div>
                         <div class="d-flex justify-content-between mb-2">
                             <span class="text-muted small">Schedule:</span>

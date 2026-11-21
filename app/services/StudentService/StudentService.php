@@ -19,24 +19,8 @@ class StudentService
 
     public static function allRecords(?string $houseId = null): array
     {
-        $students = [];
-        $offset = 0;
-        $batchSize = 150;
         $wheres = $houseId ? [['houseId', '=', $houseId]] : [];
-
-        do {
-            $batch = FirebaseService::getInstance()->getCollection(
-                \COL_STUDENTS,
-                $wheres,
-                $batchSize,
-                $offset,
-                false
-            );
-            $students = array_merge($students, $batch);
-            $offset += count($batch);
-        } while (count($batch) === $batchSize);
-
-        return $students;
+        return FirebaseService::getInstance()->getAllCollection(\COL_STUDENTS, $wheres);
     }
 
     public static function find(string $id): ?array

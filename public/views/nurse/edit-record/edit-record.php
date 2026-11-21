@@ -52,7 +52,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ]);
 
     flash($result['success'] ? 'success' : 'error', $result['message']);
-    redirect(url('views/nurse/medical-records/medical-records.php'));
+    $returnTo = sanitize($_POST['returnToNursePage'] ?? '');
+    $returnPath = match ($returnTo) {
+        'dashboard' => 'views/nurse/dashboard/dashboard.php',
+        'emergencyCases' => 'views/nurse/emergency-cases/emergency-cases.php',
+        'medicalIncidents' => 'views/nurse/medical-incidents/medical-incidents.php',
+        default => 'views/nurse/medical-records/medical-records.php',
+    };
+    redirect(url($returnPath));
 }
 
 $pageTitle = 'Edit Medical Record';

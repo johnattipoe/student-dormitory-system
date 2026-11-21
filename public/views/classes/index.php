@@ -23,6 +23,7 @@ $role = current_role();
 $user = current_user() ?? [];
 $userHouseId = (string) ($user['houseId'] ?? $user['house_id'] ?? '');
 $errors = [];
+$oldClass = [];
 
 $houses = [];
 foreach (HouseService::all() as $house) {
@@ -33,10 +34,22 @@ foreach (HouseService::all() as $house) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
+        flash('error', 'The form expired. Please refresh the page and try again.');
+        redirect(url('views/classes/index.php'));
+    }
+
     $className = sanitize($_POST['className'] ?? '');
     $classCode = sanitize($_POST['classCode'] ?? '');
     $description = sanitize($_POST['description'] ?? '');
     $status = sanitize($_POST['status'] ?? 'active');
+    $oldClass = [
+        'className' => $className,
+        'classCode' => $classCode,
+        'description' => $description,
+        'status' => $status,
+        'houseId' => $role === ROLE_ADMIN ? sanitize($_POST['houseId'] ?? '') : $userHouseId,
+    ];
     $houseId = $role === ROLE_ADMIN
         ? sanitize($_POST['houseId'] ?? '')
         : $userHouseId;
@@ -128,9 +141,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <h5 class="mb-1">Add Classes</h5>
                 <p class="text-muted mb-0">Create class options used when registering students.</p>
             </div>
-            <a class="btn btn-outline-secondary btn-sm" href="<?= url($studentsRoute) ?>">
-                <i class="bi bi-mortarboard"></i> Students
-            </a>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createClassModal">
+                    <i class="bi bi-plus-lg me-1"></i>Add Class
+                </button>
+                <a class="btn btn-outline-secondary btn-sm" href="<?= url($studentsRoute) ?>">
+                    <i class="bi bi-mortarboard"></i> Students
+                </a>
+            </div>
         </div>
 
         <?php if (!empty($errors['general'])): ?>
@@ -138,57 +156,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <?php endif; ?>
 
         <div class="row g-4">
-            <div class="col-lg-5">
-                <div class="card stat-card p-4">
-                    <h6 class="mb-3">New Class</h6>
-                    <form method="POST" action="<?= url('views/classes/index.php') ?>" class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label">Class Name</label>
-                            <input name="className" class="form-control" placeholder="Example: SHS 1" required>
-                            <?php if (!empty($errors['className'])): ?><div class="text-danger small"><?= e($errors['className']) ?></div><?php endif; ?>
-                        </div>
-
-                        <div class="col-12">
-                            <label class="form-label">Class Code</label>
-                            <input name="classCode" class="form-control" placeholder="Example: SHS1">
-                        </div>
-
-                        <?php if ($role === ROLE_ADMIN): ?>
-                            <div class="col-12">
-                                <label class="form-label">House Scope</label>
-                                <select name="houseId" class="form-select select2">
-                                    <option value="">Global class</option>
-                                    <?php foreach ($houses as $houseId => $houseName): ?>
-                                        <option value="<?= e($houseId) ?>"><?= e($houseName) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <small class="text-muted">Choose Global if all houses can use this class.</small>
-                            </div>
-                        <?php endif; ?>
-
-                        <div class="col-12">
-                            <label class="form-label">Status</label>
-                            <select name="status" class="form-select">
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                        </div>
-
-                        <div class="col-12">
-                            <label class="form-label">Description</label>
-                            <textarea name="description" class="form-control" rows="3" placeholder="Optional notes about this class"></textarea>
-                        </div>
-
-                        <div class="col-12">
-                            <button class="btn btn-primary w-100" type="submit">
-                                <i class="bi bi-plus-lg"></i> Add Class
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <div class="col-lg-7">
+            <div class="col-12">
                 <div class="card stat-card p-3">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h6 class="mb-0">Existing Classes</h6>
@@ -233,4 +201,68 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<div class="modal fade" id="createClassModal" tabindex="-1" aria-labelledby="createClassModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/classes/index.php') ?>">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createClassModalLabel">Add class</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <?= csrf_field() ?>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="className">Class name</label>
+                            <input id="className" name="className" class="form-control" placeholder="Example: SHS 1" value="<?= e($oldClass['className'] ?? '') ?>" required>
+                            <?php if (!empty($errors['className']) && $errors['className'] !== 'Class name is required.'): ?>
+                                <div class="text-danger small mt-1"><?= e($errors['className']) ?></div>
+                            <?php endif; ?>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="classCode">Class code</label>
+                            <input id="classCode" name="classCode" class="form-control" placeholder="Example: SHS1" value="<?= e($oldClass['classCode'] ?? '') ?>">
+                        </div>
+                        <?php if ($role === ROLE_ADMIN): ?>
+                            <div class="col-12">
+                                <label class="form-label" for="classHouseScope">House scope</label>
+                                <select id="classHouseScope" name="houseId" class="form-select">
+                                    <option value="">Global class</option>
+                                    <?php foreach ($houses as $houseId => $houseName): ?>
+                                        <option value="<?= e($houseId) ?>" <?= ($oldClass['houseId'] ?? '') === $houseId ? 'selected' : '' ?>><?= e($houseName) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-muted">Choose Global if all houses can use this class.</small>
+                            </div>
+                        <?php endif; ?>
+                        <div class="col-md-6">
+                            <label class="form-label" for="classStatus">Status</label>
+                            <select id="classStatus" name="status" class="form-select">
+                                <option value="active" <?= ($oldClass['status'] ?? 'active') === 'active' ? 'selected' : '' ?>>Active</option>
+                                <option value="inactive" <?= ($oldClass['status'] ?? 'active') === 'inactive' ? 'selected' : '' ?>>Inactive</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="classDescription">Description</label>
+                            <textarea id="classDescription" name="description" class="form-control" rows="3" placeholder="Optional notes"><?= e($oldClass['description'] ?? '') ?></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Add class</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('createClassModal').dataset.disableLoading = 'true';
+document.body.appendChild(document.getElementById('createClassModal'));
+<?php if (!empty($errors)): ?>
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.bootstrap) bootstrap.Modal.getOrCreateInstance(document.getElementById('createClassModal')).show();
+});
+<?php endif; ?>
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -107,7 +107,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    redirect(base_url('index.php?route=/views/nurse/medical-records/medical-records.php'));
+    $returnTo = sanitize($_POST['returnToNursePage'] ?? '');
+    $returnStudentId = sanitize($_POST['returnStudentId'] ?? '');
+    $returnPath = match ($returnTo) {
+        'dashboard' => 'views/nurse/dashboard/dashboard.php',
+        'emergencyCases' => 'views/nurse/emergency-cases/emergency-cases.php',
+        'medicalIncidents' => 'views/nurse/medical-incidents/medical-incidents.php',
+        'studentProfile' => 'views/nurse/student-profile/student-profile.php?id=' . urlencode($returnStudentId),
+        default => 'views/nurse/medical-records/medical-records.php',
+    };
+    redirect(url($returnPath));
 }
 
 $pageTitle = 'Create Medical Record';

@@ -134,12 +134,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <a href="<?= url('views/house-master/reports/incidents/incidents.php') ?>" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-file-earmark-bar-graph me-1"></i>Reports
                 </a>
-                <a href="<?= url('views/house-master/incidents/upload/upload.php') ?>" class="btn btn-outline-info btn-sm">
+                <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#houseUploadExternalIncidentModal">
                     <i class="bi bi-upload me-1"></i>Upload External Incident
-                </a>
-                <a href="<?= url('views/house-master/incidents/create/create.php') ?>" class="btn btn-danger btn-sm">
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#houseCreateIncidentModal">
                     <i class="bi bi-plus-lg me-1"></i>Report Incident
-                </a>
+                </button>
             </div>
         </div>
 
@@ -326,4 +326,55 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <div class="modal fade" id="houseExternalIncidentEditModal-<?= e($modalExternalKey) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><form method="POST" action="<?= url('views/house-master/incidents/external-edit/external-edit.php?file=' . urlencode($modalExternalFile)) ?>"><div class="modal-header"><h5 class="modal-title">Edit External Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><label class="form-label">Student Name</label><input name="studentName" class="form-control mb-3" value="<?= e($external['studentName'] ?? '') ?>" required><label class="form-label">Incident Type</label><input name="incidentType" class="form-control mb-3" value="<?= e($external['incidentType'] ?? '') ?>" required><label class="form-label">Incident Date</label><input type="date" name="incidentDate" class="form-control mb-3" value="<?= e($external['incidentDate'] ?? '') ?>" required><label class="form-label">Status</label><select name="status" class="form-select"><option value="submitted" <?= ($external['status'] ?? 'submitted') === 'submitted' ? 'selected' : '' ?>>Submitted</option><option value="reviewed" <?= ($external['status'] ?? '') === 'reviewed' ? 'selected' : '' ?>>Reviewed</option><option value="resolved" <?= ($external['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>Resolved</option></select></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
     <div class="modal fade" id="houseExternalIncidentDeleteModal-<?= e($modalExternalKey) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete External Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete the uploaded incident record for <strong><?= e($external['studentName'] ?? 'this student') ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/incidents/external-delete/external-delete.php?file=' . urlencode($modalExternalFile)) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
 <?php endforeach; ?>
+<div class="modal fade" id="houseCreateIncidentModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openCreateIncident']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/incidents/create/create.php') ?>">
+                <div class="modal-header"><h5 class="modal-title">Report House Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Student Involved</label>
+                            <select name="studentId" class="form-select" required>
+                                <option value="">Select student</option>
+                                <?php foreach ($students as $studentOption): ?>
+                                    <option value="<?= e((string) ($studentOption['id'] ?? '')) ?>"><?= e(trim(($studentOption['firstName'] ?? '') . ' ' . ($studentOption['lastName'] ?? ''))) ?> (<?= e($studentOption['admissionNo'] ?? 'No ID') ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6"><label class="form-label">Incident Title</label><input name="title" class="form-control" required></div>
+                        <div class="col-md-6">
+                            <label class="form-label">Severity / Priority</label>
+                            <select name="priority" class="form-select"><option value="low">Low Priority</option><option value="medium" selected>Medium Priority</option><option value="high">High Priority</option></select>
+                        </div>
+                        <div class="col-12"><label class="form-label">Detailed Description</label><textarea name="description" class="form-control" rows="5" required></textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger"><i class="bi bi-send me-1"></i>Submit Incident</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseUploadExternalIncidentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" enctype="multipart/form-data" action="<?= url('views/house-master/incidents/upload/upload.php') ?>">
+                <div class="modal-header"><h5 class="modal-title">Upload External Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3"><label class="form-label">Student Name</label><input name="studentName" class="form-control" required></div>
+                    <div class="mb-3"><label class="form-label">Incident Type</label><input name="incidentType" class="form-control" required></div>
+                    <label class="form-label">Signed Incident Document</label><input type="file" name="signedBond" class="form-control" accept=".jpeg,.jpg,image/jpeg,.pdf,application/pdf" required>
+                    <div class="form-text">Accepted formats: JPEG and PDF. Complete the official external incident form before uploading.</div>
+                    <a class="btn btn-outline-primary btn-sm mt-3" href="<?= url('templates/external-incident-template.docx') ?>" target="_blank" rel="noopener"><i class="bi bi-file-earmark-word me-1"></i>Download template</a>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-info"><i class="bi bi-cloud-upload me-1"></i>Upload Incident</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.querySelectorAll('.modal[data-open-on-load="true"]').forEach(function (modalElement) {
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

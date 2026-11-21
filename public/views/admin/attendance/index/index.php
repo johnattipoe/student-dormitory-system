@@ -111,6 +111,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <input type="date" name="date" class="form-control form-control-sm" value="<?= e($date) ?>">
                     <button class="btn btn-primary btn-sm"><i class="bi bi-calendar3 me-1"></i> Filter Date</button>
                 </form>
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#adminMarkAttendanceModal">
+                    <i class="bi bi-pencil-square me-1"></i> Mark Attendance
+                </button>
                 <a href="<?= url('views/admin/attendance/reports/reports.php') ?>" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-bar-chart me-1"></i> Reports
                 </a>
@@ -156,52 +159,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <div class="rounded-3 bg-danger bg-opacity-10 p-2 text-danger"><i class="bi bi-person-x fs-4"></i></div>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Mark Attendance Form -->
-        <div class="card stat-card shadow-sm border-0 mb-4">
-            <div class="card-header bg-white py-3">
-                <h6 class="mb-0 fw-bold"><i class="bi bi-pencil-square me-2 text-primary"></i>Direct Roll Call Entry</h6>
-            </div>
-            <div class="card-body p-4">
-                <form method="POST" class="row g-3 align-items-end">
-                    <input type="hidden" name="action" value="mark_attendance">
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold">Student</label>
-                        <select name="studentId" class="form-select select2" required>
-                            <option value="">-- Choose student --</option>
-                            <?php foreach ($students as $student): ?>
-                                <option value="<?= e((string) ($student['id'] ?? '')) ?>"><?= e(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' (' . ($student['admissionNo'] ?? '') . ')') ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-semibold">Dormitory House</label>
-                        <select name="houseId" class="form-select select2">
-                            <option value="">-- Select house --</option>
-                            <?php foreach ($houses as $house): ?>
-                                <option value="<?= e((string) ($house['id'] ?? '')) ?>"><?= e($house['name'] ?? '') ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label fw-semibold">Roll Call Date</label>
-                        <input type="date" name="date" class="form-control" value="<?= e($date) ?>" required>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label fw-semibold">Status</label>
-                        <select name="status" class="form-select">
-                            <option value="present">Present</option>
-                            <option value="absent">Absent</option>
-                            <option value="excused">Excused</option>
-                            <option value="late">Late</option>
-                        </select>
-                    </div>
-                    <div class="col-md-1">
-                        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg"></i></button>
-                    </div>
-                </form>
             </div>
         </div>
 
@@ -348,6 +305,64 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
     </div>
 </div>
+
+<div class="modal fade" id="adminMarkAttendanceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form method="POST" data-disable-loading="true">
+                <input type="hidden" name="action" value="mark_attendance">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil-square me-2 text-success"></i>Direct Roll Call Entry</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Student</label>
+                            <select name="studentId" class="form-select" required>
+                                <option value="">-- Choose student --</option>
+                                <?php foreach ($students as $student): ?>
+                                    <option value="<?= e((string) ($student['id'] ?? '')) ?>"><?= e(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' (' . ($student['admissionNo'] ?? '') . ')') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Dormitory House</label>
+                            <select name="houseId" class="form-select">
+                                <option value="">-- Select house --</option>
+                                <?php foreach ($houses as $house): ?>
+                                    <option value="<?= e((string) ($house['id'] ?? '')) ?>"><?= e($house['name'] ?? '') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Roll Call Date</label>
+                            <input type="date" name="date" class="form-control" value="<?= e($date) ?>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="present">Present</option>
+                                <option value="absent">Absent</option>
+                                <option value="excused">Excused</option>
+                                <option value="late">Late</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1"></i>Save Attendance</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+const adminMarkAttendanceModal = document.getElementById('adminMarkAttendanceModal');
+adminMarkAttendanceModal.dataset.disableLoading = 'true';
+document.body.appendChild(adminMarkAttendanceModal);
+</script>
 
 <?php foreach ($todayRecords as $record): ?>
     <?php

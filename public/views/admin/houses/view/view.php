@@ -17,6 +17,7 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\HouseService;
 use App\Services\RoomService;
 use App\Services\StudentService;
+use App\Services\UserService;
 
 $pageTitle = 'View House';
 $id = $_GET['id'] ?? null;
@@ -24,6 +25,7 @@ $house = $id ? HouseService::find($id) : null;
 $houseName = $house['name'] ?? 'Dormitory House';
 $houseStudents = $id ? StudentService::all($id) : [];
 $houseRooms = $id ? RoomService::byHouse($id) : [];
+$houseStaffUsers = $house ? (new UserService())->all() : [];
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
@@ -54,9 +56,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </p>
                 </div>
                 <div class="d-flex gap-2">
-                    <a href="<?= url('views/admin/houses/edit/edit.php?id=' . urlencode((string)$id)) ?>" class="btn btn-primary btn-sm">
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#adminEditHouseModal">
                         <i class="bi bi-pencil me-1"></i> Edit House
-                    </a>
+                    </button>
                     <a href="<?= url('views/admin/houses/index/index.php') ?>" class="btn btn-outline-secondary btn-sm">
                         <i class="bi bi-arrow-left me-1"></i> Back to Houses
                     </a>
@@ -126,4 +128,26 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
     </div>
 </div>
+<?php if ($house): ?>
+<div class="modal fade" id="adminEditHouseModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content">
+        <form method="POST" action="<?= url('views/admin/houses/edit/edit.php?id=' . urlencode((string) $id)) ?>">
+            <input type="hidden" name="id" value="<?= e((string) ($house['id'] ?? $id)) ?>">
+            <div class="modal-header"><h5 class="modal-title">Edit House</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6"><label class="form-label">House Name</label><input name="name" class="form-control" value="<?= e($house['name'] ?? '') ?>" required></div>
+                    <div class="col-md-6"><label class="form-label">Gender Allocation</label><select name="gender" class="form-select"><?php foreach (['male', 'female', 'coed'] as $gender): ?><option value="<?= e($gender) ?>" <?= ($house['gender'] ?? '') === $gender ? 'selected' : '' ?>><?= ucfirst($gender) ?></option><?php endforeach; ?></select></div>
+                    <div class="col-md-6"><label class="form-label">Bed Capacity</label><input type="number" name="capacity" min="1" class="form-control" value="<?= e((string) ($house['capacity'] ?? 1)) ?>" required></div>
+                    <div class="col-md-6"><label class="form-label">Location / Zone</label><input name="location" class="form-control" value="<?= e($house['location'] ?? '') ?>"></div>
+                    <div class="col-md-6"><label class="form-label">Assigned House Master</label><select name="houseMasterId" class="form-select"><option value="">Not assigned</option><?php foreach ($houseStaffUsers as $staff): ?><?php if (($staff['role'] ?? '') === ROLE_HOUSE_MASTER): $staffId = (string) ($staff['id'] ?? $staff['uid'] ?? ''); ?><option value="<?= e($staffId) ?>" <?= (($house['houseMasterId'] ?? '') === $staffId) ? 'selected' : '' ?>><?= e($staff['name'] ?? '') ?> (<?= e($staff['email'] ?? '') ?>)</option><?php endif; ?><?php endforeach; ?></select></div>
+                    <div class="col-md-6"><label class="form-label">Assigned House Mistress</label><select name="houseMistressId" class="form-select"><option value="">Not assigned</option><?php foreach ($houseStaffUsers as $staff): ?><?php if (($staff['role'] ?? '') === ROLE_HOUSE_MISTRESS): $staffId = (string) ($staff['id'] ?? $staff['uid'] ?? ''); ?><option value="<?= e($staffId) ?>" <?= (($house['houseMistressId'] ?? '') === $staffId) ? 'selected' : '' ?>><?= e($staff['name'] ?? '') ?> (<?= e($staff['email'] ?? '') ?>)</option><?php endif; ?><?php endforeach; ?></select></div>
+                    <div class="col-12"><label class="form-label">Status</label><select name="status" class="form-select"><option value="active" <?= ($house['status'] ?? 'active') === 'active' ? 'selected' : '' ?>>Active</option><option value="inactive" <?= ($house['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Inactive</option></select></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+        </form>
+    </div></div>
+</div>
+<?php endif; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

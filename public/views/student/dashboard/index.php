@@ -146,9 +146,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <a href="<?= url('views/student/attendance/index/index.php') ?>" class="btn btn-primary btn-sm">
                     <i class="bi bi-calendar-check me-1"></i> My Attendance
                 </a>
-                <a href="<?= url('views/visitors/request/request.php') ?>" class="btn btn-outline-success btn-sm">
+                <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#studentVisitorRequest">
                     <i class="bi bi-person-plus me-1"></i> Request Visitor
-                </a>
+                </button>
             </div>
         </div>
 
@@ -388,8 +388,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <h6 class="mb-0 fw-bold"><i class="bi bi-grid me-2 text-primary"></i>Quick Actions</h6>
                     </div>
                     <div class="card-body p-3 d-grid gap-2">
-                        <a href="<?= url('views/visitors/request/request.php') ?>" class="btn btn-outline-success btn-sm"><i class="bi bi-person-plus me-1"></i>Request a Visitor</a>
-                        <a href="<?= url('views/student/incidents/create/create.php') ?>" class="btn btn-outline-danger btn-sm"><i class="bi bi-flag me-1"></i>Report Incident</a>
+                        <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#studentVisitorRequest"><i class="bi bi-person-plus me-1"></i>Request a Visitor</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#studentIncidentReport"><i class="bi bi-flag me-1"></i>Report Incident</button>
                         <a href="<?= url('views/student/notifications/index/index.php') ?>" class="btn btn-outline-info btn-sm"><i class="bi bi-bell me-1"></i>Notifications <?php if (count($unreadNotifications) > 0): ?><span class="badge bg-danger ms-1"><?= count($unreadNotifications) ?></span><?php endif; ?></a>
                         <a href="<?= url('views/student/profile/index/index.php') ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-person-circle me-1"></i>My Profile</a>
                         <a href="<?= url('views/student/settings/index/index.php') ?>" class="btn btn-secondary btn-sm"><i class="bi bi-gear me-1"></i>Settings</a>
@@ -454,4 +454,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 <?php endforeach; ?>
+<?php
+$studentVisitorModalId = 'studentVisitorRequest';
+$studentVisitorReturnTo = 'dashboard';
+$studentIncidentModalId = 'studentIncidentReport';
+$studentIncidentReturnTo = 'dashboard';
+require __DIR__ . '/../components/visitor-request-modal.php';
+require __DIR__ . '/../components/incident-report-modal.php';
+?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -117,9 +117,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </p>
             </div>
             <div class="d-flex gap-2">
-                <a class="btn btn-primary btn-sm" href="<?= url('views/admin/incidents/edit/edit.php?id=' . urlencode($id)) ?>">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#adminEditIncidentModal">
                     <i class="bi bi-pencil me-1"></i> Edit Incident
-                </a>
+                </button>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/incidents/index/index.php') ?>">
                     <i class="bi bi-arrow-left me-1"></i> Back to Incidents
                 </a>
@@ -171,12 +171,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <h6 class="mb-0 fw-bold"><i class="bi bi-lightning me-2 text-warning"></i>Incident Actions</h6>
                     </div>
                     <div class="card-body p-3 d-grid gap-2">
-                        <a class="btn btn-outline-primary btn-sm" href="<?= url('views/admin/incidents/edit/edit.php?id=' . urlencode($id)) ?>">
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#adminEditIncidentModal">
                             <i class="bi bi-pencil me-1"></i> Edit / Update Status
-                        </a>
-                        <a class="btn btn-outline-danger btn-sm" href="<?= url('views/admin/incidents/delete/delete.php?id=' . urlencode($id)) ?>">
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#adminDeleteIncidentModal">
                             <i class="bi bi-trash me-1"></i> Delete Incident
-                        </a>
+                        </button>
                         <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/admin/incidents/index/index.php') ?>">
                             <i class="bi bi-arrow-left me-1"></i> Back to Incident List
                         </a>
@@ -186,5 +186,29 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
 
     </div>
+</div>
+<div class="modal fade" id="adminEditIncidentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content">
+        <form method="POST" action="<?= url('views/admin/incidents/edit/edit.php?id=' . urlencode($id)) ?>">
+            <input type="hidden" name="id" value="<?= e($id) ?>">
+            <div class="modal-header"><h5 class="modal-title">Edit Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12"><label class="form-label">Title</label><input name="title" class="form-control" value="<?= e($incident['title'] ?? '') ?>" required></div>
+                    <div class="col-md-6"><label class="form-label">Priority</label><select name="priority" class="form-select"><?php foreach (['low', 'medium', 'high'] as $priority): ?><option value="<?= e($priority) ?>" <?= $iPri === $priority ? 'selected' : '' ?>><?= ucfirst($priority) ?></option><?php endforeach; ?></select></div>
+                    <div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><?php foreach (['open', 'investigating', 'resolved'] as $status): ?><option value="<?= e($status) ?>" <?= $iSt === $status ? 'selected' : '' ?>><?= ucfirst($status) ?></option><?php endforeach; ?></select></div>
+                    <div class="col-12"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="5"><?= e($incident['description'] ?? '') ?></textarea></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+        </form>
+    </div></div>
+</div>
+<div class="modal fade" id="adminDeleteIncidentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title text-danger">Delete Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body">Delete <strong><?= e($incident['title'] ?? 'this incident') ?></strong>? This action cannot be undone.</div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/admin/incidents/delete/delete.php?id=' . urlencode($id)) ?>"><input type="hidden" name="id" value="<?= e($id) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div>
+    </div></div>
 </div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -20,40 +20,71 @@ use App\Services\NotificationService;
 
 $firebase = FirebaseService::getInstance();
 $errors = [];
+$indexUrl = url('views/admin/announcements/index.php');
 $roles = defined('ALL_ROLES') ? ALL_ROLES : [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_SENIOR_HOUSEPARENT, ROLE_SECURITY, ROLE_NURSE, ROLE_STUDENT];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $title = trim((string) sanitize($_POST['title'] ?? ''));
-    $message = trim((string) sanitize($_POST['message'] ?? ''));
-    $audience = sanitize($_POST['audience'] ?? 'all');
-    $targetRole = sanitize($_POST['targetRole'] ?? '');
-    $type = sanitize($_POST['type'] ?? 'info');
-    $status = sanitize($_POST['status'] ?? 'published');
-    $sendNotification = !empty($_POST['sendNotification']);
-    $isUrgent = !empty($_POST['isUrgent']);
+    $action = (string) ($_POST['action'] ?? 'create_announcement');
+    $announcementCreated = false;
+    try {
+        if ($action === 'delete_announcement') {
+            $id = trim((string) sanitize($_POST['id'] ?? ''));
+            if ($id === '' || !$firebase->getDocument('announcements', $id)) {
+                throw new \InvalidArgumentException('Announcement not found.');
+            }
+            $firebase->deleteDocument('announcements', $id);
+            flash('success', 'Announcement deleted successfully.');
+            redirect($indexUrl);
+        }
 
-    if ($title === '') $errors['title'] = 'Title is required.';
-    if ($message === '') $errors['message'] = 'Message is required.';
-    if (!in_array($audience, ['all', 'role'], true)) $audience = 'all';
-    if ($audience === 'role' && !in_array($targetRole, $roles, true)) $errors['targetRole'] = 'Select a valid role.';
-    if (!in_array($type, ['info', 'success', 'warning', 'danger'], true)) $type = 'info';
-    if (!in_array($status, ['published', 'draft'], true)) $status = 'published';
+        if ($action === 'update_announcement') {
+            $id = trim((string) sanitize($_POST['id'] ?? ''));
+            if ($id === '' || !$firebase->getDocument('announcements', $id)) {
+                throw new \InvalidArgumentException('Announcement not found.');
+            }
+        } elseif ($action !== 'create_announcement') {
+            throw new \InvalidArgumentException('Unknown announcement action.');
+        }
 
-    if (empty($errors)) {
-        try {
-            $announcement = [
-                'title' => $title,
-                'message' => $message,
-                'audience' => $audience,
-                'targetRole' => $audience === 'role' ? $targetRole : '',
-                'type' => $type,
-                'status' => $status,
-                'isUrgent' => $isUrgent,
-                'createdBy' => current_user_id(),
-                'publishedAt' => $status === 'published' ? date(DATE_ATOM) : null,
-            ];
+        $title = trim((string) sanitize($_POST['title'] ?? ''));
+        $message = trim((string) sanitize($_POST['message'] ?? ''));
+        $audience = sanitize($_POST['audience'] ?? 'all');
+        $targetRole = sanitize($_POST['targetRole'] ?? '');
+        $type = sanitize($_POST['type'] ?? 'info');
+        $status = sanitize($_POST['status'] ?? 'published');
+        $sendNotification = !empty($_POST['sendNotification']);
+        $isUrgent = !empty($_POST['isUrgent']);
 
+        if ($title === '' || $message === '') {
+            throw new \InvalidArgumentException('Title and message are required.');
+        }
+        if (!in_array($audience, ['all', 'role'], true)
+            || ($audience === 'role' && !in_array($targetRole, $roles, true))) {
+            throw new \InvalidArgumentException('Select a valid audience and target role.');
+        }
+        if (!in_array($type, ['info', 'success', 'warning', 'danger'], true)
+            || !in_array($status, ['published', 'draft'], true)) {
+            throw new \InvalidArgumentException('Select a valid announcement type and status.');
+        }
+
+        $announcement = [
+            'title' => $title,
+            'message' => $message,
+            'audience' => $audience,
+            'targetRole' => $audience === 'role' ? $targetRole : '',
+            'type' => $type,
+            'status' => $status,
+            'isUrgent' => $isUrgent,
+        ];
+
+        if ($action === 'update_announcement') {
+            $firebase->updateDocument('announcements', $id, $announcement);
+            flash('success', 'Announcement updated.');
+        } else {
+            $announcement['createdBy'] = current_user_id();
+            $announcement['publishedAt'] = $status === 'published' ? date(DATE_ATOM) : null;
             $firebase->addDocument('announcements', $announcement);
+            $announcementCreated = true;
 
             if ($status === 'published' && $sendNotification) {
                 $notification = [
@@ -65,15 +96,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $result = $audience === 'role'
                     ? (new NotificationService())->notifyRole($targetRole, $notification)
                     : (new NotificationService())->notifyAll($notification);
-
                 flash($result['success'] ? 'success' : 'warning', 'Announcement saved. ' . ($result['message'] ?? ''));
             } else {
                 flash('success', 'Announcement saved.');
             }
-
-            redirect(url('views/admin/announcements/index.php'));
-        } catch (Throwable $e) {
+        }
+        redirect($indexUrl);
+    } catch (Throwable $e) {
+        if ($announcementCreated) {
+            flash('warning', 'Announcement saved, but notification delivery could not be confirmed: ' . $e->getMessage());
+            redirect($indexUrl);
+        } else {
             $errors['general'] = 'Unable to save announcement: ' . $e->getMessage();
+            $errors['action'] = $action;
         }
     }
 }
@@ -173,69 +208,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="row g-4">
             <!-- Create Announcement Column -->
             <div class="col-lg-5">
-                <div class="card stat-card shadow-sm border-0">
+                <div class="card stat-card shadow-sm border-0 h-100">
                     <div class="card-header bg-white py-3">
                         <h6 class="mb-0 fw-bold"><i class="bi bi-pencil-square me-2 text-primary"></i>Compose Announcement</h6>
                     </div>
-                    <div class="card-body p-4">
-                        <form method="POST" class="row g-3">
-                            <div class="col-12">
-                                <label class="form-label fw-semibold">Bulletin Title <span class="text-danger">*</span></label>
-                                <input name="title" class="form-control" placeholder="e.g. End of Term Roll Call Schedule" required>
-                                <?php if (!empty($errors['title'])): ?><div class="text-danger small mt-1"><?= e($errors['title']) ?></div><?php endif; ?>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-semibold">Message Content <span class="text-danger">*</span></label>
-                                <textarea name="message" class="form-control" rows="5" placeholder="Enter the announcement text..." required></textarea>
-                                <?php if (!empty($errors['message'])): ?><div class="text-danger small mt-1"><?= e($errors['message']) ?></div><?php endif; ?>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Audience Scope</label>
-                                <select name="audience" class="form-select">
-                                    <option value="all">All Portals &amp; Roles</option>
-                                    <option value="role">Targeted Role Group</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Target Role</label>
-                                <select name="targetRole" class="form-select select2">
-                                    <option value="">-- Select Role --</option>
-                                    <?php foreach ($roles as $role): ?>
-                                        <option value="<?= e($role) ?>"><?= e(ucwords(str_replace(['_', '-'], ' ', $role))) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <?php if (!empty($errors['targetRole'])): ?><div class="text-danger small mt-1"><?= e($errors['targetRole']) ?></div><?php endif; ?>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Notice Type</label>
-                                <select name="type" class="form-select">
-                                    <option value="info">Info (Blue)</option>
-                                    <option value="success">Success (Green)</option>
-                                    <option value="warning">Warning (Yellow)</option>
-                                    <option value="danger">Danger / Critical (Red)</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Publish Status</label>
-                                <select name="status" class="form-select">
-                                    <option value="published">Publish Immediately</option>
-                                    <option value="draft">Save as Draft</option>
-                                </select>
-                            </div>
-                            <div class="col-12 d-flex flex-column gap-2 bg-light p-3 rounded-3 border">
-                                <div class="form-check form-switch">
-                                    <input type="checkbox" name="sendNotification" class="form-check-input" id="sendNotification" checked>
-                                    <label class="form-check-label fw-semibold small" for="sendNotification">Push instant in-app notification</label>
-                                </div>
-                                <div class="form-check form-switch">
-                                    <input type="checkbox" name="isUrgent" class="form-check-input" id="isUrgent">
-                                    <label class="form-check-label fw-semibold small text-danger" for="isUrgent">Mark as Urgent Notice</label>
-                                </div>
-                            </div>
-                            <div class="col-12 mt-3">
-                                <button class="btn btn-primary w-100" type="submit"><i class="bi bi-send me-1"></i> Save &amp; Publish</button>
-                            </div>
-                        </form>
+                    <div class="card-body p-4 d-flex flex-column justify-content-center align-items-center text-center">
+                        <p class="text-muted">Create a campus-wide announcement or target a specific role. Published announcements can also send an in-app notification.</p>
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createAnnouncementModal">
+                            <i class="bi bi-send me-1"></i>Compose Announcement
+                        </button>
                     </div>
                 </div>
             </div>
@@ -316,6 +297,33 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     </div>
 </div>
 
+<div class="modal fade" id="createAnnouncementModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= (!empty($_GET['openCreateAnnouncement']) || (!empty($errors['general']) && ($errors['action'] ?? '') === 'create_announcement')) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="<?= e($indexUrl) ?>" class="announcement-modal-form">
+                <input type="hidden" name="action" value="create_announcement">
+                <div class="modal-header"><h5 class="modal-title">Compose Announcement</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <?php if (!empty($errors['general'])): ?><div class="alert alert-danger"><?= e($errors['general']) ?></div><?php endif; ?>
+                    <div class="row g-3">
+                        <div class="col-12"><label class="form-label">Bulletin title</label><input name="title" class="form-control" maxlength="160" value="<?= e($_POST['title'] ?? '') ?>" required></div>
+                        <div class="col-md-6"><label class="form-label">Audience scope</label><select name="audience" id="announcementAudience" class="form-select"><option value="all" <?= ($_POST['audience'] ?? 'all') === 'all' ? 'selected' : '' ?>>All portals &amp; roles</option><option value="role" <?= ($_POST['audience'] ?? '') === 'role' ? 'selected' : '' ?>>Targeted role group</option></select></div>
+                        <div class="col-md-6"><label class="form-label">Target role</label><select name="targetRole" id="announcementTargetRole" class="form-select"><option value="">Select role</option><?php foreach ($roles as $role): ?><option value="<?= e($role) ?>" <?= ($_POST['targetRole'] ?? '') === $role ? 'selected' : '' ?>><?= e(ucwords(str_replace(['_', '-'], ' ', $role))) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-md-6"><label class="form-label">Notice type</label><select name="type" class="form-select"><?php foreach (['info' => 'Info', 'success' => 'Success', 'warning' => 'Warning', 'danger' => 'Danger / Critical'] as $type => $label): ?><option value="<?= e($type) ?>" <?= ($_POST['type'] ?? 'info') === $type ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-md-6"><label class="form-label">Publish status</label><select name="status" class="form-select"><option value="published" <?= ($_POST['status'] ?? 'published') === 'published' ? 'selected' : '' ?>>Publish immediately</option><option value="draft" <?= ($_POST['status'] ?? '') === 'draft' ? 'selected' : '' ?>>Save as draft</option></select></div>
+                        <div class="col-12"><label class="form-label">Message content</label><textarea name="message" class="form-control" rows="5" maxlength="5000" required><?= e($_POST['message'] ?? '') ?></textarea></div>
+                        <div class="col-12 d-flex flex-column gap-2 bg-light p-3 rounded-3 border">
+                            <div class="form-check form-switch"><input type="checkbox" name="sendNotification" class="form-check-input" id="sendAnnouncementNotification" value="1" <?= !isset($_POST['action']) || !empty($_POST['sendNotification']) ? 'checked' : '' ?>><label class="form-check-label fw-semibold small" for="sendAnnouncementNotification">Send in-app notification when published</label></div>
+                            <div class="form-check form-switch"><input type="checkbox" name="isUrgent" class="form-check-input" id="announcementUrgent" value="1" <?= !empty($_POST['isUrgent']) ? 'checked' : '' ?>><label class="form-check-label fw-semibold small text-danger" for="announcementUrgent">Mark as urgent</label></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i>Save announcement</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <?php foreach ($announcements as $announcement): ?>
     <?php
     $annId = (string) ($announcement['id'] ?? '');
@@ -326,7 +334,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     $announcementStatus = (string) ($announcement['status'] ?? 'published');
     ?>
     <div class="modal fade" id="announcementViewModal-<?= e($annId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Announcement</h5>
@@ -345,9 +353,11 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     </div>
 
     <div class="modal fade" id="announcementEditModal-<?= e($annId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <div class="modal-content">
-                <form method="POST" action="<?= url('views/admin/announcements/edit/edit.php?id=' . urlencode($annId)) ?>">
+                <form method="POST" action="<?= e($indexUrl) ?>" class="announcement-modal-form">
+                    <input type="hidden" name="action" value="update_announcement">
+                    <input type="hidden" name="id" value="<?= e($annId) ?>">
                     <div class="modal-header">
                         <h5 class="modal-title">Edit Announcement</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -356,7 +366,11 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <div class="row g-3">
                             <div class="col-12"><label class="form-label">Title</label><input name="title" class="form-control" value="<?= e($announcementTitle) ?>" required></div>
                             <div class="col-12"><label class="form-label">Message</label><textarea name="message" class="form-control" rows="5" required><?= e($announcementMessage) ?></textarea></div>
+                            <div class="col-md-6"><label class="form-label">Audience scope</label><select name="audience" class="form-select"><option value="all" <?= $announcementAudience === 'all' ? 'selected' : '' ?>>All portals &amp; roles</option><option value="role" <?= $announcementAudience === 'role' ? 'selected' : '' ?>>Targeted role group</option></select></div>
+                            <div class="col-md-6"><label class="form-label">Target role</label><select name="targetRole" class="form-select"><option value="">Select role</option><?php foreach ($roles as $role): ?><option value="<?= e($role) ?>" <?= $announcementTargetRole === $role ? 'selected' : '' ?>><?= e(ucwords(str_replace(['_', '-'], ' ', $role))) ?></option><?php endforeach; ?></select></div>
+                            <div class="col-md-6"><label class="form-label">Notice type</label><select name="type" class="form-select"><?php foreach (['info', 'success', 'warning', 'danger'] as $type): ?><option value="<?= e($type) ?>" <?= ($announcement['type'] ?? 'info') === $type ? 'selected' : '' ?>><?= e(ucfirst($type)) ?></option><?php endforeach; ?></select></div>
                             <div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><option value="published" <?= $announcementStatus === 'published' ? 'selected' : '' ?>>Published</option><option value="draft" <?= $announcementStatus === 'draft' ? 'selected' : '' ?>>Draft</option></select></div>
+                            <div class="col-12 form-check"><input class="form-check-input" type="checkbox" name="isUrgent" value="1" id="announcementUrgent-<?= e($annId) ?>" <?= !empty($announcement['isUrgent']) ? 'checked' : '' ?>><label class="form-check-label text-danger" for="announcementUrgent-<?= e($annId) ?>">Mark as urgent</label></div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -381,7 +395,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <form method="POST" action="<?= url('views/admin/announcements/delete/delete.php?id=' . urlencode($annId)) ?>">
+                    <form method="POST" action="<?= e($indexUrl) ?>">
+                        <input type="hidden" name="action" value="delete_announcement">
+                        <input type="hidden" name="id" value="<?= e($annId) ?>">
                         <button type="submit" class="btn btn-danger">Delete</button>
                     </form>
                 </div>
@@ -389,4 +405,24 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 <?php endforeach; ?>
+<script>
+document.querySelectorAll('select[name="audience"]').forEach(function (audienceSelect) {
+    const form = audienceSelect.closest('form');
+    const roleSelect = form ? form.querySelector('select[name="targetRole"]') : null;
+    if (!roleSelect) return;
+    const updateRoleRequirement = function () {
+        roleSelect.required = audienceSelect.value === 'role';
+        roleSelect.disabled = audienceSelect.value !== 'role';
+    };
+    audienceSelect.addEventListener('change', updateRoleRequirement);
+    updateRoleRequirement();
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('createAnnouncementModal');
+    if (modal && modal.dataset.openOnLoad === 'true' && window.bootstrap) {
+        bootstrap.Modal.getOrCreateInstance(modal).show();
+    }
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

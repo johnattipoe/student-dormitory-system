@@ -40,8 +40,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download_template'])) {
 // Handle bulk import
 $errors = [];
 $successCount = 0;
+$returnToStudents = !empty($_POST['returnToStudents']);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = sanitize($_POST['action'] ?? '');
+
+    if ($action === 'import_students' && empty($_FILES['students_file'])) {
+        $errors[] = 'Please select a CSV or XLSX file to import.';
+    }
     
     if ($action === 'import_students' && !empty($_FILES['students_file'])) {
         $file = $_FILES['students_file'];
@@ -111,7 +116,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $accountMessage = $createAccounts ? " Created $userCount login account(s)." : '';
                 flash('success', "Imported $successCount student(s) successfully." . $accountMessage);
-                redirect(url('views/admin/students/bulk-import/bulk-import.php'));
+                redirect($returnToStudents
+                    ? url('views/admin/students/index/index.php')
+                    : url('views/admin/students/bulk-import/bulk-import.php'));
             } catch (Exception $e) {
                 $errors[] = 'Import failed: ' . $e->getMessage();
             }
@@ -137,6 +144,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
+}
+
+if ($returnToStudents && !empty($errors)) {
+    flash('error', implode(' ', $errors));
+    redirect(url('views/admin/students/index/index.php?openImport=1'));
 }
 
 // Get students for status management

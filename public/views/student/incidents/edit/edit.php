@@ -39,6 +39,17 @@ $studentName = $studentProfile
     : (current_user()['name'] ?? 'My account');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $returnParams = [
+        'search' => sanitize($_POST['returnSearch'] ?? ''),
+        'dateFrom' => sanitize($_POST['returnDateFrom'] ?? ''),
+        'dateTo' => sanitize($_POST['returnDateTo'] ?? ''),
+        'severity' => sanitize($_POST['returnSeverity'] ?? ''),
+        'status' => sanitize($_POST['returnStatus'] ?? ''),
+        'page' => max(1, (int) ($_POST['returnPage'] ?? 1)),
+        'limit' => max(1, min(150, (int) ($_POST['returnLimit'] ?? app_config()['pagination_per_page'] ?? 25))),
+    ];
+    $returnQuery = http_build_query(array_filter($returnParams, static fn($value): bool => $value !== ''));
+    $incidentListPath = 'views/student/incidents/index/index.php' . ($returnQuery !== '' ? '?' . $returnQuery : '');
     $result = $service->update($id, [
         'title' => sanitize($_POST['title'] ?? ''),
         'description' => sanitize($_POST['description'] ?? ''),
@@ -47,7 +58,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ]);
     flash($result['success'] ? 'success' : 'error', $result['message']);
     if ($result['success']) {
-        redirect(url('views/student/incidents/view/view.php?id=' . urlencode($id)));
+        redirect(!empty($_POST['returnToIncidentList'])
+            ? url($incidentListPath)
+            : url('views/student/incidents/view/view.php?id=' . urlencode($id)));
+    }
+    if (!empty($_POST['returnToIncidentList']) || !empty($_POST['returnToIncidentView'])) {
+        $_SESSION['_student_incident_edit_id'] = $id;
+        $_SESSION['_student_incident_edit_old'] = [
+            'title' => $_POST['title'] ?? '',
+            'description' => $_POST['description'] ?? '',
+            'type' => $_POST['type'] ?? 'other',
+            'priority' => $_POST['priority'] ?? 'medium',
+        ];
+        $_SESSION['_student_incident_edit_errors'] = ['general' => $result['message']];
+        redirect(!empty($_POST['returnToIncidentList'])
+            ? url($incidentListPath . (strpos($incidentListPath, '?') === false ? '?' : '&') . 'openIncidentEdit=1')
+            : url('views/student/incidents/view/view.php?id=' . urlencode($id) . '&openEditModal=1'));
     }
     $incident['title'] = $_POST['title'] ?? '';
     $incident['description'] = $_POST['description'] ?? '';

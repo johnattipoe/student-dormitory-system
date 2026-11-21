@@ -120,9 +120,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Overview of disciplinary records, misconduct, and incident statuses.</p>
             </div>
             <div class="d-flex gap-2">
-                <a class="btn btn-outline-success btn-sm" href="<?= url('views/house-master/reports/export/export.php?type=incidents') ?>">
-                    <i class="bi bi-filetype-csv me-1"></i> Export Incidents CSV
-                </a>
+                <?php
+                $reportType = 'incidents';
+                $reportExportBaseUrl = url('views/house-master/reports/export/export.php');
+                $reportExportFormats = ['csv' => 'CSV'];
+                $reportDownloadButtonLabel = 'Export Incidents CSV';
+                $reportDownloadWrapperClass = '';
+                require APP_ROOT . '/app/views/components/report-downloads/report-downloads.php';
+                ?>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/reports/index/index.php') ?>">
                     <i class="bi bi-arrow-left me-1"></i> Reports Overview
                 </a>

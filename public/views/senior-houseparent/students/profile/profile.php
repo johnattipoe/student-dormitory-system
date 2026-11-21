@@ -134,10 +134,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <strong><i class="bi bi-flag-fill me-1"></i>Student Flagged (<?= e($student['flagType'] ?? 'Attention') ?>)</strong>
                             <p class="mb-0 small"><?= e($student['flagReason'] ?? 'No reason provided') ?></p>
                         </div>
-                        <form method="POST" class="d-inline">
-                            <input type="hidden" name="action" value="unflag_student">
-                            <button class="btn btn-sm btn-outline-warning">Remove Flag</button>
-                        </form>
+                        <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#unflagStudentModal">Remove Flag</button>
                     </div>
                 <?php endif; ?>
 
@@ -294,6 +291,21 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <button type="submit" class="btn btn-warning">Save Flag</button>
                     </div>
                 </form>
+            </div>
+        </div>
+        <div class="modal fade" id="unflagStudentModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Remove Student Flag</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">Remove the attention flag from <strong><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: 'this student') ?></strong>?</div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <form method="POST"><input type="hidden" name="action" value="unflag_student"><button type="submit" class="btn btn-warning">Remove Flag</button></form>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

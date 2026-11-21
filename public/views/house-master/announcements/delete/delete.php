@@ -24,9 +24,28 @@ if ($id === '') {
 }
 
 $firebase = FirebaseService::getInstance();
+$houseId = (string) (current_user()['houseId'] ?? current_user()['house_id'] ?? '');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $announcement = $firebase->getDocument('announcements', $id);
+    if (!$announcement
+        || $houseId === ''
+        || ($announcement['audience'] ?? '') !== 'house'
+        || (string) ($announcement['targetHouseId'] ?? '') !== $houseId) {
+        flash('error', 'You can only delete announcements for your assigned house.');
+        redirect(url('views/house-master/announcements/index.php'));
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
+        $announcement = $firebase->getDocument('announcements', $id);
+        if (!$announcement
+            || $houseId === ''
+            || ($announcement['audience'] ?? '') !== 'house'
+            || (string) ($announcement['targetHouseId'] ?? '') !== $houseId) {
+            throw new \RuntimeException('You can only delete announcements for your assigned house.');
+        }
         $firebase->deleteDocument('announcements', $id);
         flash('success', 'Announcement deleted successfully.');
         redirect(url('views/house-master/announcements/index.php'));

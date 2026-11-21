@@ -178,9 +178,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Operational history and supervisory records for <?= e($houseName) ?></p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-primary btn-sm" href="<?= url('views/house-master/activity-logs/create/create.php') ?>">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#houseCreateLogModal">
                     <i class="bi bi-plus-circle me-1"></i>Log Activity
-                </a>
+                </button>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/activity-logs/export/export.php') ?>">
                     <i class="bi bi-download me-1"></i>Export CSV
                 </a>
@@ -340,4 +340,47 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<div class="modal fade" id="houseCreateLogModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openLogModal']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/activity-logs/create/create.php') ?>">
+                <div class="modal-header"><h5 class="modal-title">Record House Activity</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Action / Event Type</label><input class="form-control" name="event" placeholder="e.g. Morning Dorm Check, Curfew Round" required></div>
+                        <div class="col-md-6">
+                            <label class="form-label">Priority</label>
+                            <select class="form-select" name="priority"><option value="normal">Normal</option><option value="important">Important</option><option value="urgent">Urgent</option></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Involved Student (Optional)</label>
+                            <select class="form-select" name="studentId">
+                                <option value="">None / General House Event</option>
+                                <?php foreach ($houseStudents as $studentOption): ?>
+                                    <option value="<?= e((string) ($studentOption['id'] ?? '')) ?>"><?= e(trim(($studentOption['firstName'] ?? '') . ' ' . ($studentOption['lastName'] ?? ''))) ?><?= !empty($studentOption['admissionNo']) ? ' [' . e($studentOption['admissionNo']) . ']' : '' ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Involved Room (Optional)</label>
+                            <select class="form-select" name="roomId">
+                                <option value="">None / Entire House</option>
+                                <?php foreach ($houseRooms as $roomOption): ?>
+                                    <option value="<?= e((string) ($roomOption['id'] ?? '')) ?>">Room <?= e($roomOption['roomNumber'] ?? $roomOption['name'] ?? 'Room') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12"><label class="form-label">Observation Details</label><textarea class="form-control" name="details" rows="5" required></textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1"></i>Save Observation</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.querySelectorAll('.modal[data-open-on-load="true"]').forEach(function (modalElement) {
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

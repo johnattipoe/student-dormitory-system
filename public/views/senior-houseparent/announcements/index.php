@@ -126,9 +126,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <h5 class="mb-1">House Announcements & Bulletins</h5>
                 <p class="text-muted mb-0">Broadcast house notices, curfew updates, and emergency bulletins.</p>
             </div>
-            <a class="btn btn-primary btn-sm" href="<?= url('views/senior-houseparent/announcements/create/create.php') ?>">
+            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#seniorCreateAnnouncementModal">
                 <i class="bi bi-plus-circle me-1"></i> New Announcement
-            </a>
+            </button>
         </div>
 
         <div class="row g-3 mb-4">
@@ -258,4 +258,41 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <div class="modal fade" id="seniorAnnouncementEdit-<?= e($modalAnnouncementId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><form method="POST" action="<?= url('views/senior-houseparent/announcements/edit/edit.php?id=' . urlencode($modalAnnouncementId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Announcement</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalAnnouncementId) ?>"><label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($item['title'] ?? '') ?>" required><label class="form-label">Type</label><select name="type" class="form-select mb-3"><option value="info" <?= $modalAnnouncementType === 'info' ? 'selected' : '' ?>>Info</option><option value="success" <?= $modalAnnouncementType === 'success' ? 'selected' : '' ?>>Success</option><option value="warning" <?= $modalAnnouncementType === 'warning' ? 'selected' : '' ?>>Warning</option><option value="danger" <?= $modalAnnouncementType === 'danger' ? 'selected' : '' ?>>Urgent</option></select><label class="form-label">Message</label><textarea name="message" class="form-control" rows="5" required><?= e($item['message'] ?? '') ?></textarea><input type="hidden" name="status" value="<?= e($item['status'] ?? 'published') ?>"><input type="hidden" name="isUrgent" value="<?= !empty($item['isUrgent']) ? '1' : '' ?>"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
     <div class="modal fade" id="seniorAnnouncementDelete-<?= e($modalAnnouncementId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Announcement</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">Delete <strong><?= e($item['title'] ?? 'this announcement') ?></strong>?</div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/senior-houseparent/announcements/delete/delete.php?id=' . urlencode($modalAnnouncementId)) ?>"><input type="hidden" name="id" value="<?= e($modalAnnouncementId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
 <?php endforeach; ?>
+<div class="modal fade" id="seniorCreateAnnouncementModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openCreateAnnouncement']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/senior-houseparent/announcements/create/create.php') ?>">
+                <div class="modal-header"><h5 class="modal-title">Create House Announcement</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <label class="form-label">Announcement Title</label><input name="title" class="form-control mb-3" required>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Category / Priority</label>
+                            <select class="form-select" name="type">
+                                <option value="info">General Information</option><option value="warning">Warning / Inspection</option><option value="danger">Urgent / Emergency</option><option value="success">Commendation / Update</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Target Audience</label>
+                            <select class="form-select" name="audience">
+                                <option value="all">All Dormitory</option><option value="house_master">House Masters &amp; Mistresses</option><option value="student">Dormitory Students</option>
+                            </select>
+                        </div>
+                        <div class="col-12"><label class="form-label">Message</label><textarea name="message" class="form-control" rows="5" required></textarea></div>
+                        <div class="col-12">
+                            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="seniorCreateAnnouncementUrgent" name="isUrgent" value="1"><label class="form-check-label fw-semibold text-danger" for="seniorCreateAnnouncementUrgent">Mark as urgent</label></div>
+                            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="seniorCreateAnnouncementNotify" name="sendNotification" value="1" checked><label class="form-check-label" for="seniorCreateAnnouncementNotify">Send a notification to the target audience</label></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i>Publish Announcement</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.querySelectorAll('.modal[data-open-on-load="true"]').forEach(function (modalElement) {
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

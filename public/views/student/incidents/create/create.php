@@ -36,7 +36,16 @@ if (!$student && !empty($currentUser['email'])) {
     }
 }
 
+$returnRoutes = [
+    'incidents' => 'views/student/incidents/index/index.php',
+    'dashboard' => 'views/student/dashboard/index.php',
+    'room' => 'views/student/room/index.php',
+    'beds' => 'views/student/beds/index.php',
+];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $returnTo = sanitize($_POST['returnToStudentPage'] ?? '');
+    $returnPage = $returnRoutes[$returnTo] ?? null;
     $studentName = $student ? trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) : ($currentUser['name'] ?? 'Student');
     $adm = !empty($student['admissionNo']) ? ' [' . $student['admissionNo'] . ']' : '';
     
@@ -52,7 +61,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ]);
     flash($result['success'] ? 'success' : 'error', $result['message']);
     if ($result['success']) {
-        redirect(url('views/student/incidents/index/index.php'));
+        redirect(url($returnPage ?? 'views/student/incidents/index/index.php'));
+    }
+    if ($returnPage !== null) {
+        $_SESSION['_student_incident_report_old'] = [
+            'title' => $_POST['title'] ?? '',
+            'description' => $_POST['description'] ?? '',
+            'type' => $_POST['type'] ?? 'other',
+            'priority' => $_POST['priority'] ?? 'medium',
+        ];
+        $_SESSION['_student_incident_report_errors'] = ['general' => $result['message']];
+        redirect(url($returnPage . '?openIncidentReport=1'));
     }
 }
 

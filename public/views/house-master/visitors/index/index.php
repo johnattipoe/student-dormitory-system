@@ -20,11 +20,36 @@ use App\Services\VisitorService;
 
 $houseId = current_user()['houseId'] ?? null;
 $students = StudentService::all($houseId);
+$visitorService = new VisitorService();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $studentId = sanitize($_POST['studentId'] ?? '');
+    $allowedStudentIds = array_fill_keys(array_filter(array_map(
+        static fn(array $student): string => (string) ($student['id'] ?? ''),
+        $students
+    )), true);
+
+    if ((string) $houseId === '' || !isset($allowedStudentIds[$studentId])) {
+        flash('error', 'Select a student assigned to your house.');
+    } else {
+        $result = $visitorService->register([
+            'visitorName' => sanitize($_POST['visitorName'] ?? ''),
+            'phone' => sanitize($_POST['phone'] ?? ''),
+            'studentId' => $studentId,
+            'purpose' => sanitize($_POST['purpose'] ?? ''),
+            'registeredBy' => current_user()['uid'] ?? current_user()['id'] ?? null,
+        ]);
+        flash($result['success'] ? 'success' : 'error', $result['message']);
+    }
+
+    redirect(url('views/house-master/visitors/index/index.php'));
+}
+
 $studentMap = [];
 foreach ($students as $student) {
     $studentMap[(string) ($student['id'] ?? '')] = $student;
 }
-$visitors = (new VisitorService())->byHouse($houseId);
+$visitors = $visitorService->byHouse($houseId);
 $visitorSearch = strtolower(sanitize($_GET['search'] ?? ''));
 $visitorStatus = sanitize($_GET['status'] ?? '');
 if ($visitorSearch !== '' || $visitorStatus !== '') {
@@ -70,8 +95,65 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Review visitor activity for students in your house</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="<?= url('views/house-master/reports/export/export.php?type=visitors') ?>" class="btn btn-success btn-sm"><i class="bi bi-filetype-csv me-1"></i>Export CSV</a>
-                <a href="<?= url('views/house-master/visitors/create/create.php') ?>" class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Register Visitor</a>
+                <button type="button" class="btn btn-success btn-sm" id="houseVisitorExportButton"
+                    data-export-url="<?= e(url('views/house-master/reports/export/export.php') . '&type=visitors') ?>"
+                    data-filename="house-master-visitors-<?= e(date('Y-m-d')) ?>.csv">
+                    <i class="bi bi-filetype-csv me-1"></i>Export CSV
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#registerHouseVisitorModal">
+                    <i class="bi bi-person-plus me-1"></i>Register Visitor
+                </button>
+            </div>
+        </div>
+        <div id="houseVisitorExportError" class="alert alert-danger d-none" role="alert"></div>
+
+        <div class="modal fade" id="registerHouseVisitorModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <form method="POST" action="<?= url('views/house-master/visitors/index/index.php') ?>" data-disable-loading="true">
+                        <input type="hidden" name="action" value="register">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-person-plus me-2 text-primary"></i>Register House Visitor</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Visitor Full Name <span class="text-danger">*</span></label>
+                                    <input name="visitorName" class="form-control" placeholder="e.g. Mr. Kofi Acheampong" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Phone / Contact Number</label>
+                                    <input name="phone" class="form-control" placeholder="+233 XX XXX XXXX">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Student Being Visited <span class="text-danger">*</span></label>
+                                    <select name="studentId" class="form-select" required <?= empty($students) ? 'disabled' : '' ?>>
+                                        <option value="">Select resident student</option>
+                                        <?php foreach ($students as $student): ?>
+                                            <option value="<?= e((string) ($student['id'] ?? '')) ?>">
+                                                <?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?> (<?= e($student['admissionNo'] ?? '') ?>)
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <?php if (empty($students)): ?>
+                                        <div class="form-text text-danger">No students are assigned to your house.</div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Purpose of Visit</label>
+                                    <textarea name="purpose" class="form-control" rows="3" placeholder="Reason for visiting the student..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary" <?= empty($students) ? 'disabled' : '' ?>>
+                                <i class="bi bi-person-check me-1"></i>Register Visitor
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
@@ -193,4 +275,39 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <div class="modal fade" id="houseVisitorEditModal-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="<?= url('views/house-master/visitors/edit/edit.php?id=' . urlencode($modalVisitorId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalVisitorId) ?>"><label class="form-label">Visitor Name</label><input name="visitorName" class="form-control mb-3" value="<?= e($visitor['visitorName'] ?? '') ?>" required><label class="form-label">Phone</label><input name="phone" class="form-control mb-3" value="<?= e($visitor['phone'] ?? '') ?>"><label class="form-label">Status</label><select name="status" class="form-select mb-3"><option value="registered" <?= $modalVisitorStatus === 'registered' ? 'selected' : '' ?>>Registered</option><option value="inside" <?= $modalVisitorStatus === 'inside' ? 'selected' : '' ?>>Inside</option><option value="checked_out" <?= $modalVisitorStatus === 'checked_out' ? 'selected' : '' ?>>Checked Out</option></select><label class="form-label">Purpose</label><textarea name="purpose" class="form-control" rows="3"><?= e($visitor['purpose'] ?? '') ?></textarea></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
     <div class="modal fade" id="houseVisitorDeleteModal-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete visitor <strong><?= e($visitor['visitorName'] ?? 'this visitor') ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/visitors/delete/delete.php?id=' . urlencode($modalVisitorId)) ?>"><input type="hidden" name="id" value="<?= e($modalVisitorId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
 <?php endforeach; ?>
+<script>
+document.querySelectorAll('.modal').forEach(function (modal) {
+    document.body.appendChild(modal);
+});
+
+document.getElementById('houseVisitorExportButton').addEventListener('click', async function () {
+    const button = this;
+    const errorMessage = document.getElementById('houseVisitorExportError');
+    SDS.showButtonLoading(button);
+    errorMessage.classList.add('d-none');
+    errorMessage.textContent = '';
+    try {
+        const response = await fetch(button.dataset.exportUrl, {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (!response.ok || !(response.headers.get('content-type') || '').includes('text/csv')) {
+            throw new Error('The visitor export could not be downloaded. Please try again.');
+        }
+        const downloadUrl = URL.createObjectURL(await response.blob());
+        const downloadLink = document.createElement('a');
+        downloadLink.href = downloadUrl;
+        downloadLink.download = button.dataset.filename;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        downloadLink.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(downloadUrl); }, 1000);
+    } catch (error) {
+        errorMessage.textContent = error instanceof Error ? error.message : 'The visitor export could not be downloaded. Please try again.';
+        errorMessage.classList.remove('d-none');
+    } finally {
+        SDS.hideButtonLoading(button);
+    }
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

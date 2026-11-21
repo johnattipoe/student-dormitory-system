@@ -142,7 +142,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 </tr>
 
                                 <div class="modal fade" id="viewFeeModal<?= e($feeId) ?>" tabindex="-1" aria-labelledby="viewFeeModalLabel<?= e($feeId) ?>" aria-hidden="true">
-                                    <div class="modal-dialog">
+                                    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                                         <div class="modal-content">
                                             <div class="modal-header">
                                                 <h5 class="modal-title" id="viewFeeModalLabel<?= e($feeId) ?>"><?= e((string) ($fee['name'] ?? 'Unnamed Fee')) ?></h5>
@@ -161,9 +161,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 </div>
 
                                 <div class="modal fade" id="editFeeModal<?= e($feeId) ?>" tabindex="-1" aria-hidden="true">
-                                    <div class="modal-dialog">
+                                    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                                         <div class="modal-content">
-                                            <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php'))) ?>">
+                                            <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php'))) ?>" class="finance-modal-form">
                                                 <input type="hidden" name="action" value="update_fee">
                                                 <input type="hidden" name="id" value="<?= e($feeId) ?>">
                                                 <div class="modal-header">
@@ -224,9 +224,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
 
         <div class="modal fade" id="addFeeModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
-                    <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php'))) ?>">
+                <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/fees/index.php'))) ?>" class="finance-modal-form">
                         <input type="hidden" name="action" value="add_fee">
                         <div class="modal-header">
                             <h5 class="modal-title">Add fee category</h5>

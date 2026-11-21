@@ -18,6 +18,9 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\FirebaseService;
 
 $pageTitle = 'Security Activity Logs & Gate Audit Trail';
+$createLogOld = $_SESSION['_security_log_create_old'] ?? [];
+$createLogErrors = $_SESSION['_security_log_create_errors'] ?? [];
+unset($_SESSION['_security_log_create_old'], $_SESSION['_security_log_create_errors']);
 
 $firebase = FirebaseService::getInstance();
 $allLogs = $firebase->getCollection(COL_ACTIVITY_LOGS, [], 500);
@@ -103,9 +106,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Audit trail of gate entries, visitor access, perimeter patrols, and security events.</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-primary btn-sm" href="<?= url('views/security/activity-logs/create/create.php') ?>">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#securityCreateLogModal">
                     <i class="bi bi-plus-circle me-1"></i> Log Gate Observation
-                </a>
+                </button>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/security/activity-logs/export/export.php') ?>">
                     <i class="bi bi-download me-1"></i> Export CSV
                 </a>
@@ -248,7 +251,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     };
     ?>
     <div class="modal fade" id="securityActivityLogView-<?= e($modalLogId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Security Activity Log</h5>
@@ -273,5 +276,31 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 <?php endforeach; ?>
+<div class="modal fade" id="securityCreateLogModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openLogModal']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/security/activity-logs/create/create.php') ?>" class="security-modal-form">
+                <input type="hidden" name="returnToLogs" value="1">
+                <div class="modal-header"><h5 class="modal-title">Log Security / Gate Observation</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <?php if (!empty($createLogErrors['general'])): ?><div class="alert alert-danger"><?= e($createLogErrors['general']) ?></div><?php endif; ?>
+                    <div class="row g-3">
+                        <div class="col-md-8"><label class="form-label">Event / Operation Type</label><input class="form-control" name="event" value="<?= e($createLogOld['event'] ?? '') ?>" required><?php if (!empty($createLogErrors['event'])): ?><div class="text-danger small mt-1"><?= e($createLogErrors['event']) ?></div><?php endif; ?></div>
+                        <div class="col-md-4"><label class="form-label">Priority</label><select class="form-select" name="priority"><?php foreach (['normal' => 'Normal (Routine)', 'important' => 'Important', 'urgent' => 'Urgent / Incident'] as $value => $label): ?><option value="<?= e($value) ?>" <?= ($createLogOld['priority'] ?? 'normal') === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-12"><label class="form-label">Observation &amp; Action Details</label><textarea class="form-control" name="details" rows="5" required><?= e($createLogOld['details'] ?? '') ?></textarea><?php if (!empty($createLogErrors['details'])): ?><div class="text-danger small mt-1"><?= e($createLogErrors['details']) ?></div><?php endif; ?></div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-shield-check me-1"></i>Save to Security Log</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.modal[data-open-on-load="true"]').forEach(function (modalElement) {
+        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    });
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>
 

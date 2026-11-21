@@ -58,12 +58,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Dormitory room details and current bed occupancy</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-warning btn-sm" href="<?= url('views/house-master/rooms/edit/edit.php?id=' . urlencode($id)) ?>">
+                <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#houseRoomEditModal">
                     <i class="bi bi-pencil me-1"></i>Edit Room
-                </a>
-                <a class="btn btn-outline-danger btn-sm" href="<?= url('views/house-master/rooms/delete/delete.php?id=' . urlencode($id)) ?>">
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#houseRoomDeleteModal">
                     <i class="bi bi-trash me-1"></i>Delete
-                </a>
+                </button>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/rooms/index/index.php') ?>">
                     <i class="bi bi-arrow-left me-1"></i>Back
                 </a>
@@ -150,7 +150,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             </div>
                             <small class="text-muted"><?= $occupancyPct ?>% full</small>
                         </div>
-                        <a class="btn btn-outline-primary btn-sm w-100" href="<?= url('views/house-master/rooms/allocation/allocation.php?roomId=' . urlencode($id)) ?>">
+                        <a class="btn btn-outline-primary btn-sm w-100" href="<?= url('views/house-master/rooms/allocation/allocation.php?roomId=' . urlencode($id) . '&openAllocation=1') ?>">
                             <i class="bi bi-person-plus me-1"></i>Manage Allocation
                         </a>
                     </div>
@@ -185,6 +185,43 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <?php endif; ?>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseRoomEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/rooms/edit/edit.php?id=' . urlencode($id)) ?>">
+                <div class="modal-header"><h5 class="modal-title">Edit Room</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" value="<?= e($id) ?>">
+                    <label class="form-label">Room Number</label><input name="roomNumber" class="form-control mb-3" value="<?= e($room['roomNumber'] ?? '') ?>" required>
+                    <label class="form-label">Capacity</label><input type="number" min="1" name="capacity" class="form-control mb-3" value="<?= e((string) $capacity) ?>" required>
+                    <label class="form-label">Type</label><input name="type" class="form-control mb-3" value="<?= e($room['type'] ?? 'standard') ?>">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="available" <?= $status === 'available' ? 'selected' : '' ?>>Available</option>
+                        <option value="occupied" <?= $status === 'occupied' ? 'selected' : '' ?>>Occupied</option>
+                        <option value="full" <?= $status === 'full' ? 'selected' : '' ?>>Full</option>
+                        <option value="maintenance" <?= $status === 'maintenance' ? 'selected' : '' ?>>Maintenance</option>
+                    </select>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseRoomDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Room</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">Delete room <strong><?= e($room['roomNumber'] ?? 'this room') ?></strong>?</div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="<?= url('views/house-master/rooms/delete/delete.php?id=' . urlencode($id)) ?>">
+                    <input type="hidden" name="id" value="<?= e($id) ?>"><button type="submit" class="btn btn-danger">Delete</button>
+                </form>
             </div>
         </div>
     </div>

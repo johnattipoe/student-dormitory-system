@@ -61,9 +61,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Record of all parent, guardian, and guest visits to your house.</p>
             </div>
             <div class="d-flex gap-2">
-                <a class="btn btn-outline-success btn-sm" href="<?= url('views/house-master/reports/export/export.php?type=visitors') ?>">
-                    <i class="bi bi-filetype-csv me-1"></i> Export Visitors CSV
-                </a>
+                <?php
+                $reportType = 'visitors';
+                $reportExportBaseUrl = url('views/house-master/reports/export/export.php');
+                $reportExportFormats = ['csv' => 'CSV'];
+                $reportDownloadButtonLabel = 'Export Visitors CSV';
+                $reportDownloadWrapperClass = '';
+                require APP_ROOT . '/app/views/components/report-downloads/report-downloads.php';
+                ?>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/reports/index/index.php') ?>">
                     <i class="bi bi-arrow-left me-1"></i> Reports Overview
                 </a>

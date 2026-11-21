@@ -91,9 +91,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <input type="date" name="date" class="form-control form-control-sm" value="<?= e($date) ?>">
                     <button class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
                 </form>
-                <a class="btn btn-outline-success btn-sm" href="<?= url('views/house-master/reports/export/export.php?type=house_master&date=' . urlencode($date)) ?>">
-                    <i class="bi bi-filetype-csv me-1"></i>Export CSV
-                </a>
+                <?php
+                $reportType = 'house_master';
+                $reportExportBaseUrl = url('reports/export.php');
+                $reportExportFormats = ['csv' => 'CSV'];
+                $reportDownloadButtonLabel = 'Export CSV';
+                $reportDownloadWrapperClass = 'mb-0';
+                require APP_ROOT . '/app/views/components/report-downloads/report-downloads.php';
+                ?>
             </div>
         </div>
 

@@ -71,15 +71,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Monitor perimeter access, gate entries, check-outs, and guest verification</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="<?= url('views/security/visitors/bulk-import/bulk-import.php') ?>" class="btn btn-outline-success btn-sm">
+                <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#securityVisitorImportModal">
                     <i class="bi bi-file-earmark-arrow-up me-1"></i> Upload CSV/Excel
-                </a>
+                </button>
                 <a href="<?= url('views/security/visitor-history/visitor-history.php') ?>" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-clock-history me-1"></i> Full History
                 </a>
-                <a href="<?= url('views/security/register-visitor/register-visitor.php') ?>" class="btn btn-primary btn-sm">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#securityVisitorRegisterModal">
                     <i class="bi bi-person-plus me-1"></i> Register Visitor
-                </a>
+                </button>
             </div>
         </div>
 
@@ -191,6 +191,11 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <td class="text-end text-nowrap">
                                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#securityVisitorView-<?= e($vId) ?>" title="View"><i class="bi bi-eye"></i></button>
                                             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#securityVisitorEdit-<?= e($vId) ?>" title="Edit"><i class="bi bi-pencil"></i></button>
+                                            <?php if (in_array($vStatus, ['registered', 'approved'], true)): ?>
+                                                <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#securityVisitorCheckIn-<?= e($vId) ?>" title="Check in"><i class="bi bi-box-arrow-in-right"></i></button>
+                                            <?php elseif ($vStatus === 'inside'): ?>
+                                                <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#securityVisitorCheckOut-<?= e($vId) ?>" title="Check out"><i class="bi bi-box-arrow-right"></i></button>
+                                            <?php endif; ?>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#securityVisitorDelete-<?= e($vId) ?>" title="Delete"><i class="bi bi-trash"></i></button>
                                         </td>
                                     </tr>
@@ -209,10 +214,62 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
     </div>
 </div>
+<div class="modal fade" id="securityVisitorRegisterModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/security/register-visitor/register-visitor.php') ?>" class="security-modal-form">
+                <div class="modal-header"><h5 class="modal-title">Register New Visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Visitor Full Name</label><input type="text" name="visitorName" class="form-control" required></div>
+                        <div class="col-md-6"><label class="form-label">Host Student</label><select name="studentId" class="form-select" required><option value="">Select student being visited</option><?php foreach ($students as $studentId => $studentName): ?><option value="<?= e($studentId) ?>"><?= e($studentName !== '' ? $studentName : $studentId) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-md-4"><label class="form-label">Phone Number</label><input type="text" name="phone" class="form-control" required></div>
+                        <div class="col-md-4"><label class="form-label">Identification Type</label><input type="text" name="idType" class="form-control" required></div>
+                        <div class="col-md-4"><label class="form-label">ID / Document Number</label><input type="text" name="idNumber" class="form-control" required></div>
+                        <div class="col-12"><label class="form-label">Purpose of Visit</label><textarea name="purpose" class="form-control" rows="3" required></textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Register Visitor</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="securityVisitorImportModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openVisitorImport']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" enctype="multipart/form-data" action="<?= url('views/security/visitors/bulk-import/bulk-import.php') ?>" class="security-modal-form">
+                <input type="hidden" name="action" value="import_visitors">
+                <input type="hidden" name="returnToVisitors" value="1">
+                <div class="modal-header"><h5 class="modal-title">Import Visitors</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <p class="text-muted">Accepted columns: VisitorName, StudentId, Phone, Purpose, IdType, IdNumber.</p>
+                    <label class="form-label">CSV or XLSX file</label>
+                    <input type="file" name="visitors_file" class="form-control" accept=".csv,.xlsx" required>
+                    <a class="btn btn-outline-success btn-sm mt-3" href="<?= url('views/security/visitors/bulk-import/bulk-import.php?download_template=1') ?>"><i class="bi bi-download me-1"></i>Download template</a>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-success">Upload and Import</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <?php foreach ($visitors as $visitor): ?>
     <?php $modalVisitorId = (string) ($visitor['id'] ?? ''); $modalVisitorStatus = (string) ($visitor['status'] ?? 'registered'); ?>
-    <div class="modal fade" id="securityVisitorView-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Visitor Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Name</dt><dd class="col-sm-7"><?= e($visitor['visitorName'] ?? 'Visitor') ?></dd><dt class="col-sm-5">Phone</dt><dd class="col-sm-7"><?= e($visitor['phone'] ?? '—') ?></dd><dt class="col-sm-5">Purpose</dt><dd class="col-sm-7"><?= e($visitor['purpose'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucwords(str_replace('_', ' ', $modalVisitorStatus))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
-    <div class="modal fade" id="securityVisitorEdit-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="<?= url('views/security/visitors/edit/edit.php?id=' . urlencode($modalVisitorId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalVisitorId) ?>"><label class="form-label">Visitor Name</label><input name="visitorName" class="form-control mb-3" value="<?= e($visitor['visitorName'] ?? '') ?>" required><label class="form-label">Phone</label><input name="phone" class="form-control mb-3" value="<?= e($visitor['phone'] ?? '') ?>"><label class="form-label">Purpose</label><textarea name="purpose" class="form-control" rows="3"><?= e($visitor['purpose'] ?? '') ?></textarea></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
+    <div class="modal fade" id="securityVisitorView-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Visitor Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Name</dt><dd class="col-sm-7"><?= e($visitor['visitorName'] ?? 'Visitor') ?></dd><dt class="col-sm-5">Phone</dt><dd class="col-sm-7"><?= e($visitor['phone'] ?? '—') ?></dd><dt class="col-sm-5">Purpose</dt><dd class="col-sm-7"><?= e($visitor['purpose'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucwords(str_replace('_', ' ', $modalVisitorStatus))) ?></dd><dt class="col-sm-5">Student / Host</dt><dd class="col-sm-7"><?= e($visitor['studentId'] ?? '—') ?></dd><dt class="col-sm-5">Check-in</dt><dd class="col-sm-7"><?= e($visitor['checkInTime'] ?? '—') ?></dd><dt class="col-sm-5">Check-out</dt><dd class="col-sm-7"><?= e($visitor['checkOutTime'] ?? '—') ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+    <div class="modal fade" id="securityVisitorEdit-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><form method="POST" action="<?= url('views/security/visitors/edit/edit.php?id=' . urlencode($modalVisitorId)) ?>" class="security-modal-form"><input type="hidden" name="returnToVisitors" value="1"><div class="modal-header"><h5 class="modal-title">Edit Visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalVisitorId) ?>"><label class="form-label">Visitor Name</label><input name="visitorName" class="form-control mb-3" value="<?= e($visitor['visitorName'] ?? '') ?>" required><label class="form-label">Phone</label><input name="phone" class="form-control mb-3" value="<?= e($visitor['phone'] ?? '') ?>"><label class="form-label">Purpose</label><textarea name="purpose" class="form-control" rows="3"><?= e($visitor['purpose'] ?? '') ?></textarea></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
     <div class="modal fade" id="securityVisitorDelete-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">Delete visitor <strong><?= e($visitor['visitorName'] ?? 'this visitor') ?></strong>?</div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/security/visitors/delete/delete.php?id=' . urlencode($modalVisitorId)) ?>"><input type="hidden" name="id" value="<?= e($modalVisitorId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
+    <?php if (in_array($modalVisitorStatus, ['registered', 'approved'], true)): ?>
+        <div class="modal fade" id="securityVisitorCheckIn-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="<?= url('views/security/visitor-check-in/visitor-check-in.php') ?>"><input type="hidden" name="returnToVisitors" value="1"><input type="hidden" name="visitorId" value="<?= e($modalVisitorId) ?>"><div class="modal-header"><h5 class="modal-title">Confirm Visitor Check-in</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body">Check in <strong><?= e($visitor['visitorName'] ?? 'this visitor') ?></strong>?</div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-success">Confirm Check-in</button></div></form></div></div></div>
+    <?php elseif ($modalVisitorStatus === 'inside'): ?>
+        <div class="modal fade" id="securityVisitorCheckOut-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="<?= url('views/security/visitor-check-out/visitor-check-out.php') ?>"><input type="hidden" name="returnToVisitors" value="1"><input type="hidden" name="visitorId" value="<?= e($modalVisitorId) ?>"><div class="modal-header"><h5 class="modal-title">Confirm Visitor Check-out</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body">Check out <strong><?= e($visitor['visitorName'] ?? 'this visitor') ?></strong>?</div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-warning">Confirm Check-out</button></div></form></div></div></div>
+    <?php endif; ?>
 <?php endforeach; ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.modal[data-open-on-load="true"]').forEach(function (modalElement) {
+        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    });
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

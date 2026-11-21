@@ -32,7 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ]);
 
     flash($result['success'] ? 'success' : 'error', $result['message']);
-    redirect(base_url('index.php?route=/views/security/visitors/visitors/visitors.php'));
+    $returnTo = !empty($_POST['returnToDashboard'])
+        ? url('views/security/dashboard/dashboard.php')
+        : url('views/security/visitors/visitors/visitors.php');
+    redirect($returnTo);
 }
 
 $pageTitle = 'Register Visitor';

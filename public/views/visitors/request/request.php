@@ -21,8 +21,17 @@ $pageTitle = 'Visitor Request';
 $errors = $_SESSION['_errors'] ?? []; unset($_SESSION['_errors']);
 $old = $_SESSION['_old'] ?? []; unset($_SESSION['_old']);
 $studentId = current_user()['studentId'] ?? current_user()['uid'] ?? current_user()['id'] ?? null;
+$returnRoutes = [
+    'visitors' => 'views/student/visitors/index/index.php',
+    'dashboard' => 'views/student/dashboard/index.php',
+    'room' => 'views/student/room/index.php',
+    'beds' => 'views/student/beds/index.php',
+    'settings' => 'views/student/settings/index/index.php',
+];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $returnTo = sanitize($_POST['returnToStudentPage'] ?? '');
+    $returnPage = $returnRoutes[$returnTo] ?? null;
     $data = [
         'studentId' => $studentId,
         'visitorName' => sanitize($_POST['visitorName'] ?? ''),
@@ -37,13 +46,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = (new VisitorService())->request($data);
         flash($result['success'] ? 'success' : 'error', $result['message']);
         if ($result['success']) {
-            redirect(url('views/student/visitors/index/index.php'));
+            redirect(url($returnPage ?? 'views/student/visitors/index/index.php'));
         }
+        $errors['general'] = $result['message'];
     } elseif (!$studentId) {
         flash('error', 'Student profile not found.');
+        if ($returnPage !== null) {
+            $_SESSION['_student_visitor_request_old'] = $data;
+            $_SESSION['_student_visitor_request_errors'] = ['general' => 'Student profile not found.'];
+            redirect(url($returnPage . '?openVisitorRequest=1'));
+        }
         redirect(url('views/student/visitors/index/index.php'));
     }
 
+    if ($returnPage !== null) {
+        $_SESSION['_student_visitor_request_old'] = $data;
+        $_SESSION['_student_visitor_request_errors'] = $errors;
+        redirect(url($returnPage . '?openVisitorRequest=1'));
+    }
     $_SESSION['_errors'] = $errors;
     $_SESSION['_old'] = $data;
     redirect(url('views/visitors/request/request.php'));

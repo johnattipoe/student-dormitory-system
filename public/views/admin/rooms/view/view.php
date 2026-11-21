@@ -63,9 +63,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="<?= url('views/admin/rooms/edit/edit.php?id=' . urlencode($id)) ?>" class="btn btn-primary btn-sm">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#adminEditRoomModal">
                     <i class="bi bi-pencil me-1"></i> Edit Room
-                </a>
+                </button>
                 <a href="<?= url('views/admin/rooms/allocation/allocation.php') ?>" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-diagram-3 me-1"></i> Allocations
                 </a>
@@ -146,5 +146,23 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
 
     </div>
+</div>
+<div class="modal fade" id="adminEditRoomModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content">
+        <form method="POST" action="<?= url('views/admin/rooms/edit/edit.php?id=' . urlencode($id)) ?>">
+            <input type="hidden" name="id" value="<?= e($id) ?>">
+            <div class="modal-header"><h5 class="modal-title">Edit Room</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6"><label class="form-label">Room Number</label><input name="roomNumber" class="form-control" value="<?= e($room['roomNumber'] ?? '') ?>" required></div>
+                    <div class="col-md-6"><label class="form-label">Dormitory House</label><select name="houseId" class="form-select" required><?php foreach ($houses as $house): ?><option value="<?= e((string) ($house['id'] ?? '')) ?>" <?= $houseId === (string) ($house['id'] ?? '') ? 'selected' : '' ?>><?= e($house['name'] ?? '') ?></option><?php endforeach; ?></select></div>
+                    <div class="col-md-6"><label class="form-label">Bed Capacity</label><input type="number" name="capacity" min="1" class="form-control" value="<?= e((string) ($room['capacity'] ?? 1)) ?>" required></div>
+                    <div class="col-md-6"><label class="form-label">Room Type</label><?php $roomType = (string) ($room['type'] ?? 'standard'); ?><select name="type" class="form-select"><option value="standard" <?= $roomType === 'standard' ? 'selected' : '' ?>>Standard Dorm</option><option value="prefect" <?= $roomType === 'prefect' ? 'selected' : '' ?>>Prefect Room</option><option value="sickbay" <?= $roomType === 'sickbay' ? 'selected' : '' ?>>Sickbay Annex</option><option value="special" <?= $roomType === 'special' ? 'selected' : '' ?>>Special Needs</option></select></div>
+                    <div class="col-12"><label class="form-label">Status</label><?php $roomStatus = (string) ($room['status'] ?? 'available'); ?><select name="status" class="form-select"><option value="available" <?= $roomStatus === 'available' ? 'selected' : '' ?>>Available (Open)</option><option value="full" <?= $roomStatus === 'full' ? 'selected' : '' ?>>Full (Max Capacity)</option><option value="maintenance" <?= $roomStatus === 'maintenance' ? 'selected' : '' ?>>Under Maintenance</option></select></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+        </form>
+    </div></div>
 </div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

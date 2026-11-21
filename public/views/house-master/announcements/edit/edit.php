@@ -25,9 +25,13 @@ if ($id === '') {
 
 $firebase = FirebaseService::getInstance();
 $announcement = $firebase->getDocument('announcements', $id);
+$houseId = (string) (current_user()['houseId'] ?? current_user()['house_id'] ?? '');
 
-if (!$announcement) {
-    flash('error', 'Announcement not found.');
+if (!$announcement
+    || $houseId === ''
+    || ($announcement['audience'] ?? '') !== 'house'
+    || (string) ($announcement['targetHouseId'] ?? '') !== $houseId) {
+    flash('error', 'You can only edit announcements for your assigned house.');
     redirect(url('views/house-master/announcements/index.php'));
 }
 

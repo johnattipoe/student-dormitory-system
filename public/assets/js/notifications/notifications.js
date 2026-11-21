@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (bell) {
     bell.addEventListener('click', function () {
+      SDS.showButtonLoading(this);
       window.location.href = notificationUrl;
     });
   }

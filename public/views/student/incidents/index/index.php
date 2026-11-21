@@ -61,6 +61,12 @@ $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_p
 $totalIncidents = count($filteredIncidents);
 $totalPages = max(1, (int) ceil($totalIncidents / $limit));
 $incidents = array_slice($filteredIncidents, ($page - 1) * $limit, $limit);
+$studentIncidentModalId = 'studentIncidentReport';
+$studentIncidentReturnTo = 'incidents';
+$editIncidentId = (string) ($_SESSION['_student_incident_edit_id'] ?? '');
+$editIncidentOld = $_SESSION['_student_incident_edit_old'] ?? [];
+$editIncidentErrors = $_SESSION['_student_incident_edit_errors'] ?? [];
+unset($_SESSION['_student_incident_edit_id'], $_SESSION['_student_incident_edit_old'], $_SESSION['_student_incident_edit_errors']);
 
 $openCount = count(array_filter($filteredIncidents, fn($i) => ($i['status'] ?? 'open') === 'open'));
 $resolvedCount = count(array_filter($filteredIncidents, fn($i) => ($i['status'] ?? '') === 'resolved'));
@@ -93,9 +99,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">View reported incidents, infractions, or submit a new report</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-danger btn-sm" href="<?= url('views/student/incidents/create/create.php') ?>">
+                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#studentIncidentReport">
                     <i class="bi bi-plus-lg me-1"></i>Report Incident
-                </a>
+                </button>
             </div>
         </div>
 
@@ -276,7 +282,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     if ($modalIncidentId === '') continue;
     ?>
     <div class="modal fade" id="studentIncidentView-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Incident Details</h5>
@@ -306,18 +312,29 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     </div>
 
     <div class="modal fade" id="studentIncidentEdit-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <?php $editValues = $editIncidentId === $modalIncidentId ? array_merge($incident, $editIncidentOld) : $incident; ?>
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Incident</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="mb-0">Open the full edit form to update this incident.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
+                <form method="POST" action="<?= url('views/student/incidents/edit/edit.php?id=' . urlencode($modalIncidentId)) ?>" class="student-modal-form" data-open-on-load="<?= !empty($_GET['openIncidentEdit']) && $editIncidentId === $modalIncidentId ? 'true' : 'false' ?>">
+                    <input type="hidden" name="id" value="<?= e($modalIncidentId) ?>">
+                    <input type="hidden" name="returnToIncidentList" value="1">
+                    <input type="hidden" name="returnSearch" value="<?= e($search) ?>">
+                    <input type="hidden" name="returnDateFrom" value="<?= e($dateFrom) ?>">
+                    <input type="hidden" name="returnDateTo" value="<?= e($dateTo) ?>">
+                    <input type="hidden" name="returnSeverity" value="<?= e($severity) ?>">
+                    <input type="hidden" name="returnStatus" value="<?= e($status) ?>">
+                    <input type="hidden" name="returnPage" value="<?= e((string) $page) ?>">
+                    <input type="hidden" name="returnLimit" value="<?= e((string) $limit) ?>">
+                    <div class="modal-header"><h5 class="modal-title">Edit Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body">
+                        <?php if ($editIncidentId === $modalIncidentId && !empty($editIncidentErrors['general'])): ?><div class="alert alert-danger"><?= e($editIncidentErrors['general']) ?></div><?php endif; ?>
+                        <label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($editValues['title'] ?? '') ?>" required>
+                        <label class="form-label">Category</label><select name="type" class="form-select mb-3"><?php foreach (['discipline', 'medical', 'safety', 'property', 'other'] as $type): ?><option value="<?= e($type) ?>" <?= ($editValues['type'] ?? 'other') === $type ? 'selected' : '' ?>><?= e(ucfirst($type)) ?></option><?php endforeach; ?></select>
+                        <label class="form-label">Priority</label><select name="priority" class="form-select mb-3"><?php foreach (['low', 'medium', 'high'] as $priority): ?><option value="<?= e($priority) ?>" <?= ($editValues['priority'] ?? 'medium') === $priority ? 'selected' : '' ?>><?= e(ucfirst($priority)) ?></option><?php endforeach; ?></select>
+                        <label class="form-label">Description</label><textarea name="description" class="form-control" rows="5" required><?= e($editValues['description'] ?? '') ?></textarea>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
+                </form>
             </div>
         </div>
     </div>
@@ -332,6 +349,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <form method="POST" action="<?= url('views/student/incidents/delete/delete.php') ?>">
                     <div class="modal-body">
                         <input type="hidden" name="id" value="<?= e($modalIncidentId) ?>">
+                        <input type="hidden" name="returnToIncidentList" value="1">
+                        <input type="hidden" name="returnSearch" value="<?= e($search) ?>">
+                        <input type="hidden" name="returnDateFrom" value="<?= e($dateFrom) ?>">
+                        <input type="hidden" name="returnDateTo" value="<?= e($dateTo) ?>">
+                        <input type="hidden" name="returnSeverity" value="<?= e($severity) ?>">
+                        <input type="hidden" name="returnStatus" value="<?= e($status) ?>">
+                        <input type="hidden" name="returnPage" value="<?= e((string) $page) ?>">
+                        <input type="hidden" name="returnLimit" value="<?= e((string) $limit) ?>">
                         <p class="mb-0">Delete <strong><?= e($incident['title'] ?? $incident['type'] ?? 'this incident') ?></strong>?</p>
                     </div>
                     <div class="modal-footer">
@@ -343,4 +368,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 <?php endforeach; ?>
+<?php require __DIR__ . '/../../components/incident-report-modal.php'; ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.modal form[data-open-on-load="true"]').forEach(function (form) {
+        bootstrap.Modal.getOrCreateInstance(form.closest('.modal')).show();
+    });
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

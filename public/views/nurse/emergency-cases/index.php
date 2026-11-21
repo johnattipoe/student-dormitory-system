@@ -19,6 +19,10 @@ use App\Services\MedicalService;
 use App\Services\StudentService;
 
 $medicalService = new MedicalService();
+$nurseMedicalStudents = StudentService::all();
+$nurseMedicalModalId = 'nurseMedicalRecordCreate';
+$nurseMedicalReturnTo = 'emergencyCases';
+$nurseMedicalSelectedStudentId = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $recordId = sanitize($_POST['recordId'] ?? '');
@@ -38,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $students = [];
-foreach (StudentService::all() as $student) {
+foreach ($nurseMedicalStudents as $student) {
     $studentId = (string) ($student['id'] ?? '');
     if ($studentId === '') continue;
 
@@ -114,21 +118,21 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Prioritise severe, critical, and emergency medical records requiring clinical follow-up.</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-outline-primary btn-sm" href="<?= url('views/nurse/emergency-cases/broadcast/broadcast.php') ?>">
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#nurseEmergencyBroadcast">
                     <i class="bi bi-megaphone me-1"></i>Broadcast
-                </a>
-                <a class="btn btn-outline-success btn-sm" href="<?= url('views/nurse/emergency-cases/contacts/add/add.php') ?>">
+                </button>
+                <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#nurseEmergencyContact">
                     <i class="bi bi-person-plus me-1"></i>Add Contact
-                </a>
-                <a class="btn btn-outline-warning btn-sm" href="<?= url('views/nurse/emergency-cases/referral/create.php') ?>">
+                </button>
+                <button type="button" class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#nurseEmergencyReferral">
                     <i class="bi bi-file-medical me-1"></i>Referral
-                </a>
+                </button>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/nurse/emergency-cases/export/export.php') ?>">
                     <i class="bi bi-download me-1"></i>Export
                 </a>
-                <a class="btn btn-danger btn-sm" href="<?= url('views/nurse/create-record/create-record.php') ?>">
+                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#nurseMedicalRecordCreate">
                     <i class="bi bi-plus-circle me-1"></i>Log Emergency Record
-                </a>
+                </button>
             </div>
         </div>
 
@@ -204,15 +208,69 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php require __DIR__ . '/../components/medical-record-modal.php'; ?>
+<div class="modal fade" id="nurseEmergencyContact" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable"><div class="modal-content">
+        <form method="POST" action="<?= url('views/nurse/emergency-cases/contacts/add/add.php') ?>" class="nurse-modal-form">
+            <input type="hidden" name="returnToEmergencyCases" value="1">
+            <div class="modal-header"><h5 class="modal-title">Add Emergency Contact</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body"><div class="row g-3">
+                <div class="col-md-6"><label class="form-label">Contact name</label><input name="name" class="form-control" required></div>
+                <div class="col-md-6"><label class="form-label">Phone number</label><input type="tel" name="phone" class="form-control" required></div>
+                <div class="col-md-6"><label class="form-label">Relationship</label><input name="relationship" class="form-control"></div>
+                <div class="col-md-6"><label class="form-label">Role</label><input name="role" class="form-control"></div>
+            </div></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-success">Save Contact</button></div>
+        </form>
+    </div></div>
+</div>
+<div class="modal fade" id="nurseEmergencyReferral" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable"><div class="modal-content">
+        <form method="POST" action="<?= url('views/nurse/emergency-cases/referral/create.php') ?>" class="nurse-modal-form">
+            <input type="hidden" name="returnToEmergencyCases" value="1">
+            <div class="modal-header"><h5 class="modal-title">Create Referral</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body"><div class="row g-3">
+                <div class="col-md-6"><label class="form-label">Student</label><select name="studentId" class="form-select" required><option value="">Select student</option><?php foreach ($students as $studentId => $student): ?><option value="<?= e((string) $studentId) ?>"><?= e($student['name'] . ' (' . $student['admissionNo'] . ')') ?></option><?php endforeach; ?></select></div>
+                <div class="col-md-6"><label class="form-label">Referral facility</label><input name="facility" class="form-control" required></div>
+                <div class="col-md-6"><label class="form-label">Attending doctor</label><input name="doctor" class="form-control"></div>
+                <div class="col-md-6"><label class="form-label">Urgency</label><select name="urgency" class="form-select"><option value="urgent">Urgent</option><option value="routine">Routine</option><option value="follow-up">Follow-up</option></select></div>
+                <div class="col-12"><label class="form-label">Reason for referral</label><textarea name="reason" class="form-control" rows="4" required></textarea></div>
+                <div class="col-12"><label class="form-label">Notes</label><textarea name="notes" class="form-control" rows="3"></textarea></div>
+            </div></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-warning">Save Referral</button></div>
+        </form>
+    </div></div>
+</div>
+<div class="modal fade" id="nurseEmergencyBroadcast" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable"><div class="modal-content">
+        <form method="POST" action="<?= url('views/nurse/emergency-cases/broadcast/broadcast.php') ?>" class="nurse-modal-form">
+            <input type="hidden" name="returnToEmergencyCases" value="1">
+            <div class="modal-header"><h5 class="modal-title">Queue Emergency Broadcast</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <label class="form-label">Recipients</label>
+                <div class="d-flex flex-wrap gap-3 mb-3">
+                    <div class="form-check"><input class="form-check-input" type="checkbox" name="recipients[]" value="house" id="nurseBroadcastHouse" checked><label class="form-check-label" for="nurseBroadcastHouse">House staff</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" name="recipients[]" value="parents" id="nurseBroadcastParents" checked><label class="form-check-label" for="nurseBroadcastParents">Parents</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" name="recipients[]" value="clinical" id="nurseBroadcastClinical" checked><label class="form-check-label" for="nurseBroadcastClinical">Clinical team</label></div>
+                </div>
+                <label class="form-label">Urgent student</label><select name="studentId" class="form-select mb-3"><option value="">Select student if notifying parents</option><?php foreach ($records as $urgentRecord): ?><?php $urgentStudentId = (string) ($urgentRecord['studentId'] ?? ''); if ($urgentStudentId !== '' && isset($students[$urgentStudentId])): ?><option value="<?= e($urgentStudentId) ?>"><?= e($students[$urgentStudentId]['name'] . ' (' . $students[$urgentStudentId]['admissionNo'] . ')') ?></option><?php endif; ?><?php endforeach; ?></select>
+                <label class="form-label">Message</label><textarea name="message" class="form-control" rows="5" maxlength="160" required>Student requires urgent medical follow-up. Please check in with the resident and update the clinical team immediately.</textarea>
+                <small class="text-muted">SMS messages must be 160 characters or fewer. A student is required when Parents is selected.</small>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-warning">Queue Broadcast</button></div>
+        </form>
+    </div></div>
+</div>
 <?php foreach ($filteredRecords as $record): ?>
     <?php
     $modalRecordId = (string) ($record['id'] ?? '');
     if ($modalRecordId === '') continue;
     ?>
     <div class="modal fade" id="nurseEmergencyEdit-<?= e($modalRecordId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" action="<?= url('views/nurse/edit-record/edit-record.php?id=' . urlencode($modalRecordId)) ?>">
+                    <input type="hidden" name="returnToNursePage" value="emergencyCases">
                     <div class="modal-header">
                         <h5 class="modal-title">Edit Emergency Record</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

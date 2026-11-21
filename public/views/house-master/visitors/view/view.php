@@ -67,12 +67,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Review visitor check-in information and visit purpose</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-warning btn-sm" href="<?= url('views/house-master/visitors/edit/edit.php?id=' . urlencode($id)) ?>">
+                <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#houseVisitorEditModal">
                     <i class="bi bi-pencil me-1"></i>Edit
-                </a>
-                <a class="btn btn-outline-danger btn-sm" href="<?= url('views/house-master/visitors/delete/delete.php?id=' . urlencode($id)) ?>">
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#houseVisitorDeleteModal">
                     <i class="bi bi-trash me-1"></i>Delete
-                </a>
+                </button>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/visitors/index/index.php') ?>">
                     <i class="bi bi-arrow-left me-1"></i>Back
                 </a>
@@ -130,9 +130,45 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/visitors/index/index.php') ?>">
                         Back to Visitors
                     </a>
-                    <a class="btn btn-primary btn-sm" href="<?= url('views/house-master/visitors/edit/edit.php?id=' . urlencode($id)) ?>">
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#houseVisitorEditModal">
                         <i class="bi bi-pencil me-1"></i>Edit Visitor
-                    </a>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade" id="houseVisitorEditModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <form method="POST" action="<?= url('views/house-master/visitors/edit/edit.php?id=' . urlencode($id)) ?>">
+                        <div class="modal-header"><h5 class="modal-title">Edit Visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                        <div class="modal-body">
+                            <input type="hidden" name="id" value="<?= e($id) ?>">
+                            <label class="form-label">Visitor Name</label><input name="visitorName" class="form-control mb-3" value="<?= e($visitor['visitorName'] ?? '') ?>" required>
+                            <label class="form-label">Phone</label><input name="phone" class="form-control mb-3" value="<?= e($visitor['phone'] ?? '') ?>">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select mb-3">
+                                <option value="registered" <?= $status === 'registered' ? 'selected' : '' ?>>Registered</option>
+                                <option value="inside" <?= $status === 'inside' ? 'selected' : '' ?>>Inside</option>
+                                <option value="checked_out" <?= in_array($status, ['checked_out', 'left'], true) ? 'selected' : '' ?>>Checked Out</option>
+                            </select>
+                            <label class="form-label">Purpose</label><textarea name="purpose" class="form-control" rows="3"><?= e($visitor['purpose'] ?? '') ?></textarea>
+                        </div>
+                        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade" id="houseVisitorDeleteModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body">Delete visitor <strong><?= e($visitor['visitorName'] ?? 'this visitor') ?></strong>?</div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <form method="POST" action="<?= url('views/house-master/visitors/delete/delete.php?id=' . urlencode($id)) ?>">
+                            <input type="hidden" name="id" value="<?= e($id) ?>"><button type="submit" class="btn btn-danger">Delete</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

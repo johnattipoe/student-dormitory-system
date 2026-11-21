@@ -75,9 +75,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </div>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-primary btn-sm" href="<?= url('views/house-master/profile/edit/edit.php') ?>">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#houseMasterProfileEditModal">
                     <i class="bi bi-pencil me-1"></i>Edit Profile
-                </a>
+                </button>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/profile/security/security.php') ?>">
                     <i class="bi bi-shield-lock me-1"></i>Security
                 </a>
@@ -188,13 +188,13 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </div>
                     <div class="card-body p-0">
                         <div class="list-group list-group-flush">
-                            <a href="<?= url('views/house-master/profile/edit/edit.php') ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3">
+                            <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3 text-start" data-bs-toggle="modal" data-bs-target="#houseMasterProfileEditModal">
                                 <div>
                                     <i class="bi bi-pencil-square me-2 text-primary"></i>
                                     <strong>Edit Contact Information</strong>
                                 </div>
                                 <i class="bi bi-chevron-right text-muted"></i>
-                            </a>
+                            </button>
                             <a href="<?= url('views/house-master/profile/security/security.php') ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3">
                                 <div>
                                     <i class="bi bi-shield-lock me-2 text-success"></i>
@@ -213,6 +213,34 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseMasterProfileEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/profile/edit/edit.php') ?>">
+                <?= csrf_field() ?>
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit <?= e($roleTitle) ?> Profile</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label" for="houseMasterProfileName">Full Name</label><input id="houseMasterProfileName" name="name" class="form-control" value="<?= e($user['name'] ?? $user['fullName'] ?? '') ?>" required></div>
+                        <div class="col-md-6"><label class="form-label" for="houseMasterProfileEmail">Email Address</label><input id="houseMasterProfileEmail" class="form-control bg-light" value="<?= e($user['email'] ?? '—') ?>" readonly disabled></div>
+                        <div class="col-md-6"><label class="form-label" for="houseMasterProfilePhone">Primary Phone</label><input id="houseMasterProfilePhone" name="phone" class="form-control" value="<?= e($user['phone'] ?? '') ?>"></div>
+                        <div class="col-md-6"><label class="form-label" for="houseMasterProfileAltPhone">Emergency Alt Phone</label><input id="houseMasterProfileAltPhone" name="altPhone" class="form-control" value="<?= e($user['altPhone'] ?? '') ?>"></div>
+                        <div class="col-md-6"><label class="form-label" for="houseMasterProfileOffice">Office / Master Room</label><input id="houseMasterProfileOffice" name="officeRoom" class="form-control" value="<?= e($user['officeRoom'] ?? '') ?>"></div>
+                        <div class="col-md-6"><label class="form-label" for="houseMasterProfileHours">Duty / Office Hours</label><input id="houseMasterProfileHours" name="officeHours" class="form-control" value="<?= e($user['officeHours'] ?? '8:00 AM - 6:00 PM') ?>"></div>
+                        <div class="col-12"><label class="form-label" for="houseMasterProfileBio">Bio & Supervisory Notes</label><textarea id="houseMasterProfileBio" name="bio" class="form-control" rows="3"><?= e($user['bio'] ?? '') ?></textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

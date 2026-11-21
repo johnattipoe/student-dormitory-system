@@ -45,7 +45,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ]);
     flash($result['success'] ? 'success' : 'error', $result['message']);
 
-    redirect(url('views/nurse/emergency-cases/referral/create.php'));
+    redirect(!empty($_POST['returnToEmergencyCases'])
+        ? url('views/nurse/emergency-cases/emergency-cases.php')
+        : (!empty($_POST['returnToReferralHistory'])
+            ? url('views/nurse/emergency-cases/referral/view.php')
+            : url('views/nurse/emergency-cases/referral/create.php')));
 }
 
 $navItems = [

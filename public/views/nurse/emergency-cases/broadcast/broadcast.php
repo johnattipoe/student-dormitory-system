@@ -47,7 +47,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = $broadcastService->create($message, $recipients, $studentId, current_user_id());
     flash($result['success'] ? 'success' : 'error', $result['message']);
 
-    redirect(url('views/nurse/emergency-cases/broadcast/broadcast.php'));
+    redirect(!empty($_POST['returnToEmergencyCases'])
+        ? url('views/nurse/emergency-cases/emergency-cases.php')
+        : url('views/nurse/emergency-cases/broadcast/broadcast.php'));
 }
 
 $history = $broadcastService->all();

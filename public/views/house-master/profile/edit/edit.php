@@ -33,6 +33,11 @@ $houseName = $house['name'] ?? ($houseId ?: 'Assigned House');
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
+        flash('error', 'The form expired. Please refresh the page and try again.');
+        redirect(url('views/house-master/profile/index.php'));
+    }
+
     $name = trim((string) sanitize($_POST['name'] ?? ''));
     $phone = trim((string) sanitize($_POST['phone'] ?? ''));
     $altPhone = trim((string) sanitize($_POST['altPhone'] ?? ''));
@@ -104,6 +109,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
         <div class="card stat-card p-4" style="max-width: 800px;">
             <form method="POST" class="row g-3">
+                <?= csrf_field() ?>
                 <div class="col-md-6">
                     <label class="form-label fw-bold" for="name">Full Name <span class="text-danger">*</span></label>
                     <input class="form-control <?= !empty($errors['name']) ? 'is-invalid' : '' ?>" id="name" name="name" value="<?= e($nameVal) ?>" required>

@@ -20,6 +20,9 @@ use App\Services\StudentService;
 use App\Services\UserService;
 
 $pageTitle = 'Medical Activity Logs & Audit Trail';
+$createLogOld = $_SESSION['_nurse_log_create_old'] ?? [];
+$createLogErrors = $_SESSION['_nurse_log_create_errors'] ?? [];
+unset($_SESSION['_nurse_log_create_old'], $_SESSION['_nurse_log_create_errors']);
 
 // Fetch raw medical logs and general clinic activity logs
 $firebase = FirebaseService::getInstance();
@@ -124,9 +127,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Complete audit trail of clinic consultations, prescriptions, and medical observations.</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-primary btn-sm" href="<?= url('views/nurse/activity-logs/create/create.php') ?>">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#nurseCreateLogModal">
                     <i class="bi bi-plus-circle me-1"></i> Log Clinical Note
-                </a>
+                </button>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/nurse/activity-logs/export/export.php') ?>">
                     <i class="bi bi-download me-1"></i> Export CSV
                 </a>
@@ -255,6 +258,24 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<div class="modal fade" id="nurseCreateLogModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openLogModal']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable"><div class="modal-content">
+        <form method="POST" action="<?= url('views/nurse/activity-logs/create/create.php') ?>" class="nurse-modal-form">
+            <input type="hidden" name="returnToActivityLogs" value="1">
+            <div class="modal-header"><h5 class="modal-title">Log Clinical Observation</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <?php if (!empty($createLogErrors['general'])): ?><div class="alert alert-danger"><?= e($createLogErrors['general']) ?></div><?php endif; ?>
+                <div class="row g-3">
+                    <div class="col-md-8"><label class="form-label">Event / Procedure</label><input name="event" class="form-control" value="<?= e($createLogOld['event'] ?? '') ?>" required><?php if (!empty($createLogErrors['event'])): ?><div class="text-danger small mt-1"><?= e($createLogErrors['event']) ?></div><?php endif; ?></div>
+                    <div class="col-md-4"><label class="form-label">Severity / Priority</label><select name="severity" class="form-select"><?php foreach (['normal' => 'Normal', 'high' => 'High', 'emergency' => 'Emergency / Critical'] as $value => $label): ?><option value="<?= e($value) ?>" <?= ($createLogOld['severity'] ?? 'normal') === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?></select></div>
+                    <div class="col-12"><label class="form-label">Student patient (optional)</label><select name="studentId" class="form-select"><option value="">General clinic event / multiple students</option><?php foreach ($students as $student): ?><?php $studentId = (string) ($student['id'] ?? ''); $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')); ?><option value="<?= e($studentId) ?>" <?= ($createLogOld['studentId'] ?? '') === $studentId ? 'selected' : '' ?>><?= e($studentName !== '' ? $studentName : 'Student') ?><?= !empty($student['admissionNo']) ? ' [' . e($student['admissionNo']) . ']' : '' ?></option><?php endforeach; ?></select></div>
+                    <div class="col-12"><label class="form-label">Clinical details and treatment notes</label><textarea name="details" class="form-control" rows="5" required><?= e($createLogOld['details'] ?? '') ?></textarea><?php if (!empty($createLogErrors['details'])): ?><div class="text-danger small mt-1"><?= e($createLogErrors['details']) ?></div><?php endif; ?></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Clinical Note</button></div>
+        </form>
+    </div></div>
+</div>
 <?php foreach ($logs as $log): ?>
     <?php
     $modalLogId = (string) ($log['id'] ?? '');
@@ -273,7 +294,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     };
     ?>
     <div class="modal fade" id="nurseActivityLogView-<?= e($modalLogId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Clinical Activity Log</h5>
@@ -300,5 +321,13 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 <?php endforeach; ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('nurseCreateLogModal');
+    if (modal && modal.dataset.openOnLoad === 'true') {
+        bootstrap.Modal.getOrCreateInstance(modal).show();
+    }
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>
 

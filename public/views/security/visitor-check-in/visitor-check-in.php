@@ -22,20 +22,25 @@ $eligibleVisitors = array_values(array_filter((new VisitorService())->all(), sta
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $visitorId = sanitize($_POST['visitorId'] ?? '');
+    $returnTo = !empty($_POST['returnToVisitors'])
+        ? url('views/security/visitors/visitors/visitors.php')
+        : (!empty($_POST['returnToVisitorView'])
+            ? url('views/security/visitors/view/view.php?id=' . urlencode($visitorId))
+            : url('views/security/visitor-check-in/visitor-check-in.php'));
     if ($visitorId === '') {
         flash('error', 'Visitor ID is required.');
-        redirect(base_url('index.php?route=/views/security/visitor-check-in/visitor-check-in.php'));
+        redirect($returnTo);
     }
 
     $visitor = FirebaseService::getInstance()->getDocument(COL_VISITORS, $visitorId);
     if (!$visitor || in_array(($visitor['status'] ?? ''), ['inside', 'checked_out'], true)) {
         flash('error', 'Visitor was not found or is not eligible for check-in.');
-        redirect(base_url('index.php?route=/views/security/visitor-check-in/visitor-check-in.php'));
+        redirect($returnTo);
     }
 
     $result = (new VisitorService())->checkIn($visitorId, current_user()['uid'] ?? current_user()['id'] ?? null);
     flash($result['success'] ? 'success' : 'error', $result['message']);
-    redirect(base_url('index.php?route=/views/security/visitors/visitors/visitors.php'));
+    redirect($returnTo);
 }
 
 $pageTitle = 'Visitor Check-In';

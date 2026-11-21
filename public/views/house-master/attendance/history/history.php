@@ -148,7 +148,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Historical records of roll calls, curfew attendance, and exeat tracking</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="<?= url('views/house-master/attendance/mark-attendance/mark-attendance.php') ?>" class="btn btn-primary btn-sm">
+                <a href="<?= url('views/house-master/attendance/index/index.php?openBulkAttendance=1') ?>" class="btn btn-primary btn-sm">
                     <i class="bi bi-calendar2-check me-1"></i>Mark Roll Call
                 </a>
                 <a href="<?= url('views/house-master/reports/export/export.php?type=attendance') ?>" class="btn btn-outline-success btn-sm">

@@ -15,10 +15,130 @@ $allowedRoles = [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php'; 
  
 use App\Services\FirebaseService; 
+use App\Services\HouseService;
+use App\Services\NotificationService;
 use App\Services\UserService;
 
 $role = current_role(); 
-$records = FirebaseService::getInstance()->getCollection('announcements', [], 500); 
+$currentUser = current_user() ?? [];
+$currentUserId = (string) current_user_id();
+$houseId = (string) ($currentUser['houseId'] ?? $currentUser['house_id'] ?? '');
+$house = $houseId !== '' ? HouseService::find($houseId) : null;
+$houseName = (string) ($house['name'] ?? ($houseId !== '' ? $houseId : 'your assigned house'));
+$indexUrl = url('views/house-master/announcements/index.php');
+$firebase = FirebaseService::getInstance();
+$errors = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = (string) ($_POST['action'] ?? '');
+    try {
+        if ($houseId === '') {
+            throw new \InvalidArgumentException('Your account must have an assigned house to manage announcements.');
+        }
+
+        if ($action === 'delete_announcement' || $action === 'update_announcement') {
+            $id = trim((string) sanitize($_POST['id'] ?? ''));
+            $announcement = $id !== '' ? $firebase->getDocument('announcements', $id) : null;
+            if (!$announcement
+                || ($announcement['audience'] ?? '') !== 'house'
+                || (string) ($announcement['targetHouseId'] ?? '') !== $houseId) {
+                throw new \InvalidArgumentException('You can only manage announcements for your assigned house.');
+            }
+
+            if ($action === 'delete_announcement') {
+                $firebase->deleteDocument('announcements', $id);
+                flash('success', 'Announcement deleted successfully.');
+                redirect($indexUrl);
+            }
+
+            $title = trim((string) sanitize($_POST['title'] ?? ''));
+            $message = trim((string) sanitize($_POST['message'] ?? ''));
+            $type = (string) sanitize($_POST['type'] ?? 'info');
+            $status = (string) sanitize($_POST['status'] ?? 'published');
+            if ($title === '' || $message === '') {
+                throw new \InvalidArgumentException('Title and message are required.');
+            }
+            if (!in_array($type, ['info', 'success', 'warning', 'danger'], true)
+                || !in_array($status, ['published', 'draft', 'archived'], true)) {
+                throw new \InvalidArgumentException('Select a valid notice type and status.');
+            }
+            $firebase->updateDocument('announcements', $id, [
+                'title' => $title,
+                'message' => $message,
+                'type' => $type,
+                'status' => $status,
+                'isUrgent' => !empty($_POST['isUrgent']),
+                'updatedAt' => date(DATE_ATOM),
+            ]);
+            flash('success', 'Announcement updated successfully.');
+        } elseif ($action === 'create_announcement') {
+            $title = trim((string) sanitize($_POST['title'] ?? ''));
+            $message = trim((string) sanitize($_POST['message'] ?? ''));
+            $type = (string) sanitize($_POST['type'] ?? 'info');
+            if ($title === '' || $message === '') {
+                throw new \InvalidArgumentException('Title and message are required.');
+            }
+            if (!in_array($type, ['info', 'success', 'warning', 'danger'], true)) {
+                throw new \InvalidArgumentException('Select a valid notice type.');
+            }
+            $isUrgent = !empty($_POST['isUrgent']);
+            $sendNotification = !empty($_POST['sendNotification']);
+            $now = date(DATE_ATOM);
+            $firebase->addDocument('announcements', [
+                'title' => $title,
+                'message' => $message,
+                'audience' => 'house',
+                'targetHouseId' => $houseId,
+                'type' => $type,
+                'status' => 'published',
+                'isUrgent' => $isUrgent,
+                'createdBy' => $currentUserId,
+                'createdByName' => trim((string) ($currentUser['name'] ?? '')) ?: ucfirst(str_replace('_', ' ', $role)),
+                'publishedAt' => $now,
+            ]);
+
+            if ($sendNotification) {
+                try {
+                    $notificationService = new NotificationService();
+                    $recipientCount = 0;
+                    $recipients = $firebase->getAllCollection('users', [['houseId', '=', $houseId]]);
+                    foreach ($recipients as $recipient) {
+                        if ((string) ($recipient['houseId'] ?? '') !== $houseId
+                            || ($recipient['status'] ?? 'active') !== 'active') {
+                            continue;
+                        }
+                        $recipientId = (string) ($recipient['uid'] ?? $recipient['id'] ?? '');
+                        if ($recipientId === '') {
+                            continue;
+                        }
+                        $result = $notificationService->create([
+                            'recipientType' => 'user',
+                            'userId' => $recipientId,
+                            'title' => $title,
+                            'message' => $message,
+                            'type' => $type,
+                            'isUrgent' => $isUrgent,
+                        ]);
+                        $recipientCount += !empty($result['success']) ? 1 : 0;
+                    }
+                    flash($recipientCount > 0 ? 'success' : 'warning', 'Announcement published for ' . $houseName . '; notifications confirmed for ' . $recipientCount . ' house user(s).');
+                } catch (\Throwable $e) {
+                    flash('warning', 'Announcement published for ' . $houseName . ', but in-app notification delivery could not be confirmed: ' . $e->getMessage());
+                }
+            } else {
+                flash('success', 'Announcement published for ' . $houseName . '.');
+            }
+        } else {
+            throw new \InvalidArgumentException('Unknown announcement action.');
+        }
+        redirect($indexUrl);
+    } catch (\Throwable $e) {
+        $errors['general'] = 'Unable to save announcement: ' . $e->getMessage();
+        $errors['action'] = $action;
+    }
+}
+
+$records = $firebase->getCollection('announcements', [], 500);
 
 // Preload user map for author name resolution
 $userMap = [
@@ -66,14 +186,21 @@ $getAuthorName = function (array $announcement) use (&$userMap): string {
     return $raw;
 };
 
-$announcements = array_values(array_filter($records, static function (array $item) use ($role): bool { 
-    if (!empty($item['createdBy']) && $item['createdBy'] === current_user_id()) {
+$announcements = array_values(array_filter($records, static function (array $item) use ($role, $houseId): bool {
+    $audience = (string) ($item['audience'] ?? 'all');
+    if ($audience === 'house') {
+        return $houseId !== ''
+            && (string) ($item['targetHouseId'] ?? '') === $houseId
+            && (($item['status'] ?? 'published') === 'published'
+                || (string) ($item['createdBy'] ?? '') === current_user_id());
+    }
+    if (($item['status'] ?? 'published') !== 'published') {
+        return false;
+    }
+    if ($audience === 'all') {
         return true;
     }
-    $audience = (string) ($item['audience'] ?? 'all'); 
-    $targetRole = (string) ($item['targetRole'] ?? ''); 
-    return ($item['status'] ?? 'published') === 'published' 
-        && ($audience === 'all' || $targetRole === '' || $targetRole === $role); 
+    return $audience === 'role' && (string) ($item['targetRole'] ?? '') === $role;
 })); 
 
 usort( 
@@ -117,11 +244,17 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
             <div class="d-flex gap-2 flex-wrap align-items-center">
                 <span class="badge bg-primary"><i class="bi bi-megaphone me-1"></i><?= e((string) count($announcements)) ?> notices</span>
-                <a href="<?= url('views/house-master/announcements/create/create.php') ?>" class="btn btn-primary btn-sm">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createHouseAnnouncementModal" <?= $houseId === '' ? 'disabled title="Assign a house to this account first"' : '' ?>>
                     <i class="bi bi-send me-1"></i>Post Announcement
-                </a>
+                </button>
             </div>
         </div>
+        <?php if ($houseId === ''): ?>
+            <div class="alert alert-warning">This account has no assigned house. Posting and managing house announcements is disabled.</div>
+        <?php endif; ?>
+        <?php if (!empty($errors['general'])): ?>
+            <div class="alert alert-danger"><?= e($errors['general']) ?></div>
+        <?php endif; ?>
 
         <!-- KPI Row -->
         <div class="row g-3 mb-4">
@@ -209,6 +342,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         $audience = (string) ($announcement['audience'] ?? 'all');
                                         $author = $getAuthorName($announcement);
                                         $annId = (string) ($announcement['id'] ?? '');
+                                        $canManageAnnouncement = $houseId !== ''
+                                            && $audience === 'house'
+                                            && (string) ($announcement['targetHouseId'] ?? '') === $houseId;
                                     ?>
                                     <tr> 
                                         <td> 
@@ -225,7 +361,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         </td>
                                         <td>
                                             <span class="badge bg-secondary-subtle text-secondary border">
-                                                <?= e($audience === 'all' ? 'All Dormitory' : ucfirst(str_replace('_', ' ', (string)($announcement['targetRole'] ?? $audience)))) ?>
+                                                <?= e($audience === 'house' ? $houseName : ($audience === 'all' ? 'All Dormitory' : ucfirst(str_replace('_', ' ', (string)($announcement['targetRole'] ?? $audience))))) ?>
                                             </span>
                                         </td>
                                         <td class="fw-medium"><?= e($author) ?></td>
@@ -233,8 +369,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <td class="text-end text-nowrap">
                                             <?php if ($annId !== ''): ?>
                                                 <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#houseAnnouncementViewModal-<?= e($annId) ?>" title="View"><i class="bi bi-eye"></i></button>
-                                                <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#houseAnnouncementEditModal-<?= e($annId) ?>" title="Edit"><i class="bi bi-pencil"></i></button>
-                                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#houseAnnouncementDeleteModal-<?= e($annId) ?>" title="Delete"><i class="bi bi-trash"></i></button>
+                                                <?php if ($canManageAnnouncement): ?>
+                                                    <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#houseAnnouncementEditModal-<?= e($annId) ?>" title="Edit"><i class="bi bi-pencil"></i></button>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#houseAnnouncementDeleteModal-<?= e($annId) ?>" title="Delete"><i class="bi bi-trash"></i></button>
+                                                <?php endif; ?>
                                             <?php endif; ?>
                                         </td>
                                     </tr> 
@@ -247,10 +385,50 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div> 
     </div> 
 </div> 
+<div class="modal fade" id="createHouseAnnouncementModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="<?= e($indexUrl) ?>" class="announcement-modal-form">
+                <input type="hidden" name="action" value="create_announcement">
+                <div class="modal-header"><h5 class="modal-title">Post Announcement for <?= e($houseName) ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <?php if (!empty($errors['general'])): ?><div class="alert alert-danger"><?= e($errors['general']) ?></div><?php endif; ?>
+                    <div class="alert alert-info">Only users assigned to <?= e($houseName) ?> will see this announcement. No school-wide audience is available from the House Master/Mistress portal.</div>
+                    <div class="row g-3">
+                        <div class="col-12"><label class="form-label fw-semibold">Title / subject</label><input name="title" class="form-control" maxlength="160" value="<?= e($_POST['title'] ?? '') ?>" required></div>
+                        <div class="col-md-6"><label class="form-label fw-semibold">Category</label><select name="type" class="form-select"><?php foreach (['info' => 'General information', 'success' => 'Positive notice', 'warning' => 'Warning / advisory', 'danger' => 'Urgent / critical'] as $type => $label): ?><option value="<?= e($type) ?>" <?= ($_POST['type'] ?? 'info') === $type ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-12"><label class="form-label fw-semibold">Message</label><textarea name="message" class="form-control" rows="5" maxlength="5000" required><?= e($_POST['message'] ?? '') ?></textarea></div>
+                        <div class="col-12 d-flex flex-column gap-2 bg-light p-3 rounded-3 border">
+                            <div class="form-check"><input type="checkbox" name="sendNotification" class="form-check-input" id="sendHouseAnnouncementNotification" value="1" <?= !isset($_POST['action']) || !empty($_POST['sendNotification']) ? 'checked' : '' ?>><label class="form-check-label fw-semibold" for="sendHouseAnnouncementNotification">Send in-app notification to active users assigned to this house</label></div>
+                            <div class="form-check"><input type="checkbox" name="isUrgent" class="form-check-input" id="houseAnnouncementUrgent" value="1" <?= !empty($_POST['isUrgent']) ? 'checked' : '' ?>><label class="form-check-label fw-semibold text-danger" for="houseAnnouncementUrgent">Flag as urgent</label></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i>Publish for house</button></div>
+            </form>
+        </div>
+    </div>
+</div>
 <?php foreach ($announcements as $announcement): ?>
-    <?php $modalAnnouncementId = (string) ($announcement['id'] ?? ''); $modalAnnouncementType = (string) ($announcement['type'] ?? 'info'); ?>
-    <div class="modal fade" id="houseAnnouncementViewModal-<?= e($modalAnnouncementId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Announcement Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><h5><?= e($announcement['title'] ?? 'Untitled') ?></h5><span class="badge bg-<?= e($modalAnnouncementType === 'danger' ? 'danger' : ($modalAnnouncementType === 'warning' ? 'warning text-dark' : ($modalAnnouncementType === 'success' ? 'success' : 'info'))) ?> mb-3"><?= e(ucfirst($modalAnnouncementType)) ?></span><p class="mb-0" style="white-space: pre-line;"><?= e($announcement['message'] ?? '') ?></p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
-    <div class="modal fade" id="houseAnnouncementEditModal-<?= e($modalAnnouncementId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><form method="POST" action="<?= url('views/house-master/announcements/edit/edit.php?id=' . urlencode($modalAnnouncementId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Announcement</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalAnnouncementId) ?>"><label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($announcement['title'] ?? '') ?>" required><label class="form-label">Type</label><select name="type" class="form-select mb-3"><option value="info" <?= $modalAnnouncementType === 'info' ? 'selected' : '' ?>>Info</option><option value="success" <?= $modalAnnouncementType === 'success' ? 'selected' : '' ?>>Success</option><option value="warning" <?= $modalAnnouncementType === 'warning' ? 'selected' : '' ?>>Warning</option><option value="danger" <?= $modalAnnouncementType === 'danger' ? 'selected' : '' ?>>Urgent</option></select><label class="form-label">Message</label><textarea name="message" class="form-control" rows="5" required><?= e($announcement['message'] ?? '') ?></textarea><input type="hidden" name="status" value="<?= e($announcement['status'] ?? 'published') ?>"><input type="hidden" name="isUrgent" value="<?= !empty($announcement['isUrgent']) ? '1' : '' ?>"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
-    <div class="modal fade" id="houseAnnouncementDeleteModal-<?= e($modalAnnouncementId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Announcement</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete <strong><?= e($announcement['title'] ?? 'this announcement') ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/announcements/delete/delete.php?id=' . urlencode($modalAnnouncementId)) ?>"><input type="hidden" name="id" value="<?= e($modalAnnouncementId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
+    <?php
+    $modalAnnouncementId = (string) ($announcement['id'] ?? '');
+    $modalAnnouncementType = (string) ($announcement['type'] ?? 'info');
+    $modalCanManageAnnouncement = $houseId !== ''
+        && ($announcement['audience'] ?? '') === 'house'
+        && (string) ($announcement['targetHouseId'] ?? '') === $houseId;
+    ?>
+    <div class="modal fade" id="houseAnnouncementViewModal-<?= e($modalAnnouncementId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Announcement Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><h5><?= e($announcement['title'] ?? 'Untitled') ?></h5><span class="badge bg-<?= e($modalAnnouncementType === 'danger' ? 'danger' : ($modalAnnouncementType === 'warning' ? 'warning text-dark' : ($modalAnnouncementType === 'success' ? 'success' : 'info'))) ?> mb-3"><?= e(ucfirst($modalAnnouncementType)) ?></span><p class="mb-0" style="white-space: pre-line;"><?= e($announcement['message'] ?? '') ?></p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+    <?php if ($modalCanManageAnnouncement): ?>
+        <div class="modal fade" id="houseAnnouncementEditModal-<?= e($modalAnnouncementId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg"><div class="modal-content"><form method="POST" action="<?= e($indexUrl) ?>" class="announcement-modal-form"><input type="hidden" name="action" value="update_announcement"><input type="hidden" name="id" value="<?= e($modalAnnouncementId) ?>"><div class="modal-header"><h5 class="modal-title">Edit Announcement</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($announcement['title'] ?? '') ?>" required><label class="form-label">Type</label><select name="type" class="form-select mb-3"><option value="info" <?= $modalAnnouncementType === 'info' ? 'selected' : '' ?>>Info</option><option value="success" <?= $modalAnnouncementType === 'success' ? 'selected' : '' ?>>Success</option><option value="warning" <?= $modalAnnouncementType === 'warning' ? 'selected' : '' ?>>Warning</option><option value="danger" <?= $modalAnnouncementType === 'danger' ? 'selected' : '' ?>>Urgent</option></select><label class="form-label">Message</label><textarea name="message" class="form-control" rows="5" required><?= e($announcement['message'] ?? '') ?></textarea><input type="hidden" name="status" value="<?= e($announcement['status'] ?? 'published') ?>"><input type="hidden" name="isUrgent" value="<?= !empty($announcement['isUrgent']) ? '1' : '' ?>"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
+        <div class="modal fade" id="houseAnnouncementDeleteModal-<?= e($modalAnnouncementId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Announcement</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete <strong><?= e($announcement['title'] ?? 'this announcement') ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= e($indexUrl) ?>"><input type="hidden" name="action" value="delete_announcement"><input type="hidden" name="id" value="<?= e($modalAnnouncementId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
+    <?php endif; ?>
 <?php endforeach; ?>
+<?php if (!empty($errors['general']) && ($errors['action'] ?? '') === 'create_announcement'): ?>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const modal = document.getElementById('createHouseAnnouncementModal');
+        if (modal && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modal).show();
+    });
+    </script>
+<?php endif; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

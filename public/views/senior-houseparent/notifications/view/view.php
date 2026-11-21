@@ -50,12 +50,28 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="d-flex justify-content-between align-items-center">
                 <span class="badge <?= !empty($notification['read']) ? 'bg-success' : 'bg-warning text-dark' ?>"><?= !empty($notification['read']) ? 'Read' : 'Unread' ?></span>
                 <div>
-                    <a class="btn btn-sm btn-outline-primary" href="<?= url('views/senior-houseparent/notifications/edit/edit.php?id=' . urlencode($id)) ?>">Edit</a>
-                    <a class="btn btn-sm btn-outline-danger" href="<?= url('views/senior-houseparent/notifications/delete/delete.php?id=' . urlencode($id)) ?>">Delete</a>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#seniorEditNotificationModal">Edit</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#seniorDeleteNotificationModal">Delete</button>
                     <?php if (empty($notification['read'])): ?><form method="POST" class="d-inline"><button class="btn btn-primary btn-sm">Mark as read</button></form><?php endif; ?>
                 </div>
             </div>
         </div>
     </div>
 </div>
+<div class="modal fade" id="seniorEditNotificationModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content">
+    <form method="POST" action="<?= url('views/senior-houseparent/notifications/edit/edit.php?id=' . urlencode($id)) ?>">
+        <div class="modal-header"><h5 class="modal-title">Edit Notification</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body"><input type="hidden" name="id" value="<?= e($id) ?>">
+            <label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($notification['title'] ?? '') ?>" required>
+            <label class="form-label">Type</label><select name="type" class="form-select mb-3"><?php foreach (['info', 'success', 'warning', 'danger'] as $notificationType): ?><option value="<?= e($notificationType) ?>" <?= ($notification['type'] ?? 'info') === $notificationType ? 'selected' : '' ?>><?= ucfirst($notificationType) ?></option><?php endforeach; ?></select>
+            <label class="form-label">Message</label><textarea name="message" class="form-control" rows="5" required><?= e($notification['message'] ?? '') ?></textarea>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+    </form>
+</div></div></div>
+<div class="modal fade" id="seniorDeleteNotificationModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title text-danger">Delete Notification</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+    <div class="modal-body">Delete <strong><?= e($notification['title'] ?? 'this notification') ?></strong>?</div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/senior-houseparent/notifications/delete/delete.php?id=' . urlencode($id)) ?>"><input type="hidden" name="id" value="<?= e($id) ?>"><button type="submit" class="btn btn-danger">Delete notification</button></form></div>
+</div></div></div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

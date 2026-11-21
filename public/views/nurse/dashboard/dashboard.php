@@ -20,6 +20,10 @@ $nurseName = trim(($user['name'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . (
 
 $medicalService = new MedicalService();
 $students = StudentService::all();
+$nurseMedicalStudents = $students;
+$nurseMedicalModalId = 'nurseMedicalRecordCreate';
+$nurseMedicalReturnTo = 'dashboard';
+$nurseMedicalSelectedStudentId = '';
 $records  = $medicalService->all();
 $todayCases    = (int) $medicalService->todayCases();
 $emergencyCases = (int) $medicalService->emergencyCases();
@@ -86,9 +90,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="<?= url('views/nurse/create-record/create-record.php') ?>" class="btn btn-primary btn-sm">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#nurseMedicalRecordCreate">
                     <i class="bi bi-plus-circle me-1"></i> New Medical Record
-                </a>
+                </button>
                 <a href="<?= url('views/nurse/emergency-cases/emergency-cases.php') ?>" class="btn btn-outline-danger btn-sm">
                     <i class="bi bi-exclamation-octagon me-1"></i> Emergencies
                 </a>
@@ -284,10 +288,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="card-body p-3">
                         <div class="row g-2">
                             <div class="col-6">
-                                <a href="<?= url('views/nurse/create-record/create-record.php') ?>" class="btn btn-outline-primary w-100 p-3 d-flex flex-column align-items-center">
+                                <button type="button" class="btn btn-outline-primary w-100 p-3 d-flex flex-column align-items-center" data-bs-toggle="modal" data-bs-target="#nurseMedicalRecordCreate">
                                     <i class="bi bi-plus-circle fs-3 mb-1"></i>
                                     <span class="small fw-bold">New Record</span>
-                                </a>
+                                </button>
                             </div>
                             <div class="col-6">
                                 <a href="<?= url('views/nurse/emergency-cases/emergency-cases.php') ?>" class="btn btn-outline-danger w-100 p-3 d-flex flex-column align-items-center">
@@ -349,15 +353,17 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
     </div>
 </div>
+<?php require __DIR__ . '/../components/medical-record-modal.php'; ?>
 <?php foreach ($recentRecords as $rec): ?>
     <?php
     $modalRecId = (string) ($rec['id'] ?? '');
     if ($modalRecId === '') continue;
     ?>
     <div class="modal fade" id="nurseDashboardRecordEdit-<?= e($modalRecId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" action="<?= url('views/nurse/edit-record/edit-record.php?id=' . urlencode($modalRecId)) ?>">
+                    <input type="hidden" name="returnToNursePage" value="dashboard">
                     <div class="modal-header">
                         <h5 class="modal-title">Edit Recent Medical Record</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

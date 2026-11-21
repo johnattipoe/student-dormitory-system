@@ -159,11 +159,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#seniorRequestView-<?= e((string) ($request['id'] ?? '')) ?>">View</button>
                                     <?php if (($request['status'] ?? 'pending') === 'pending'): ?>
                                         <div class="btn-group btn-group-sm" role="group">
-                                            <form method="POST" style="display:inline;">
-                                                <input type="hidden" name="action" value="approve_request">
-                                                <input type="hidden" name="requestId" value="<?= e((string) ($request['id'] ?? '')) ?>">
-                                                <button class="btn btn-success btn-sm">Approve</button>
-                                            </form>
+                                            <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#approveModal_<?= md5((string) ($request['id'] ?? '')) ?>">Approve</button>
                                             <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#rejectModal_<?= md5((string) ($request['id'] ?? '')) ?>">Reject</button>
                                         </div>
                                     <?php else: ?>
@@ -181,6 +177,13 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <?php $requestStudent = $studentMap[(string) ($request['studentId'] ?? '')] ?? null; ?>
             <div class="modal fade" id="seniorRequestView-<?= e((string) ($request['id'] ?? '')) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Visitor Request Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Visitor</dt><dd class="col-sm-7"><?= e($request['visitorName'] ?? '—') ?></dd><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e(trim((($requestStudent['firstName'] ?? '') . ' ' . ($requestStudent['lastName'] ?? ''))) ?: ($request['studentId'] ?? '—')) ?></dd><dt class="col-sm-5">Visit Date</dt><dd class="col-sm-7"><?= e($request['requestedDate'] ?? ($request['visitDate'] ?? '—')) ?></dd><dt class="col-sm-5">Relationship</dt><dd class="col-sm-7"><?= e($request['relationship'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e($request['status'] ?? 'pending') ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
             <?php if (($request['status'] ?? 'pending') === 'pending'): ?>
+                <div class="modal fade" id="approveModal_<?= md5((string) ($request['id'] ?? '')) ?>" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+                        <div class="modal-header"><h5 class="modal-title">Approve Visitor Request</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                        <div class="modal-body">Approve the visit request for <strong><?= e($request['visitorName'] ?? 'this visitor') ?></strong>?</div>
+                        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST"><input type="hidden" name="action" value="approve_request"><input type="hidden" name="requestId" value="<?= e((string) ($request['id'] ?? '')) ?>"><button type="submit" class="btn btn-success">Approve Request</button></form></div>
+                    </div></div>
+                </div>
                 <div class="modal fade" id="rejectModal_<?= md5((string) ($request['id'] ?? '')) ?>" tabindex="-1">
                     <div class="modal-dialog">
                         <div class="modal-content">

@@ -20,6 +20,10 @@ use App\Services\StudentService;
 
 $studentId = sanitize($_GET['id'] ?? '');
 $student = $studentId !== '' ? StudentService::find($studentId) : null;
+$nurseMedicalStudents = $student ? [$student] : [];
+$nurseMedicalModalId = 'nurseMedicalRecordCreate';
+$nurseMedicalReturnTo = 'studentProfile';
+$nurseMedicalSelectedStudentId = $studentId;
 $records = (new MedicalService())->all();
 $studentRecords = array_values(array_filter($records, static fn(array $record): bool => (string) ($record['studentId'] ?? '') === (string) ($student['id'] ?? $studentId)));
 $latestRecords = array_slice($studentRecords, 0, 5);
@@ -67,7 +71,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </div>
                 <div class="nurse-hero-actions">
                     <a class="btn btn-light" href="<?= url('views/nurse/students/students.php') ?>"><i class="bi bi-arrow-left"></i> Students</a>
-                    <a class="btn btn-warning" href="<?= url('views/nurse/create-record/create-record.php?studentId=' . urlencode($studentId)) ?>"><i class="bi bi-plus-circle"></i> New record</a>
+                    <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#nurseMedicalRecordCreate"><i class="bi bi-plus-circle"></i> New record</button>
                 </div>
             </section>
 
@@ -144,4 +148,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <?php endif; ?>
     </div>
 </div>
+<?php if ($student): ?>
+    <?php require __DIR__ . '/../components/medical-record-modal.php'; ?>
+<?php endif; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

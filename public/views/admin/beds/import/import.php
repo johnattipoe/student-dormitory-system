@@ -91,7 +91,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <select name="defaultRoomId" class="form-select mb-3"><option value="">Use RoomId column</option><?php foreach ($rooms as $room): ?><option value="<?= e((string) ($room['id'] ?? '')) ?>"><?= e($room['roomNumber'] ?? '-') ?> - <?= e($houses[(string) ($room['houseId'] ?? '')] ?? '-') ?></option><?php endforeach; ?></select>
                 <p class="small text-muted">Headers: BedNumber, RoomId, Status. Maximum 1,000 rows.</p>
                 <button class="btn btn-primary">Upload and import</button>
-                <a class="btn btn-outline-secondary" href="<?= url('views/admin/beds/import/import.php?download_template=1') ?>">Download template</a>
+                <a class="btn btn-outline-secondary" href="data:text/csv;charset=utf-8,BedNumber%2CRoomId%2CStatus%0ABed%201%2CROOM_ID%2Cavailable%0A" download="bed-import-template.csv">Download template</a>
             </form>
         </div>
     </div>

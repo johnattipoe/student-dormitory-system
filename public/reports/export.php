@@ -144,7 +144,7 @@ function export_report_pdf(string $filename, string $title, array $rows): void
 function house_master_report_data(): array
 {
     $date = sanitize($_GET['date'] ?? date('Y-m-d'));
-    $houseId = current_user()['houseId'] ?? null;
+    $houseId = current_user()['houseId'] ?? current_user()['house_id'] ?? null;
     $summary = App\Services\AttendanceService::summary($date, $houseId);
     $students = App\Services\StudentService::all($houseId);
     $incidents = (new App\Services\IncidentService())->byHouse($houseId, true);

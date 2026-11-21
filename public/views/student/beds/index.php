@@ -233,7 +233,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <h3>Quick actions</h3>
                         <div class="d-grid gap-2">
                             <a href="<?= url('views/student/room/index.php') ?>" class="btn btn-outline-primary"><i class="bi bi-house-door me-1"></i>View room page</a>
-                            <a href="<?= url('views/student/incidents/create/create.php') ?>" class="btn btn-outline-danger"><i class="bi bi-flag me-1"></i>Report issue</a>
+                            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#studentIncidentReport"><i class="bi bi-flag me-1"></i>Report issue</button>
                             <a href="<?= url('views/student/visitors/index/index.php') ?>" class="btn btn-outline-info"><i class="bi bi-people me-1"></i>Visitor requests</a>
                         </div>
                     </aside>
@@ -242,4 +242,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <?php endif; ?>
     </div>
 </div>
+<?php
+$studentIncidentModalId = 'studentIncidentReport';
+$studentIncidentReturnTo = 'beds';
+require __DIR__ . '/../components/incident-report-modal.php';
+?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -2,6 +2,124 @@
 require __DIR__ . '/../_context/_context.php';
 
 use App\Services\BedService;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = sanitize($_POST['action'] ?? '');
+    if (in_array($action, ['create', 'import'], true)) {
+        if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
+            flash('error', 'The form expired. Please refresh the page and try again.');
+            house_master_bed_redirect();
+        }
+
+        if ($action === 'create') {
+            $roomId = sanitize($_POST['roomId'] ?? '');
+            if (!house_master_bed_allowed($roomMap[$roomId] ?? null, $houseId)) {
+                flash('error', 'Select a room in your assigned house.');
+            } else {
+                $result = BedService::create([
+                    'bedNumber' => sanitize($_POST['bedNumber'] ?? ''),
+                    'roomId' => $roomId,
+                    'capacity' => max(1, (int) ($_POST['capacity'] ?? 1)),
+                    'status' => sanitize($_POST['status'] ?? 'available'),
+                ]);
+                flash(!empty($result['success']) ? 'success' : 'error', $result['message'] ?? 'Unable to create bed.');
+            }
+            house_master_bed_redirect();
+        }
+
+        $file = $_FILES['beds_file'] ?? [];
+        $fileError = validate_uploaded_file($file, ['csv', 'xlsx']);
+        if ($fileError !== null) {
+            flash('error', $fileError);
+            house_master_bed_redirect();
+        }
+
+        try {
+            $rows = IOFactory::load($file['tmp_name'])->getActiveSheet()->toArray(null, true, true, false);
+            $header = array_map(static fn ($value) => strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $value)), array_shift($rows) ?: []);
+            $columns = [];
+            foreach ($header as $index => $name) {
+                $columns[$name] = $index;
+            }
+            if (!array_key_exists('bednumber', $columns)) {
+                flash('error', 'The file must include a BedNumber column.');
+                house_master_bed_redirect();
+            }
+
+            $defaultRoomId = sanitize($_POST['defaultRoomId'] ?? '');
+            if (!array_key_exists('roomid', $columns) && $defaultRoomId === '') {
+                flash('error', 'Include a RoomId column or choose a default room.');
+                house_master_bed_redirect();
+            }
+
+            $value = static fn (array $row, string $column, string $default = ''): string =>
+                trim((string) ($row[$columns[$column] ?? -1] ?? $default));
+            $maxRecords = max(1, (int) (app_config()['import_max_records'] ?? 1000));
+            $rowsToImport = array_slice($rows, 0, $maxRecords);
+            $imported = 0;
+            $importErrors = [];
+            foreach ($rowsToImport as $index => $row) {
+                if (count(array_filter($row, static fn ($cell): bool => trim((string) $cell) !== '')) === 0) {
+                    continue;
+                }
+
+                $rowNumber = $index + 2;
+                $bedNumber = $value($row, 'bednumber');
+                $roomId = $value($row, 'roomid') ?: $defaultRoomId;
+                $status = strtolower($value($row, 'status') ?: 'available');
+                $capacityText = $value($row, 'capacity') ?: '1';
+                if ($bedNumber === '') {
+                    $importErrors[] = "Row {$rowNumber}: bed number is required.";
+                    continue;
+                }
+                if (!house_master_bed_allowed($roomMap[$roomId] ?? null, $houseId)) {
+                    $importErrors[] = "Row {$rowNumber}: select a room in your assigned house.";
+                    continue;
+                }
+                if ($capacityText === '' || !ctype_digit($capacityText) || (int) $capacityText < 1) {
+                    $importErrors[] = "Row {$rowNumber}: capacity must be a positive whole number.";
+                    continue;
+                }
+                if (!in_array($status, ['available', 'maintenance'], true)) {
+                    $importErrors[] = "Row {$rowNumber}: status must be available or maintenance.";
+                    continue;
+                }
+
+                $result = BedService::create([
+                    'bedNumber' => sanitize($bedNumber),
+                    'roomId' => $roomId,
+                    'capacity' => (int) $capacityText,
+                    'status' => $status,
+                ]);
+                if (!empty($result['success'])) {
+                    $imported++;
+                } else {
+                    $importErrors[] = "Row {$rowNumber}: " . (string) ($result['message'] ?? 'Unable to create bed.');
+                }
+            }
+
+            if ($imported > 0) {
+                flash('success', "Imported {$imported} bed(s) into your house.");
+            }
+            if ($importErrors !== []) {
+                $shownErrors = array_slice($importErrors, 0, 3);
+                $remainingErrors = count($importErrors) - count($shownErrors);
+                flash('warning', implode(' ', $shownErrors) . ($remainingErrors > 0 ? " {$remainingErrors} more row(s) could not be imported." : ''));
+            } elseif ($imported === 0) {
+                flash('error', 'No beds were imported. Check that the file contains valid data rows.');
+            }
+            if (count($rows) > $maxRecords) {
+                flash('info', "Only the first {$maxRecords} data rows were processed.");
+            }
+        } catch (Throwable $e) {
+            error_log('House bed import failed: ' . $e->getMessage());
+            flash('error', 'Import failed. Check the file format and try again.');
+        }
+
+        house_master_bed_redirect();
+    }
+}
 
 $search = strtolower(trim(sanitize($_GET['search'] ?? '')));
 $statusFilter = sanitize($_GET['status'] ?? '');
@@ -37,12 +155,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0"><?= e($house['name'] ?? 'Your house') ?> — bed assignments and availability</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-outline-success btn-sm" href="<?= url('views/house-master/beds/export/export.php') ?>">
+                <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#houseExportBedsModal">
                     <i class="bi bi-download me-1"></i>Export
-                </a>
-                <a class="btn btn-primary btn-sm" href="<?= url('views/house-master/beds/create/create.php') ?>">
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#houseImportBedsModal">
+                    <i class="bi bi-upload me-1"></i>Import
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#houseCreateBedModal">
                     <i class="bi bi-plus-lg me-1"></i>Add Bed
-                </a>
+                </button>
             </div>
         </div>
 
@@ -202,4 +323,130 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <?php if ($modalStudent): ?><div class="modal fade" id="houseBedUnassignModal-<?= e($modalBedId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Unassign Bed</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body">Remove <strong><?= e(trim(($modalStudent['firstName'] ?? '') . ' ' . ($modalStudent['lastName'] ?? ''))) ?></strong> from this bed?</div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/beds/unassign/unassign.php') ?>"><input type="hidden" name="id" value="<?= e($modalBedId) ?>"><button type="submit" class="btn btn-warning">Unassign</button></form></div></div></div></div><?php endif; ?>
     <div class="modal fade" id="houseBedDeleteModal-<?= e($modalBedId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Bed</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete bed <strong><?= e($bed['bedNumber'] ?? 'this bed') ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/beds/delete/delete.php?id=' . urlencode($modalBedId)) ?>"><input type="hidden" name="id" value="<?= e($modalBedId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
 <?php endforeach; ?>
+<div class="modal fade" id="houseExportBedsModal" tabindex="-1" aria-labelledby="houseExportBedsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="houseExportBedsModalLabel">Export house beds</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Download a CSV of beds in <?= e($house['name'] ?? 'your house') ?>, including room and student assignment details.
+                <div id="houseExportBedsError" class="alert alert-danger mt-3 mb-0 d-none" role="alert"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="houseExportBedsDownload" class="btn btn-success" data-export-url="<?= e(url('views/house-master/beds/export/export.php')) ?>" data-filename="house-beds-<?= e(date('Y-m-d')) ?>.csv">
+                    <i class="bi bi-download me-1"></i>Download CSV
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseCreateBedModal" tabindex="-1" aria-labelledby="houseCreateBedModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/beds/index/index.php') ?>">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="houseCreateBedModalLabel">Add bed</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="create">
+                    <label class="form-label" for="houseBedNumber">Bed number</label>
+                    <input id="houseBedNumber" name="bedNumber" class="form-control mb-3" placeholder="e.g. Bed A1 or Bunk 2" required>
+                    <label class="form-label" for="houseBedCapacity">Bed capacity</label>
+                    <input id="houseBedCapacity" type="number" name="capacity" class="form-control mb-3" min="1" value="1" required>
+                    <label class="form-label" for="houseBedRoom">Room</label>
+                    <select id="houseBedRoom" name="roomId" class="form-select mb-3" required>
+                        <option value="">Select room</option>
+                        <?php foreach ($rooms as $room): ?>
+                            <?php if (!house_master_bed_allowed($room, $houseId)) continue; ?>
+                            <option value="<?= e((string) ($room['id'] ?? '')) ?>"><?= e($room['roomNumber'] ?? '—') ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label class="form-label" for="houseBedStatus">Initial status</label>
+                    <select id="houseBedStatus" name="status" class="form-select">
+                        <option value="available">Available</option>
+                        <option value="maintenance">Under maintenance</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Create bed</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseImportBedsModal" tabindex="-1" aria-labelledby="houseImportBedsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/beds/index/index.php') ?>" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="houseImportBedsModalLabel">Import house beds</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="import">
+                    <label class="form-label" for="houseBedsImportFile">CSV or XLSX file</label>
+                    <input id="houseBedsImportFile" type="file" name="beds_file" class="form-control mb-3" accept=".csv,.xlsx" required>
+                    <label class="form-label" for="houseBedsDefaultRoom">Default room</label>
+                    <select id="houseBedsDefaultRoom" name="defaultRoomId" class="form-select mb-3">
+                        <option value="">Use the RoomId column</option>
+                        <?php foreach ($rooms as $room): ?>
+                            <?php if (!house_master_bed_allowed($room, $houseId)) continue; ?>
+                            <option value="<?= e((string) ($room['id'] ?? '')) ?>"><?= e($room['roomNumber'] ?? '—') ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="small text-muted mb-0">Required header: BedNumber. Optional headers: RoomId, Capacity, Status. Any RoomId must belong to your assigned house. Maximum <?= e((string) (app_config()['import_max_records'] ?? 1000)) ?> rows.</p>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <a class="btn btn-outline-secondary" href="data:text/csv;charset=utf-8,BedNumber%2CRoomId%2CCapacity%2CStatus%0ABed%201%2C%2C1%2Cavailable%0A" download="house-bed-import-template.csv"><i class="bi bi-file-earmark-arrow-down me-1"></i>Download template</a>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-upload me-1"></i>Upload and import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.querySelectorAll('.modal').forEach(function (modal) {
+    modal.dataset.disableLoading = 'true';
+    document.body.appendChild(modal);
+});
+
+document.getElementById('houseExportBedsDownload').addEventListener('click', async function () {
+    const button = this;
+    const errorMessage = document.getElementById('houseExportBedsError');
+    SDS.showButtonLoading(button);
+    errorMessage.classList.add('d-none');
+    errorMessage.textContent = '';
+
+    try {
+        const response = await fetch(button.dataset.exportUrl, {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (!response.ok || !(response.headers.get('content-type') || '').includes('text/csv')) {
+            throw new Error('The bed export could not be downloaded. Please try again.');
+        }
+
+        const downloadUrl = URL.createObjectURL(await response.blob());
+        const downloadLink = document.createElement('a');
+        downloadLink.href = downloadUrl;
+        downloadLink.download = button.dataset.filename;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        downloadLink.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(downloadUrl); }, 1000);
+    } catch (error) {
+        errorMessage.textContent = error instanceof Error ? error.message : 'The bed export could not be downloaded. Please try again.';
+        errorMessage.classList.remove('d-none');
+    } finally {
+        SDS.hideButtonLoading(button);
+    }
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

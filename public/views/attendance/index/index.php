@@ -16,6 +16,27 @@ $allowedRoles = [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_SENIOR_HOUSEPARENT, ROLE_SE
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\FirebaseService;
+use App\Services\AttendanceService;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_attendance') {
+    if (!in_array(current_role(), [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_SENIOR_HOUSEPARENT, ROLE_SECURITY], true)) {
+        http_response_code(403);
+        exit('You are not authorized to mark attendance.');
+    }
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
+        flash('error', 'The form expired. Please refresh the page and try again.');
+        redirect(url('views/attendance/index/index.php'));
+    }
+
+    $result = AttendanceService::mark([
+        'studentId' => sanitize($_POST['studentId'] ?? ''),
+        'status' => sanitize($_POST['status'] ?? ''),
+        'date' => sanitize($_POST['date'] ?? date('Y-m-d')),
+        'markedBy' => current_user()['uid'] ?? null,
+    ]);
+    flash($result['success'] ? 'success' : 'error', $result['message']);
+    redirect(url('views/attendance/index/index.php'));
+}
 
 $pageTitle = 'Attendance';
 $page = max(1, (int) ($_GET['page'] ?? 1));
@@ -24,6 +45,7 @@ $allRecords = FirebaseService::getInstance()->getCollection(COL_ATTENDANCE, [], 
 $totalRecords = count($allRecords);
 $totalPages = max(1, (int) ceil($totalRecords / $limit));
 $records = array_slice($allRecords, ($page - 1) * $limit, $limit);
+$students = FirebaseService::getInstance()->getCollection(COL_STUDENTS, [], 500);
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-calendar-check', 'label' => 'Attendance', 'href' => url('views/attendance/index/index.php'), 'active' => true],
@@ -38,7 +60,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <div class="content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Attendance</h5>
-            <a href="<?= url('views/attendance/mark/mark.php') ?>" class="btn btn-primary btn-sm">Mark Attendance</a>
+            <?php if (in_array(current_role(), [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_SENIOR_HOUSEPARENT, ROLE_SECURITY], true)): ?>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#markAttendanceModal">Mark Attendance</button>
+            <?php endif; ?>
         </div>
 
         <div class="card stat-card p-3">
@@ -75,6 +99,21 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <?php $paginationBaseUrl = url('views/attendance/index/index.php'); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
         </div>
     </div>
+</div>
+<div class="modal fade" id="markAttendanceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <form method="POST" action="<?= url('views/attendance/index/index.php') ?>">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="mark_attendance">
+            <div class="modal-header"><h5 class="modal-title">Mark Attendance</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">Student</label><select name="studentId" class="form-select" required><option value="">Select student</option><?php foreach ($students as $student): ?><option value="<?= e((string) ($student['id'] ?? '')) ?>"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?></option><?php endforeach; ?></select></div>
+                <div class="mb-3"><label class="form-label">Date</label><input type="date" name="date" class="form-control" value="<?= e(date('Y-m-d')) ?>" required></div>
+                <div><label class="form-label">Status</label><select name="status" class="form-select" required><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Attendance</button></div>
+        </form>
+    </div></div>
 </div>
 <?php foreach ($records as $r): ?>
     <?php

@@ -21,6 +21,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 $errors = [];
 $success = 0;
+$returnToVisitors = !empty($_POST['returnToVisitors']);
 
 if (isset($_GET['download_template'])) {
     header('Content-Type:text/csv');
@@ -30,6 +31,10 @@ if (isset($_GET['download_template'])) {
     fputcsv($out, ['John Doe', 'STUDENT_ID', '0800000000', 'Visit', 'National ID', 'ID001']);
     fclose($out);
     exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'import_visitors' && empty($_FILES['visitors_file'])) {
+    $errors[] = 'Please select a CSV or XLSX file.';
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'import_visitors' && !empty($_FILES['visitors_file'])) {
@@ -70,11 +75,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
             }
 
             flash('success', "Imported {$success} visitor(s).");
-            redirect(url('views/security/visitors/bulk-import/bulk-import.php'));
+            redirect($returnToVisitors
+                ? url('views/security/visitors/visitors/visitors.php')
+                : url('views/security/visitors/bulk-import/bulk-import.php'));
         } catch (Throwable $e) {
             $errors[] = 'Import failed: ' . $e->getMessage();
         }
     }
+}
+
+if ($returnToVisitors && !empty($errors)) {
+    flash('error', implode(' ', $errors));
+    redirect(url('views/security/visitors/visitors/visitors.php?openVisitorImport=1'));
 }
 
 $pageTitle = 'Bulk Visitor Import';

@@ -32,7 +32,19 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="mb-4">
             <h5 class="mb-1">Attendance Reports</h5>
             <p class="text-muted">Daily attendance metrics and export-ready summaries.</p>
-            <form method="GET" class="d-flex gap-2 mb-3"><input type="date" name="date" class="form-control" value="<?= e($date) ?>"><button class="btn btn-primary btn-sm">View</button><a class="btn btn-success btn-sm" href="<?= url('reports/export.php?type=attendance&format=csv') ?>">CSV</a></form>
+            <div class="d-flex gap-2 align-items-center mb-3 flex-wrap">
+                <form method="GET" class="d-flex gap-2 m-0">
+                    <input type="date" name="date" class="form-control" value="<?= e($date) ?>">
+                    <button class="btn btn-primary btn-sm">View</button>
+                </form>
+                <?php
+                $reportType = 'attendance';
+                $reportExportFormats = ['csv' => 'CSV'];
+                $reportDownloadButtonLabel = 'CSV';
+                $reportDownloadWrapperClass = 'mb-0';
+                require APP_ROOT . '/app/views/components/report-downloads/report-downloads.php';
+                ?>
+            </div>
         </div>
         <div class="row g-3">
             <div class="col-md-6">

@@ -35,7 +35,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ]);
     flash($result['success'] ? 'success' : 'error', $result['message']);
 
-    redirect(url('views/nurse/emergency-cases/contacts/add/add.php'));
+    redirect(!empty($_POST['returnToEmergencyCases'])
+        ? url('views/nurse/emergency-cases/emergency-cases.php')
+        : url('views/nurse/emergency-cases/contacts/add/add.php'));
 }
 
 $contacts = $contactService->all();

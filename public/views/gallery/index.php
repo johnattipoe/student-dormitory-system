@@ -450,7 +450,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                                     </div>
                                                 </div>
                                                 <div class="modal-footer">
-                                                    <a href="<?= url('index.php?route=' . urlencode('/views/gallery/edit/edit.php') . '&file=' . urlencode($item['fileName'])) ?>" class="btn btn-outline-secondary">Open Full Page</a>
                                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                                     <button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1"></i>Save Changes</button>
                                                 </div>
@@ -472,7 +471,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                                     <p class="mb-0">Delete the photo for <strong><?= e($item['studentName']) ?></strong>? This cannot be undone.</p>
                                                 </div>
                                                 <div class="modal-footer">
-                                                    <a href="<?= url('index.php?route=' . urlencode('/views/gallery/delete/delete.php') . '&file=' . urlencode($item['fileName'])) ?>" class="btn btn-outline-secondary">Open Full Page</a>
                                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                                     <button type="submit" class="btn btn-danger"><i class="bi bi-trash3 me-1"></i>Delete Photo</button>
                                                 </div>

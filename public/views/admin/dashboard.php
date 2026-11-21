@@ -109,10 +109,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </p>
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                <a href="<?= url('views/admin/students/create/create.php') ?>" class="btn btn-primary btn-sm">
+                <a href="<?= url('views/admin/students/index/index.php') . '&openAddStudent=1' ?>" class="btn btn-primary btn-sm">
                     <i class="bi bi-person-plus me-1"></i> Add Student
                 </a>
-                <a href="<?= url('views/admin/announcements/create/create.php') ?>" class="btn btn-outline-warning btn-sm">
+                <a href="<?= url('views/admin/announcements/index.php') . '&openCreateAnnouncement=1' ?>" class="btn btn-outline-warning btn-sm">
                     <i class="bi bi-megaphone me-1"></i> Broadcast
                 </a>
                 <a href="<?= url('views/admin/profile.php') ?>" class="btn btn-outline-secondary btn-sm">
@@ -314,19 +314,19 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="card-body p-3">
                         <div class="row g-2">
                             <div class="col-6">
-                                <a href="<?= url('views/admin/students/create/create.php') ?>" class="btn btn-outline-primary w-100 p-3 d-flex flex-column align-items-center">
+                                <a href="<?= url('views/admin/students/index/index.php') . '&openAddStudent=1' ?>" class="btn btn-outline-primary w-100 p-3 d-flex flex-column align-items-center">
                                     <i class="bi bi-person-plus fs-3 mb-1"></i>
                                     <span class="small fw-bold">Add Student</span>
                                 </a>
                             </div>
                             <div class="col-6">
-                                <a href="<?= url('views/admin/houses/create/create.php') ?>" class="btn btn-outline-success w-100 p-3 d-flex flex-column align-items-center">
+                                <a href="<?= url('views/admin/houses/index/index.php') . '&openCreateHouse=1' ?>" class="btn btn-outline-success w-100 p-3 d-flex flex-column align-items-center">
                                     <i class="bi bi-building fs-3 mb-1"></i>
                                     <span class="small fw-bold">Add House</span>
                                 </a>
                             </div>
                             <div class="col-6">
-                                <a href="<?= url('views/admin/rooms/create/create.php') ?>" class="btn btn-outline-info w-100 p-3 d-flex flex-column align-items-center">
+                                <a href="<?= url('views/admin/rooms/index/index.php') . '&openCreateRoom=1' ?>" class="btn btn-outline-info w-100 p-3 d-flex flex-column align-items-center">
                                     <i class="bi bi-door-closed fs-3 mb-1"></i>
                                     <span class="small fw-bold">Add Room</span>
                                 </a>
@@ -338,7 +338,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 </a>
                             </div>
                             <div class="col-6">
-                                <a href="<?= url('views/admin/announcements/create/create.php') ?>" class="btn btn-outline-warning w-100 p-3 d-flex flex-column align-items-center">
+                                <a href="<?= url('views/admin/announcements/index.php') . '&openCreateAnnouncement=1' ?>" class="btn btn-outline-warning w-100 p-3 d-flex flex-column align-items-center">
                                     <i class="bi bi-megaphone fs-3 mb-1"></i>
                                     <span class="small fw-bold">Broadcast</span>
                                 </a>

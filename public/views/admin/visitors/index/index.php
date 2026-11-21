@@ -261,17 +261,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <button type="button" class="btn btn-sm btn-outline-secondary" title="Edit" data-bs-toggle="modal" data-bs-target="#visitorEditModal-<?= e($vId) ?>"><i class="bi bi-pencil"></i></button>
                                         <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" data-bs-toggle="modal" data-bs-target="#visitorDeleteModal-<?= e($vId) ?>"><i class="bi bi-trash"></i></button>
                                         <?php if ($vStatus === 'inside'): ?>
-                                            <form method="POST" action="<?= url('views/admin/visitors/index/index.php') ?>" class="d-inline">
-                                                <input type="hidden" name="action" value="check_out">
-                                                <input type="hidden" name="id" value="<?= e($vId) ?>">
-                                                <button class="btn btn-sm btn-outline-secondary ms-1">Check out</button>
-                                            </form>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary ms-1" data-bs-toggle="modal" data-bs-target="#visitorCheckOutModal-<?= e($vId) ?>">Check out</button>
                                         <?php else: ?>
-                                            <form method="POST" action="<?= url('views/admin/visitors/index/index.php') ?>" class="d-inline">
-                                                <input type="hidden" name="action" value="check_in">
-                                                <input type="hidden" name="id" value="<?= e($vId) ?>">
-                                                <button class="btn btn-sm btn-success ms-1">Check in</button>
-                                            </form>
+                                            <button type="button" class="btn btn-sm btn-success ms-1" data-bs-toggle="modal" data-bs-target="#visitorCheckInModal-<?= e($vId) ?>">Check in</button>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -369,5 +361,52 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
     </div>
+
+    <?php if ($vStatus === 'inside'): ?>
+        <div class="modal fade" id="visitorCheckOutModal-<?= e($vId) ?>" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="POST" action="<?= url('views/admin/visitors/index/index.php') ?>" data-disable-loading="true">
+                        <input type="hidden" name="action" value="check_out">
+                        <input type="hidden" name="id" value="<?= e($vId) ?>">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Check Out Visitor</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">Confirm that <strong><?= e($visitorName) ?></strong> is leaving campus?</div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-secondary"><i class="bi bi-box-arrow-right me-1"></i>Check Out</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    <?php else: ?>
+        <div class="modal fade" id="visitorCheckInModal-<?= e($vId) ?>" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="POST" action="<?= url('views/admin/visitors/index/index.php') ?>" data-disable-loading="true">
+                        <input type="hidden" name="action" value="check_in">
+                        <input type="hidden" name="id" value="<?= e($vId) ?>">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Check In Visitor</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">Confirm that <strong><?= e($visitorName) ?></strong> is arriving on campus?</div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-success"><i class="bi bi-box-arrow-in-right me-1"></i>Check In</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
 <?php endforeach; ?>
+<script>
+document.querySelectorAll('.modal').forEach(function (modal) {
+    document.body.appendChild(modal);
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

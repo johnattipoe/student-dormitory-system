@@ -22,13 +22,22 @@ use App\Services\NotificationService;
 RoleMiddleware::allow($allowedRoles);
 
 $firebase = FirebaseService::getInstance();
-$studentCount = $firebase->count(COL_STUDENTS);
-$houseCount = $firebase->count(COL_HOUSES);
-$roomCount = $firebase->count(COL_ROOMS);
-$incidentCount = $firebase->count(COL_INCIDENTS);
-$attendanceCount = $firebase->count(COL_ATTENDANCE);
-$allocationCount = $firebase->count(COL_ROOM_ALLOCATIONS);
-$activityLogCount = $firebase->count(COL_ACTIVITY_LOGS);
+$countMetric = static function (string $collection) use ($firebase): int {
+    try {
+        return $firebase->count($collection);
+    } catch (\Throwable $exception) {
+        error_log('Dashboard metric unavailable (' . $collection . '): ' . $exception->getMessage());
+        return 0;
+    }
+};
+
+$studentCount = $countMetric(COL_STUDENTS);
+$houseCount = $countMetric(COL_HOUSES);
+$roomCount = $countMetric(COL_ROOMS);
+$incidentCount = $countMetric(COL_INCIDENTS);
+$attendanceCount = $countMetric(COL_ATTENDANCE);
+$allocationCount = $countMetric(COL_ROOM_ALLOCATIONS);
+$activityLogCount = $countMetric(COL_ACTIVITY_LOGS);
 $notificationCount = (new NotificationService())->count();
 
 $metrics = [

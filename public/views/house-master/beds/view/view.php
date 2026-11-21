@@ -37,18 +37,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Room <?= e($room['roomNumber'] ?? '—') ?> &bull; <?= e($house['name'] ?? '') ?></p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-warning btn-sm" href="<?= url('views/house-master/beds/edit/edit.php?id=' . urlencode($id)) ?>">
+                <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#houseBedEditModal">
                     <i class="bi bi-pencil me-1"></i>Edit
-                </a>
+                </button>
                 <?php if (!$student && $status !== 'maintenance'): ?>
-                    <a class="btn btn-outline-success btn-sm" href="<?= url('views/house-master/beds/assign/assign.php?id=' . urlencode($id)) ?>">
+                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#houseBedAssignModal">
                         <i class="bi bi-person-plus me-1"></i>Assign Student
-                    </a>
+                    </button>
                 <?php elseif ($student): ?>
-                    <form method="POST" action="<?= url('views/house-master/beds/unassign/unassign.php') ?>" class="d-inline">
-                        <input type="hidden" name="id" value="<?= e($id) ?>">
-                        <button class="btn btn-outline-warning btn-sm"><i class="bi bi-person-dash me-1"></i>Unassign</button>
-                    </form>
+                    <button type="button" class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#houseBedUnassignModal"><i class="bi bi-person-dash me-1"></i>Unassign</button>
                 <?php endif; ?>
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/beds/index/index.php') ?>">
                     <i class="bi bi-arrow-left me-1"></i>Back
@@ -102,4 +99,64 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<div class="modal fade" id="houseBedEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/beds/edit/edit.php?id=' . urlencode($id)) ?>">
+                <div class="modal-header"><h5 class="modal-title">Edit Bed</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" value="<?= e($id) ?>">
+                    <label class="form-label">Bed Number</label><input name="bedNumber" class="form-control mb-3" value="<?= e($bed['bedNumber'] ?? '') ?>" required>
+                    <label class="form-label">Room</label>
+                    <select name="roomId" class="form-select mb-3" required>
+                        <?php foreach ($rooms as $roomOption): ?>
+                            <option value="<?= e((string) ($roomOption['id'] ?? '')) ?>" <?= (string) ($bed['roomId'] ?? '') === (string) ($roomOption['id'] ?? '') ? 'selected' : '' ?>><?= e($roomOption['roomNumber'] ?? '—') ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label class="form-label">Capacity</label><input type="number" min="1" name="capacity" class="form-control mb-3" value="<?= e((string) ($bed['capacity'] ?? 1)) ?>" required>
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="available" <?= $status === 'available' ? 'selected' : '' ?>>Available</option>
+                        <option value="occupied" <?= $status === 'occupied' ? 'selected' : '' ?>>Occupied</option>
+                        <option value="maintenance" <?= $status === 'maintenance' ? 'selected' : '' ?>>Maintenance</option>
+                    </select>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php if (!$student && $status !== 'maintenance'): ?>
+<div class="modal fade" id="houseBedAssignModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/beds/assign/assign.php?id=' . urlencode($id)) ?>">
+                <div class="modal-header"><h5 class="modal-title">Assign Bed</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" value="<?= e($id) ?>">
+                    <label class="form-label">Student</label>
+                    <select name="studentId" class="form-select" required>
+                        <option value="">Choose a student</option>
+                        <?php foreach ($students as $studentOption): ?>
+                            <option value="<?= e((string) ($studentOption['id'] ?? '')) ?>"><?= e(trim(($studentOption['firstName'] ?? '') . ' ' . ($studentOption['lastName'] ?? ''))) ?> (<?= e($studentOption['admissionNo'] ?? '') ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-success">Assign student</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<?php if ($student): ?>
+<div class="modal fade" id="houseBedUnassignModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Unassign Bed</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">Remove <strong><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?></strong> from this bed?</div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/beds/unassign/unassign.php') ?>"><input type="hidden" name="id" value="<?= e($id) ?>"><button type="submit" class="btn btn-warning">Unassign</button></form></div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

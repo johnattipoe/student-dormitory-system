@@ -297,7 +297,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     $modalTypeBadge = match($note['type'] ?? 'info') { 'danger' => 'danger', 'warning' => 'warning text-dark', 'success' => 'success', 'urgent' => 'danger', default => 'info' };
     ?>
     <div class="modal fade" id="studentNotificationView-<?= e($modalNoteId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Notification Details</h5>

@@ -121,10 +121,24 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <dd class="col-sm-8"><?= e($markedByName) ?></dd>
             </dl>
             <div class="mt-4">
-                <a class="btn btn-primary" href="<?= url('views/admin/attendance/edit/edit.php?id=' . urlencode($id)) ?>"><i class="bi bi-pencil me-1"></i> Edit Record</a>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#adminEditAttendanceModal"><i class="bi bi-pencil me-1"></i> Edit Record</button>
                 <a class="btn btn-outline-secondary ms-1" href="<?= url('views/admin/attendance/index/index.php') ?>">Back to list</a>
             </div>
         </div>
     </div>
+</div>
+<div class="modal fade" id="adminEditAttendanceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <form method="POST" action="<?= url('views/admin/attendance/edit/edit.php?id=' . urlencode($id)) ?>">
+            <input type="hidden" name="id" value="<?= e($id) ?>">
+            <div class="modal-header"><h5 class="modal-title">Edit Attendance</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">Student</label><input class="form-control" value="<?= e($studentName) ?>" disabled></div>
+                <div class="mb-3"><label class="form-label">Date</label><input type="date" name="date" class="form-control" value="<?= e($entry['date'] ?? date('Y-m-d')) ?>" required></div>
+                <label class="form-label">Status</label><select name="status" class="form-select"><?php foreach (['present', 'absent', 'late', 'excused'] as $attendanceStatus): ?><option value="<?= e($attendanceStatus) ?>" <?= ($entry['status'] ?? 'present') === $attendanceStatus ? 'selected' : '' ?>><?= ucfirst($attendanceStatus) ?></option><?php endforeach; ?></select>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+        </form>
+    </div></div>
 </div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

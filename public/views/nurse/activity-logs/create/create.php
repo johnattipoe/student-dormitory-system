@@ -74,6 +74,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors['general'] = 'Failed to record clinical log: ' . $e->getMessage();
         }
     }
+
+    if (!empty($_POST['returnToActivityLogs'])) {
+        $_SESSION['_nurse_log_create_old'] = [
+            'event' => $event,
+            'studentId' => $studentId,
+            'severity' => $severity,
+            'details' => $details,
+        ];
+        $_SESSION['_nurse_log_create_errors'] = $errors;
+        flash('error', $errors['general'] ?? 'Please complete the required clinical note fields.');
+        redirect(url('views/nurse/activity-logs/index.php?openLogModal=1'));
+    }
 }
 
 $pageTitle = 'Log Clinical Note';

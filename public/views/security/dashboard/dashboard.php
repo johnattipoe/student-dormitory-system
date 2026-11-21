@@ -14,6 +14,7 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\IncidentService;
 use App\Services\VisitorService;
 use App\Services\FirebaseService;
+use App\Services\StudentService;
 
 $user = current_user() ?? [];
 $officerName = trim(($user['name'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))) ?: 'Security Officer';
@@ -23,6 +24,7 @@ $visitorService = new VisitorService();
 $incidentService = new IncidentService();
 $visitors  = $visitorService->all();
 $incidents = $incidentService->all();
+$securityStudents = StudentService::all();
 
 $insideVisitors  = array_values(array_filter($visitors, static fn($v) => ($v['status'] ?? '') === 'inside'));
 $pendingVisitors = array_values(array_filter($visitors, static fn($v) => ($v['status'] ?? '') === 'pending'));
@@ -76,12 +78,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="<?= url('views/security/register-visitor/register-visitor.php') ?>" class="btn btn-primary btn-sm">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#securityDashboardRegisterVisitorModal">
                     <i class="bi bi-person-plus me-1"></i> Register Visitor
-                </a>
-                <a href="<?= url('views/security/report-incident/report-incident.php') ?>" class="btn btn-outline-danger btn-sm">
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#securityDashboardReportIncidentModal">
                     <i class="bi bi-flag me-1"></i> Report Incident
-                </a>
+                </button>
                 <a href="<?= url('views/security/emergency-alerts/index.php') ?>" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-telephone-inbound me-1"></i> Alert Desk
                 </a>
@@ -298,16 +300,16 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="card-body p-3">
                         <div class="row g-2">
                             <div class="col-6">
-                                <a href="<?= url('views/security/register-visitor/register-visitor.php') ?>" class="btn btn-outline-primary w-100 p-3 d-flex flex-column align-items-center">
+                                <button type="button" class="btn btn-outline-primary w-100 p-3 d-flex flex-column align-items-center" data-bs-toggle="modal" data-bs-target="#securityDashboardRegisterVisitorModal">
                                     <i class="bi bi-person-plus fs-3 mb-1"></i>
                                     <span class="small fw-bold">Register Visitor</span>
-                                </a>
+                                </button>
                             </div>
                             <div class="col-6">
-                                <a href="<?= url('views/security/report-incident/report-incident.php') ?>" class="btn btn-outline-danger w-100 p-3 d-flex flex-column align-items-center">
+                                <button type="button" class="btn btn-outline-danger w-100 p-3 d-flex flex-column align-items-center" data-bs-toggle="modal" data-bs-target="#securityDashboardReportIncidentModal">
                                     <i class="bi bi-flag fs-3 mb-1"></i>
                                     <span class="small fw-bold">Report Incident</span>
-                                </a>
+                                </button>
                             </div>
                             <div class="col-6">
                                 <a href="<?= url('views/security/visitors/visitors/visitors.php') ?>" class="btn btn-outline-success w-100 p-3 d-flex flex-column align-items-center">
@@ -372,7 +374,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     if ($modalVisitorId === '') continue;
     ?>
     <div class="modal fade" id="securityDashboardVisitorView-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Recent Visitor Details</h5>
@@ -399,4 +401,44 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 <?php endforeach; ?>
+<div class="modal fade" id="securityDashboardRegisterVisitorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/security/register-visitor/register-visitor.php') ?>" class="security-modal-form">
+                <input type="hidden" name="returnToDashboard" value="1">
+                <div class="modal-header"><h5 class="modal-title">Register New Visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Visitor Full Name</label><input type="text" name="visitorName" class="form-control" required></div>
+                        <div class="col-md-6"><label class="form-label">Host Student</label><select name="studentId" class="form-select" required><option value="">Select student being visited</option><?php foreach ($securityStudents as $student): ?><?php $studentId = (string) ($student['id'] ?? ''); if ($studentId === '') continue; ?><option value="<?= e($studentId) ?>"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: ($student['admissionNo'] ?? $studentId)) ?> (<?= e($student['admissionNo'] ?? 'No ID') ?>)</option><?php endforeach; ?></select></div>
+                        <div class="col-md-4"><label class="form-label">Phone Number</label><input type="text" name="phone" class="form-control" required></div>
+                        <div class="col-md-4"><label class="form-label">Identification Type</label><input type="text" name="idType" class="form-control" required></div>
+                        <div class="col-md-4"><label class="form-label">ID / Document Number</label><input type="text" name="idNumber" class="form-control" required></div>
+                        <div class="col-12"><label class="form-label">Purpose of Visit</label><textarea name="purpose" class="form-control" rows="3" required></textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Register Visitor</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="securityDashboardReportIncidentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/security/report-incident/report-incident.php') ?>" class="security-modal-form">
+                <input type="hidden" name="returnToDashboard" value="1">
+                <div class="modal-header"><h5 class="modal-title">Report Security Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Incident Title</label><input type="text" name="title" class="form-control" required></div>
+                        <div class="col-md-6"><label class="form-label">Priority</label><select name="priority" class="form-select"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></div>
+                        <div class="col-12"><label class="form-label">Student Involved (Optional)</label><select name="studentId" class="form-select"><option value="">No specific student linked</option><?php foreach ($securityStudents as $student): ?><?php $studentId = (string) ($student['id'] ?? ''); if ($studentId === '') continue; ?><option value="<?= e($studentId) ?>"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: ($student['admissionNo'] ?? $studentId)) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-12"><label class="form-label">Detailed Description</label><textarea name="description" class="form-control" rows="5" required></textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger"><i class="bi bi-send me-1"></i>Submit Report</button></div>
+            </form>
+        </div>
+    </div>
+</div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

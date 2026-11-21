@@ -19,6 +19,7 @@ use App\Services\BedService;
 use App\Services\HouseService;
 use App\Services\RoomService;
 use App\Services\StudentService;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 $rooms = RoomService::all();
 $houses = HouseService::all();
@@ -34,6 +35,63 @@ foreach ($students as $student) $studentMap[(string) ($student['id'] ?? '')] = $
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = sanitize($_POST['action'] ?? '');
+    if ($action === 'import') {
+        if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
+            flash('error', 'The form expired. Please refresh the page and try again.');
+            redirect(url('views/admin/beds/index/index.php'));
+        }
+
+        $file = $_FILES['beds_file'] ?? [];
+        $fileError = validate_uploaded_file($file, ['csv', 'xlsx']);
+        if ($fileError !== null) {
+            flash('error', $fileError);
+            redirect(url('views/admin/beds/index/index.php'));
+        }
+
+        try {
+            $rows = IOFactory::load($file['tmp_name'])->getActiveSheet()->toArray(null, true, true, false);
+            $header = array_map(static fn ($value) => strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $value)), array_shift($rows) ?: []);
+            $map = [];
+            foreach ($header as $index => $name) {
+                $map[$name] = $index;
+            }
+
+            $defaultRoomId = sanitize($_POST['defaultRoomId'] ?? '');
+            $successCount = 0;
+            $importErrors = [];
+            $maxRecords = (int) (app_config()['import_max_records'] ?? 1000);
+            foreach (array_slice($rows, 0, $maxRecords) as $row) {
+                $value = static fn ($name, $fallback = -1) => $row[$map[strtolower(preg_replace('/[^a-z0-9]/i', '', $name))] ?? $fallback] ?? '';
+                $result = BedService::create([
+                    'bedNumber' => sanitize($value('bednumber', 0)),
+                    'roomId' => sanitize($value('roomid', 1) ?: $defaultRoomId),
+                    'status' => sanitize($value('status', 2) ?: 'available'),
+                ]);
+                if (!empty($result['success'])) {
+                    $successCount++;
+                } elseif (($result['message'] ?? '') !== '') {
+                    $importErrors[] = $result['message'];
+                }
+            }
+
+            if ($successCount > 0) {
+                flash('success', "Imported {$successCount} bed(s) successfully.");
+            }
+            if ($importErrors !== []) {
+                $shownErrors = array_slice($importErrors, 0, 3);
+                $remainingErrors = count($importErrors) - count($shownErrors);
+                flash('warning', implode(' ', $shownErrors) . ($remainingErrors > 0 ? " {$remainingErrors} more row(s) could not be imported." : ''));
+            } elseif ($successCount === 0) {
+                flash('error', 'No beds were imported. Check that the file has BedNumber, RoomId, and Status columns and contains valid rows.');
+            }
+        } catch (Throwable $e) {
+            error_log('Bed import failed: ' . $e->getMessage());
+            flash('error', 'Import failed. Check the file format and try again.');
+        }
+
+        redirect(url('views/admin/beds/index/index.php'));
+    }
+
     $bedId = sanitize($_POST['bedId'] ?? '');
     if ($action === 'create') {
         $result = BedService::create(['bedNumber' => sanitize($_POST['bedNumber'] ?? ''), 'roomId' => sanitize($_POST['roomId'] ?? ''), 'status' => sanitize($_POST['status'] ?? 'available')]);
@@ -86,9 +144,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <div><h5 class="mb-1">Bed Management</h5><p class="text-muted mb-0">Create beds, assign students, and manage availability.</p></div>
             <div class="d-flex gap-2">
-                <a class="btn btn-outline-success btn-sm" href="<?= url('views/admin/beds/export/export.php') ?>"><i class="bi bi-download"></i> Export</a>
-                <a class="btn btn-outline-primary btn-sm" href="<?= url('views/admin/beds/import/import.php') ?>"><i class="bi bi-upload"></i> Import</a>
-                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createBedModal"><i class="bi bi-plus-lg"></i> Add bed</button>
+                <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#exportBedsModal"><i class="bi bi-download"></i> Export</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#importBedsModal"><i class="bi bi-upload"></i> Import</button>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createBedModal"><i class="bi bi-plus-lg"></i> Add bed</button>
             </div>
         </div>
         <div class="row g-3 mb-3">
@@ -217,13 +275,61 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div></div>
     </div>
 </div>
-<div class="modal fade" id="createBedModal" tabindex="-1">
-    <div class="modal-dialog">
+<div class="modal fade" id="exportBedsModal" tabindex="-1" aria-labelledby="exportBedsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exportBedsModalLabel">Export beds</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Download a CSV containing all beds, including room, house, student, admission number, and status.
+                <div id="exportBedsError" class="alert alert-danger mt-3 mb-0 d-none" role="alert"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="exportBedsDownload" class="btn btn-success" data-export-url="<?= e(url('views/admin/beds/export/export.php')) ?>" data-filename="beds-<?= e(date('Y-m-d')) ?>.csv"><i class="bi bi-download me-1"></i> Download CSV</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="importBedsModal" tabindex="-1" aria-labelledby="importBedsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="importBedsModalLabel">Import beds</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="import">
+                    <label class="form-label" for="bedsImportFile">CSV or XLSX file</label>
+                    <input id="bedsImportFile" type="file" name="beds_file" class="form-control mb-3" accept=".csv,.xlsx" required>
+                    <label class="form-label" for="bedsDefaultRoom">Default room</label>
+                    <select id="bedsDefaultRoom" name="defaultRoomId" class="form-select mb-3">
+                        <option value="">Use RoomId column</option>
+                        <?php foreach ($rooms as $room): ?>
+                            <option value="<?= e((string) ($room['id'] ?? '')) ?>"><?= e($room['roomNumber'] ?? '-') ?> - <?= e($houseMap[(string) ($room['houseId'] ?? '')] ?? '-') ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="small text-muted mb-0">Required headers: BedNumber, RoomId, Status. Maximum <?= e((string) (app_config()['import_max_records'] ?? 1000)) ?> rows.</p>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <a class="btn btn-outline-secondary" href="data:text/csv;charset=utf-8,BedNumber%2CRoomId%2CStatus%0ABed%201%2CROOM_ID%2Cavailable%0A" download="bed-import-template.csv"><i class="bi bi-file-earmark-arrow-down me-1"></i> Download template</a>
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-upload me-1"></i> Upload and import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="createBedModal" tabindex="-1" aria-labelledby="createBedModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form method="POST">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add bed</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title" id="createBedModalLabel">Add bed</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" name="action" value="create">
@@ -253,6 +359,38 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 document.querySelectorAll('.modal').forEach(function (modal) {
     modal.dataset.disableLoading = 'true';
     document.body.appendChild(modal);
+});
+
+document.getElementById('exportBedsDownload').addEventListener('click', async function () {
+    const button = this;
+    const errorMessage = document.getElementById('exportBedsError');
+    SDS.showButtonLoading(button);
+    errorMessage.classList.add('d-none');
+    errorMessage.textContent = '';
+
+    try {
+        const response = await fetch(button.dataset.exportUrl, {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (!response.ok || !(response.headers.get('content-type') || '').includes('text/csv')) {
+            throw new Error('The bed export could not be downloaded. Please try again.');
+        }
+
+        const downloadUrl = URL.createObjectURL(await response.blob());
+        const downloadLink = document.createElement('a');
+        downloadLink.href = downloadUrl;
+        downloadLink.download = button.dataset.filename;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        downloadLink.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(downloadUrl); }, 1000);
+    } catch (error) {
+        errorMessage.textContent = error instanceof Error ? error.message : 'The bed export could not be downloaded. Please try again.';
+        errorMessage.classList.remove('d-none');
+    } finally {
+        SDS.hideButtonLoading(button);
+    }
 });
 </script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -17,6 +17,7 @@ SMS notifications are now sent to the parent/guardian phone number when an exeat
 2. **Message Content**
    - **Internal Exeat**: `"Your ward [Student Name] has been approved for internal exeat on [Date]. Dormitory Administration."`
    - **External Exeat**: `"Your ward [Student Name] has been approved for external exeat from [Start Date] to [End Date]. Dormitory Administration."`
+   - **Vacation**: `"Your ward [Student Name] has been approved for vacation from [Start Date] to [End Date]. Dormitory Administration."`
    - Messages are optimized to fit within SMS 160 character limit
 
 3. **Error Handling**
@@ -30,11 +31,11 @@ SMS notifications are now sent to the parent/guardian phone number when an exeat
 Your `.env` file must have:
 ```
 BMS_ENABLED=true
-BMS_API_KEY=jrTN1CRTIIec5ZhnVJztxzhDt
+BMS_API_KEY=<your BMS Africa API key>
 BMS_SENDER_ID=BMS Africa  (optional, defaults to "BMS Africa")
 ```
 
-**Status**: ✅ Already configured in your `.env` file
+Keep the API key in local environment configuration only; never commit it to source control.
 
 #### 2. App Settings
 SMS notifications must be enabled in Admin Settings:
@@ -54,7 +55,9 @@ Each student must have:
 1. User creates an exeat and submits the form
 2. Exeat is created in the database
 3. **If exeat creation succeeds AND SMS is enabled AND guardian phone exists**:
-   - An SMS is sent to the guardian phone via BMS Africa API
+   - A request is submitted to the BMS Africa API
+   - If the provider accepts it, the returned campaign ID is logged and shown to the user
+   - Provider acceptance does not confirm delivery to the guardian's phone
    - Notification includes student name and exeat dates
 4. User is redirected to the exeat list view
 
@@ -73,7 +76,8 @@ Each student must have:
 
 3. **Verify**:
    - Check if the exeat was created successfully
-   - Verify that an SMS was sent to the guardian phone number
+   - If a campaign ID is shown, use it to check the delivery report with BMS Africa
+   - If the request times out, its delivery status is unknown; do not submit the vacation again just to retry SMS, since that can create a duplicate record
    - Check logs if SMS didn't send: `storage/logs/`
 
 ### SMS Service Details
@@ -81,13 +85,15 @@ Each student must have:
 - **Provider**: BMS Africa (mnotify.com API)
 - **Character Limit**: 160 characters per SMS
 - **Sender ID**: "BMS Africa" (configurable)
-- **Timeout**: 15 seconds per request
+- **Timeout**: 20 seconds per attempt; one retry is made only if cURL confirms that no connection was established
 
 ### Error Logging
 
-If SMS fails to send, the error is logged to:
+SMS outcomes are logged to:
 - `storage/logs/` directory
-- Check PHP error logs for detailed information
+- A successful provider response records the campaign ID; check that campaign's delivery report to confirm whether the SMS reached the phone
+- A timeout does not prove that the provider rejected the request
+- Requests are not retried after connection, to avoid duplicate SMS if the provider may already have accepted the message
 
 ### Code Changes Summary
 
@@ -123,8 +129,8 @@ To enable SMS notifications:
 
 ### Support
 
-If SMS is not being sent:
+If the parent/guardian does not receive an SMS:
 1. Verify SMS notifications are enabled in Admin Settings
 2. Verify the student has a guardian phone registered
 3. Check the logs in `storage/logs/`
-4. Verify BMS API key is correct in `.env`
+4. If available, check the campaign's delivery report in BMS Africa. If requests continue timing out, contact BMS Africa support with the request timestamp and campaign ID (when available); do not share the API key.

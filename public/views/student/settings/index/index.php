@@ -115,7 +115,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </div>
             </div>
             <div class="student-settings-actions">
-                <a href="<?= url('views/student/profile/edit/edit.php') ?>" class="btn btn-light"><i class="bi bi-pencil-square me-1"></i>Edit Profile</a>
+                <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#studentProfileEditModal"><i class="bi bi-pencil-square me-1"></i>Edit Profile</button>
                 <a href="<?= url('views/student/settings/notification-preferences/notification-preferences.php') ?>" class="btn btn-primary"><i class="bi bi-sliders me-1"></i>Notifications</a>
             </div>
         </section>
@@ -176,7 +176,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 <li><span>Phone</span><strong><?= e($student['phone'] ?? 'Not specified') ?></strong></li>
                                 <li><span>Guardian</span><strong><?= e($student['guardianName'] ?? 'Not specified') ?></strong></li>
                             </ul>
-                            <a href="<?= url('views/student/profile/edit/edit.php') ?>" class="btn btn-outline-primary mt-auto"><i class="bi bi-pencil me-1"></i>Edit contact details</a>
+                            <button type="button" class="btn btn-outline-primary mt-auto" data-bs-toggle="modal" data-bs-target="#studentProfileEditModal"><i class="bi bi-pencil me-1"></i>Edit contact details</button>
                         </article>
                     </div>
 
@@ -206,7 +206,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             </div>
                             <div class="student-settings-button-grid">
                                 <a href="<?= url('views/student/visitors/index/index.php') ?>" class="btn btn-outline-info"><i class="bi bi-list-check me-1"></i>Visitor log</a>
-                                <a href="<?= url('views/visitors/request/request.php') ?>" class="btn btn-outline-primary"><i class="bi bi-person-plus me-1"></i>New request</a>
+                                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#studentVisitorRequest"><i class="bi bi-person-plus me-1"></i>New request</button>
                             </div>
                         </article>
                     </div>
@@ -253,4 +253,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<?php
+$studentVisitorModalId = 'studentVisitorRequest';
+$studentVisitorReturnTo = 'settings';
+require __DIR__ . '/../../components/visitor-request-modal.php';
+?>
+<?php require __DIR__ . '/../../components/profile-edit-modal.php'; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

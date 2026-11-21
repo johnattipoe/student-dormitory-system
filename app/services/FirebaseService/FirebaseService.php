@@ -12,6 +12,9 @@ class FirebaseService
     private static ?FirebaseService $instance = null;
     private ?object $client = null;
     private ?object $storageClient = null;
+    private ?bool $readDiagnosticsEnabled = null;
+    private bool $readDiagnosticsRegistered = false;
+    private array $readDiagnostics = [];
 
     public static function getInstance(): self
     {
@@ -52,6 +55,92 @@ class FirebaseService
             && is_string($credentialPath)
             && $credentialPath !== ''
             && file_exists($credentialPath);
+    }
+
+    private function diagnosticsEnabled(): bool
+    {
+        if ($this->readDiagnosticsEnabled === null) {
+            $config = require APP_ROOT . '/app/config/firebase/firebase.php';
+            $this->readDiagnosticsEnabled = !empty($config['read_diagnostics']);
+        }
+
+        return $this->readDiagnosticsEnabled;
+    }
+
+    private function recordCollectionRead(string $collection, int $documentsRead, int $documentsReturned): void
+    {
+        if (!$this->diagnosticsEnabled()) {
+            return;
+        }
+
+        if (!$this->readDiagnosticsRegistered) {
+            register_shutdown_function([$this, 'writeReadDiagnostics']);
+            $this->readDiagnosticsRegistered = true;
+        }
+
+        if (!isset($this->readDiagnostics[$collection])) {
+            $this->readDiagnostics[$collection] = [
+                'queries' => 0,
+                'documentReads' => 0,
+                'documentsReturned' => 0,
+                'aggregateQueries' => 0,
+            ];
+        }
+
+        $this->readDiagnostics[$collection]['queries']++;
+        $this->readDiagnostics[$collection]['documentReads'] += $documentsRead;
+        $this->readDiagnostics[$collection]['documentsReturned'] += $documentsReturned;
+    }
+
+    private function recordAggregateQuery(string $collection): void
+    {
+        if (!$this->diagnosticsEnabled()) {
+            return;
+        }
+
+        if (!$this->readDiagnosticsRegistered) {
+            register_shutdown_function([$this, 'writeReadDiagnostics']);
+            $this->readDiagnosticsRegistered = true;
+        }
+
+        if (!isset($this->readDiagnostics[$collection])) {
+            $this->readDiagnostics[$collection] = [
+                'queries' => 0,
+                'documentReads' => 0,
+                'documentsReturned' => 0,
+                'aggregateQueries' => 0,
+            ];
+        }
+
+        $this->readDiagnostics[$collection]['queries']++;
+        $this->readDiagnostics[$collection]['aggregateQueries']++;
+    }
+
+    public function writeReadDiagnostics(): void
+    {
+        if (empty($this->readDiagnostics)) {
+            return;
+        }
+
+        $route = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
+        $summary = [
+            'route' => is_string($route) ? $route : '',
+            'method' => (string) ($_SERVER['REQUEST_METHOD'] ?? ''),
+            'collections' => $this->readDiagnostics,
+        ];
+        error_log('Firestore read diagnostics: ' . json_encode(
+            $summary,
+            JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR
+        ));
+    }
+
+    private function applyWheres(object $query, array $wheres): object
+    {
+        foreach ($wheres as [$field, $op, $value]) {
+            $query = $query->where($field, $op, $value);
+        }
+
+        return $query;
     }
 
     private function storageClient(): object
@@ -208,7 +297,11 @@ class FirebaseService
         }
 
         $doc = $this->client()->collection($collection)->document($id)->snapshot();
-        if (!$doc->exists()) return null;
+        if (!$doc->exists()) {
+            $this->recordCollectionRead($collection, 1, 0);
+            return null;
+        }
+        $this->recordCollectionRead($collection, 1, 1);
         return array_merge(['id' => $doc->id()], $doc->data());
     }
 
@@ -232,15 +325,13 @@ class FirebaseService
 
         $fetchLimit = $offset > 0 ? $offset + $limit : $limit;
         return $this->withAuthenticationRefresh(function ($client) use ($collection, $wheres, $fetchLimit, $offset, $limit): array {
-            $query = $client->collection($collection);
-            foreach ($wheres as [$field, $op, $value]) {
-                $query = $query->where($field, $op, $value);
-            }
-            $query = $query->limit($fetchLimit);
+            $query = $this->applyWheres($client->collection($collection), $wheres)->limit($fetchLimit);
 
             $out = [];
             $seen = 0;
+            $documentsRead = 0;
             foreach ($query->documents() as $doc) {
+                $documentsRead++;
                 if (!$doc->exists()) {
                     continue;
                 }
@@ -256,6 +347,39 @@ class FirebaseService
                 }
             }
 
+            $this->recordCollectionRead($collection, $documentsRead, count($out));
+            return $out;
+        });
+    }
+
+    /**
+     * Fetch every document matching optional filters using the SDK's streaming iterator.
+     * Unlike repeated offset queries, each document is visited only once.
+     *
+     * @param array<int,array{0:string,1:string,2:mixed}> $wheres
+     * @return array<int,array<string,mixed>>
+     */
+    public function getAllCollection(string $collection, array $wheres = []): array
+    {
+        if (!$this->credentialsAvailable()) {
+            throw new \RuntimeException($this->credentialsErrorMessage());
+        }
+
+        return $this->withAuthenticationRefresh(function ($client) use ($collection, $wheres): array {
+            $query = $this->applyWheres($client->collection($collection), $wheres);
+            $out = [];
+            $documentsRead = 0;
+
+            foreach ($query->documents() as $doc) {
+                $documentsRead++;
+                if (!$doc->exists()) {
+                    continue;
+                }
+
+                $out[] = array_merge(['id' => $doc->id()], $doc->data());
+            }
+
+            $this->recordCollectionRead($collection, $documentsRead, count($out));
             return $out;
         });
     }
@@ -267,12 +391,11 @@ class FirebaseService
             throw new \RuntimeException($this->credentialsErrorMessage());
         }
 
-        $query = $this->client()->collection($collection);
-        foreach ($wheres as [$field, $op, $value]) {
-            $query = $query->where($field, $op, $value);
-        }
+        $query = $this->applyWheres($this->client()->collection($collection), $wheres);
 
-        return (int) $query->count();
+        $count = (int) $query->count();
+        $this->recordAggregateQuery($collection);
+        return $count;
     }
 
     /** Efficiently sum a numeric field across matching documents without loading the full collection. */
@@ -282,12 +405,11 @@ class FirebaseService
             throw new \RuntimeException($this->credentialsErrorMessage());
         }
 
-        $query = $this->client()->collection($collection);
-        foreach ($wheres as [$fieldName, $op, $value]) {
-            $query = $query->where($fieldName, $op, $value);
-        }
+        $query = $this->applyWheres($this->client()->collection($collection), $wheres);
 
-        return $query->sum($field);
+        $sum = $query->sum($field);
+        $this->recordAggregateQuery($collection);
+        return $sum;
     }
 
     /** Create a document. Returns its generated (or given) id. */
@@ -307,6 +429,99 @@ class FirebaseService
         $ref = $this->client()->collection($collection)->newDocument();
         $ref->set($data);
         return $ref->id();
+    }
+
+    /** Create a document only if it does not already exist. */
+    public function createDocumentIfAbsent(string $collection, string $id, array $data): bool
+    {
+        if (!$this->credentialsAvailable()) {
+            throw new \RuntimeException($this->credentialsErrorMessage());
+        }
+
+        $now = $this->now();
+        $data['createdAt'] = $data['createdAt'] ?? $now;
+        $data['updatedAt'] = $data['updatedAt'] ?? $now;
+        $document = $this->client()->collection($collection)->document($id);
+
+        return (bool) $this->client()->runTransaction(
+            static function ($transaction) use ($document, $data): bool {
+                if ($transaction->snapshot($document)->exists()) {
+                    return false;
+                }
+
+                $transaction->create($document, $data);
+                return true;
+            }
+        );
+    }
+
+    /**
+     * Claim or renew a time-limited document lease inside a Firestore transaction.
+     */
+    public function claimDocumentLease(string $collection, string $id, string $token, int $leaseSeconds = 1800): bool
+    {
+        if (!$this->credentialsAvailable()) {
+            throw new \RuntimeException($this->credentialsErrorMessage());
+        }
+
+        $document = $this->client()->collection($collection)->document($id);
+        $now = time();
+        $expiresAt = (new \DateTimeImmutable('@' . ($now + max(60, $leaseSeconds))))->format(DATE_ATOM);
+        $nowIso = (new \DateTimeImmutable('@' . $now))->format(DATE_ATOM);
+
+        return (bool) $this->client()->runTransaction(
+            static function ($transaction) use ($document, $token, $now, $expiresAt, $nowIso): bool {
+                $snapshot = $transaction->snapshot($document);
+                if (!$snapshot->exists()) {
+                    return false;
+                }
+
+                $data = $snapshot->data();
+                $currentToken = (string) ($data['lockToken'] ?? '');
+                $currentExpiry = strtotime((string) ($data['lockExpiresAt'] ?? '')) ?: 0;
+                if ($currentToken !== '' && $currentToken !== $token && $currentExpiry > $now) {
+                    return false;
+                }
+
+                $transaction->update($document, [
+                    ['path' => 'lockToken', 'value' => $token],
+                    ['path' => 'lockExpiresAt', 'value' => $expiresAt],
+                    ['path' => 'status', 'value' => 'processing'],
+                    ['path' => 'updatedAt', 'value' => $nowIso],
+                ]);
+                return true;
+            }
+        );
+    }
+
+    /** Release a document lease and atomically update its final state if the token still matches. */
+    public function releaseDocumentLease(string $collection, string $id, string $token, array $updates): bool
+    {
+        if (!$this->credentialsAvailable()) {
+            throw new \RuntimeException($this->credentialsErrorMessage());
+        }
+
+        $document = $this->client()->collection($collection)->document($id);
+        $now = $this->now();
+        $updates['lockToken'] = '';
+        $updates['lockExpiresAt'] = $now;
+        $updates['updatedAt'] = $now;
+        $fields = [];
+        foreach ($updates as $key => $value) {
+            $fields[] = ['path' => $key, 'value' => $value];
+        }
+
+        return (bool) $this->client()->runTransaction(
+            static function ($transaction) use ($document, $token, $fields): bool {
+                $snapshot = $transaction->snapshot($document);
+                if (!$snapshot->exists() || (string) ($snapshot->data()['lockToken'] ?? '') !== $token) {
+                    return false;
+                }
+
+                $transaction->update($document, $fields);
+                return true;
+            }
+        );
     }
 
     public function updateDocument(string $collection, string $id, array $data): void

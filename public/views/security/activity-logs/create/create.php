@@ -57,6 +57,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors['general'] = 'Failed to save security log: ' . $e->getMessage();
         }
     }
+
+    if (!empty($_POST['returnToLogs'])) {
+        $_SESSION['_security_log_create_old'] = [
+            'event' => $event,
+            'priority' => $priority,
+            'details' => $details,
+        ];
+        $_SESSION['_security_log_create_errors'] = $errors;
+        flash('error', $errors['general'] ?? 'Please complete the required log fields.');
+        redirect(url('views/security/activity-logs/index.php?openLogModal=1'));
+    }
 }
 
 $pageTitle = 'Log Security Observation';

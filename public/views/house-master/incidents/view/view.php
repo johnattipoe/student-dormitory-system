@@ -127,12 +127,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/incidents/index/index.php') ?>">
                     <i class="bi bi-arrow-left me-1"></i>Back
                 </a>
-                <a class="btn btn-warning btn-sm" href="<?= url('views/house-master/incidents/edit/edit.php?id=' . urlencode($id)) ?>">
+                <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#houseIncidentEditModal">
                     <i class="bi bi-pencil me-1"></i>Edit Incident
-                </a>
-                <a class="btn btn-outline-danger btn-sm" href="<?= url('views/house-master/incidents/delete/delete.php?id=' . urlencode($id)) ?>">
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#houseIncidentDeleteModal">
                     <i class="bi bi-trash me-1"></i>Delete
-                </a>
+                </button>
             </div>
         </div>
 
@@ -176,10 +176,56 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <a class="btn btn-outline-secondary btn-sm" href="<?= url('views/house-master/incidents/index/index.php') ?>">
                         Back to Incident Log
                     </a>
-                    <a class="btn btn-primary btn-sm" href="<?= url('views/house-master/incidents/edit/edit.php?id=' . urlencode($id)) ?>">
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#houseIncidentEditModal">
                         <i class="bi bi-pencil me-1"></i>Edit Incident
-                    </a>
+                    </button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseIncidentEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/house-master/incidents/edit/edit.php?id=' . urlencode($id)) ?>">
+                <div class="modal-header"><h5 class="modal-title">Edit Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" value="<?= e($id) ?>">
+                    <label class="form-label">Incident Title</label><input name="title" class="form-control mb-3" value="<?= e($incident['title'] ?? $incident['type'] ?? '') ?>" required>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Priority</label>
+                            <select name="priority" class="form-select">
+                                <option value="low" <?= $priority === 'low' ? 'selected' : '' ?>>Low</option>
+                                <option value="medium" <?= $priority === 'medium' ? 'selected' : '' ?>>Medium</option>
+                                <option value="high" <?= in_array($priority, ['high', 'critical', 'emergency'], true) ? 'selected' : '' ?>>High</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="open" <?= $status === 'open' ? 'selected' : '' ?>>Open</option>
+                                <option value="investigating" <?= in_array($status, ['investigating', 'in_progress'], true) ? 'selected' : '' ?>>Investigating</option>
+                                <option value="resolved" <?= in_array($status, ['resolved', 'closed'], true) ? 'selected' : '' ?>>Resolved</option>
+                            </select>
+                        </div>
+                    </div>
+                    <label class="form-label mt-3">Description and Investigation Notes</label>
+                    <textarea name="description" class="form-control" rows="5"><?= e($incident['description'] ?? $incident['notes'] ?? '') ?></textarea>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseIncidentDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">Delete <strong><?= e($incident['title'] ?? $incident['type'] ?? 'this incident') ?></strong>?</div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="<?= url('views/house-master/incidents/delete/delete.php?id=' . urlencode($id)) ?>"><input type="hidden" name="id" value="<?= e($id) ?>"><button type="submit" class="btn btn-danger">Delete</button></form>
             </div>
         </div>
     </div>

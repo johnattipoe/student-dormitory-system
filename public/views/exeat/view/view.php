@@ -60,7 +60,10 @@ $room = !empty($student['roomId']) ? RoomService::find((string) $student['roomId
 $roomNumber = $room['roomNumber'] ?? $room['name'] ?? ($student['roomId'] ?? '—');
 $guardianPhone = $exeat['guardianPhone'] ?? $student['guardianPhone'] ?? $student['phone'] ?? '—';
 
-$isInternal = ($exeat['exeatType'] ?? $exeat['type'] ?? '') === 'internal';
+$exeatType = strtolower((string) ($exeat['exeatType'] ?? $exeat['type'] ?? 'external'));
+$isInternal = $exeatType === 'internal';
+$isVacation = $exeatType === 'vacation';
+$typeLabel = $isInternal ? 'Internal' : ($isVacation ? 'Vacation' : 'External');
 $status = strtolower((string) ($exeat['status'] ?? 'pending'));
 
 $statusClasses = [
@@ -101,12 +104,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <a href="<?= url('views/exeat/index.php') ?>" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-arrow-left me-1"></i>Back to Exeats
                 </a>
-                <a href="<?= url('views/exeat/edit/edit.php?id=' . urlencode($id)) ?>" class="btn btn-outline-warning btn-sm">
+                <button type="button" class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#detailEditExeatModal">
                     <i class="bi bi-pencil me-1"></i>Edit Pass
-                </a>
-                <a href="<?= url('views/exeat/delete/delete.php?id=' . urlencode($id)) ?>" class="btn btn-outline-danger btn-sm">
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#detailDeleteExeatModal">
                     <i class="bi bi-trash me-1"></i>Delete
-                </a>
+                </button>
                 <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">
                     <i class="bi bi-printer me-1"></i>Print Pass
                 </button>
@@ -130,6 +133,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             </span>
                             <?php if ($isInternal): ?>
                                 <span class="badge bg-info text-white px-3 py-2 fs-6"><i class="bi bi-clock me-1"></i>Internal</span>
+                            <?php elseif ($isVacation): ?>
+                                <span class="badge bg-success text-white px-3 py-2 fs-6"><i class="bi bi-sun me-1"></i>Vacation</span>
                             <?php else: ?>
                                 <span class="badge bg-primary px-3 py-2 fs-6"><i class="bi bi-calendar-range me-1"></i>External</span>
                             <?php endif; ?>
@@ -222,24 +227,24 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 </div>
                             </div>
                         <?php else: ?>
-                            <div class="alert alert-primary d-flex align-items-center mb-4">
+                            <div class="alert <?= $isVacation ? 'alert-success' : 'alert-primary' ?> d-flex align-items-center mb-4">
                                 <i class="bi bi-calendar2-range fs-3 me-3"></i>
                                 <div>
-                                    <strong class="d-block">External Exeat Pass</strong>
-                                    <small>This pass is valid for multi-day travel, weekend release, medical appointments, or holiday home trips.</small>
+                                    <strong class="d-block"><?= e($typeLabel) ?><?= $isVacation ? '' : ' Exeat' ?> Pass</strong>
+                                    <small><?= $isVacation ? 'This request covers a multi-day vacation away from the dormitory.' : 'This pass is valid for multi-day travel, weekend release, medical appointments, or holiday home trips.' ?></small>
                                 </div>
                             </div>
 
                             <div class="row g-3 mb-4">
                                 <div class="col-md-6">
                                     <div class="p-3 bg-light rounded-3 text-center border">
-                                        <span class="text-muted small d-block mb-1">Departure Start Date</span>
+                                        <span class="text-muted small d-block mb-1"><?= $isVacation ? 'Vacation Start Date' : 'Departure Start Date' ?></span>
                                         <h5 class="fw-bold mb-0 text-primary"><i class="bi bi-calendar-check me-1"></i><?= e($exeat['startDate'] ?? '—') ?></h5>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="p-3 bg-light rounded-3 text-center border">
-                                        <span class="text-muted small d-block mb-1">Expected Return Date</span>
+                                        <span class="text-muted small d-block mb-1"><?= $isVacation ? 'Vacation End Date' : 'Expected Return Date' ?></span>
                                         <h5 class="fw-bold mb-0 text-danger"><i class="bi bi-calendar-x me-1"></i><?= e($exeat['endDate'] ?? '—') ?></h5>
                                     </div>
                                 </div>
@@ -288,4 +293,81 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+<div class="modal fade" id="detailEditExeatModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg"><div class="modal-content">
+        <form method="POST" action="<?= url('views/exeat/edit/edit.php?id=' . urlencode($id)) ?>">
+            <?= csrf_field() ?>
+            <input type="hidden" name="id" value="<?= e($id) ?>">
+            <div class="modal-header"><h5 class="modal-title">Edit Exeat Pass</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <?php if ($isStaff): ?>
+                    <div class="mb-3"><label class="form-label">Status</label><select name="status" class="form-select"><?php foreach (['pending', 'approved', 'rejected', 'departed', 'returned'] as $exeatStatus): ?><option value="<?= e($exeatStatus) ?>" <?= $status === $exeatStatus ? 'selected' : '' ?>><?= ucfirst($exeatStatus) ?></option><?php endforeach; ?></select></div>
+                <?php endif; ?>
+                <div class="mb-3"><label class="form-label">Pass Type</label><select name="exeatType" id="detailExeatType" class="form-select"><option value="internal" <?= $exeatType === 'internal' ? 'selected' : '' ?>>Internal</option><option value="external" <?= $exeatType === 'external' ? 'selected' : '' ?>>External</option><option value="vacation" <?= $exeatType === 'vacation' ? 'selected' : '' ?>>Vacation</option></select></div>
+                <div id="detailInternalExeatFields" class="row g-3">
+                    <div class="col-md-4"><label class="form-label">Date</label><input type="date" name="date" class="form-control" value="<?= e($exeat['startDate'] ?? $exeat['date'] ?? date('Y-m-d')) ?>"></div>
+                    <div class="col-md-4"><label class="form-label">Start Time</label><input type="time" name="startTime" class="form-control" value="<?= e($exeat['startTime'] ?? '08:00') ?>"></div>
+                    <div class="col-md-4"><label class="form-label">Close Time</label><input type="time" name="closeTime" class="form-control" value="<?= e($exeat['closeTime'] ?? $exeat['endTime'] ?? '17:00') ?>"></div>
+                </div>
+                <div id="detailExternalExeatFields" class="row g-3">
+                    <div class="col-md-6"><label class="form-label">Start Date</label><input type="date" name="startDate" class="form-control" value="<?= e($exeat['startDate'] ?? date('Y-m-d')) ?>"></div>
+                    <div class="col-md-6"><label class="form-label">End Date</label><input type="date" name="endDate" class="form-control" value="<?= e($exeat['endDate'] ?? date('Y-m-d', strtotime('+1 day'))) ?>"></div>
+                </div>
+                <div class="mt-3"><label class="form-label">Destination</label><input name="destination" class="form-control" value="<?= e($exeat['destination'] ?? '') ?>"></div>
+                <div class="mt-3"><label class="form-label">Parent / Guardian Phone</label><input type="tel" name="guardianPhone" class="form-control" value="<?= e($guardianPhone) ?>"></div>
+                <div class="mt-3"><label class="form-label">Reason</label><textarea name="reason" id="detailExeatReason" class="form-control" rows="4" required><?= $isVacation ? 'Vacation' : e($exeat['reason'] ?? '') ?></textarea><div class="form-text" id="detailExeatReasonHint"></div></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+        </form>
+    </div></div>
+</div>
+<div class="modal fade" id="detailDeleteExeatModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <form method="POST" action="<?= url('views/exeat/index.php') ?>">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="delete"><input type="hidden" name="recordId" value="<?= e($id) ?>">
+            <div class="modal-header"><h5 class="modal-title text-danger">Delete Exeat Pass</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">Delete the exeat pass for <strong><?= e($studentName) ?></strong>? This action cannot be undone.</div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger">Delete pass</button></div>
+        </form>
+    </div></div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const typeSelect = document.getElementById('detailExeatType');
+    const internalFields = document.getElementById('detailInternalExeatFields');
+    const externalFields = document.getElementById('detailExternalExeatFields');
+    const reason = document.getElementById('detailExeatReason');
+    const reasonHint = document.getElementById('detailExeatReasonHint');
+    if (!typeSelect || !internalFields || !externalFields || !reason || !reasonHint) return;
+
+    function updateExeatType() {
+        const isInternal = typeSelect.value === 'internal';
+        const isVacation = typeSelect.value === 'vacation';
+        internalFields.classList.toggle('d-none', !isInternal);
+        externalFields.classList.toggle('d-none', isInternal);
+        internalFields.querySelectorAll('input').forEach(function (input) {
+            input.disabled = !isInternal;
+            input.required = isInternal;
+        });
+        externalFields.querySelectorAll('input').forEach(function (input) {
+            input.disabled = isInternal;
+            input.required = !isInternal;
+        });
+        if (isVacation) {
+            reason.dataset.previousReason = reason.value;
+            reason.value = 'Vacation';
+            reason.readOnly = true;
+            reasonHint.textContent = 'Vacation reason is fixed.';
+        } else {
+            if (reason.readOnly) reason.value = reason.dataset.previousReason || '';
+            reason.readOnly = false;
+            reasonHint.textContent = 'Provide a clear explanation for the exeat request.';
+        }
+    }
+
+    typeSelect.addEventListener('change', updateExeatType);
+    updateExeatType();
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

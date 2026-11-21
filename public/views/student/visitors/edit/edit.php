@@ -34,6 +34,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'purpose' => sanitize($_POST['purpose'] ?? ''),
     ]);
     flash('success', 'Visitor request updated.');
+    if (!empty($_POST['returnToStudentVisitors'])) {
+        $returnParams = [
+            'search' => sanitize($_POST['returnSearch'] ?? ''),
+            'dateFrom' => sanitize($_POST['returnDateFrom'] ?? ''),
+            'dateTo' => sanitize($_POST['returnDateTo'] ?? ''),
+            'status' => sanitize($_POST['returnStatus'] ?? ''),
+            'page' => max(1, (int) ($_POST['returnPage'] ?? 1)),
+            'limit' => max(1, min(150, (int) ($_POST['returnLimit'] ?? app_config()['pagination_per_page'] ?? 25))),
+        ];
+        $returnQuery = http_build_query(array_filter($returnParams, static fn($value): bool => $value !== ''));
+        redirect(url('views/student/visitors/index/index.php' . ($returnQuery !== '' ? '?' . $returnQuery : '')));
+    }
     redirect(url('views/student/visitors/view/view.php?id=' . urlencode($id)));
 }
 

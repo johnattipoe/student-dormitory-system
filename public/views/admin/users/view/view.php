@@ -14,12 +14,14 @@ if (!defined('APP_ROOT')) {
 }
 $allowedRoles = [ROLE_ADMIN];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
+use App\Services\HouseService;
 use App\Services\UserService;
 
 $pageTitle = 'View User';
 $id = sanitize($_GET['id'] ?? '');
 $userService = new UserService();
 $selectedUser = $id !== '' ? $userService->find($id) : null;
+$editHouses = $selectedUser ? HouseService::all() : [];
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-people', 'label' => 'Users', 'href' => url('views/admin/users/index/index.php')],
@@ -47,12 +49,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <i class="bi bi-arrow-left me-1"></i>Back to Users
                 </a>
                 <?php if ($selectedUser): ?>
-                <a href="<?= url('views/admin/users/edit/edit.php?id=' . urlencode($id)) ?>" class="btn btn-warning btn-sm">
+                <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#adminEditUserModal">
                     <i class="bi bi-pencil-square me-1"></i>Edit
-                </a>
-                <a href="<?= url('views/admin/users/delete/delete.php?id=' . urlencode($id)) ?>" class="btn btn-outline-danger btn-sm">
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#adminDeleteUserModal">
                     <i class="bi bi-trash me-1"></i>Delete
-                </a>
+                </button>
                 <?php endif; ?>
             </div>
         </div>
@@ -118,12 +120,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </div>
                         <div class="card-body">
                             <div class="d-grid gap-2">
-                                <a href="<?= url('views/admin/users/edit/edit.php?id=' . urlencode($id)) ?>" class="btn btn-outline-warning btn-sm text-start">
+                                <button type="button" data-bs-toggle="modal" data-bs-target="#adminEditUserModal" class="btn btn-outline-warning btn-sm text-start">
                                     <i class="bi bi-pencil-square me-2"></i>Edit Account
-                                </a>
-                                <a href="<?= url('views/admin/users/delete/delete.php?id=' . urlencode($id)) ?>" class="btn btn-outline-danger btn-sm text-start">
+                                </button>
+                                <button type="button" data-bs-toggle="modal" data-bs-target="#adminDeleteUserModal" class="btn btn-outline-danger btn-sm text-start">
                                     <i class="bi bi-trash me-2"></i>Delete Account
-                                </a>
+                                </button>
                                 <a href="<?= url('views/admin/users/index/index.php') ?>" class="btn btn-outline-secondary btn-sm text-start">
                                     <i class="bi bi-people me-2"></i>All Users
                                 </a>
@@ -147,4 +149,31 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <?php endif; ?>
     </div>
 </div>
+<?php if ($selectedUser): ?>
+<div class="modal fade" id="adminEditUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content">
+        <form method="POST" action="<?= url('views/admin/users/edit/edit.php?id=' . urlencode($id)) ?>">
+            <input type="hidden" name="id" value="<?= e($id) ?>">
+            <div class="modal-header"><h5 class="modal-title">Edit User Account</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6"><label class="form-label">Full Name</label><input name="name" class="form-control" value="<?= e($selectedUser['name'] ?? '') ?>" required></div>
+                    <div class="col-md-6"><label class="form-label">Email</label><input type="email" class="form-control" value="<?= e($selectedUser['email'] ?? '') ?>" disabled></div>
+                    <div class="col-md-6"><label class="form-label">Role</label><select name="role" class="form-select"><?php foreach (['admin', 'house_master', 'house_mistress', 'senior-houseparent', 'security', 'nurse', 'student'] as $roleOption): ?><option value="<?= e($roleOption) ?>" <?= ($selectedUser['role'] ?? '') === $roleOption ? 'selected' : '' ?>><?= e(ucfirst(str_replace('_', ' ', $roleOption))) ?></option><?php endforeach; ?></select></div>
+                    <div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><option value="active" <?= ($selectedUser['status'] ?? '') === 'active' ? 'selected' : '' ?>>Active</option><option value="inactive" <?= ($selectedUser['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Inactive</option></select></div>
+                    <div class="col-12"><label class="form-label">House</label><select name="houseId" class="form-select"><option value="">Select house</option><?php foreach ($editHouses as $house): ?><option value="<?= e((string) ($house['id'] ?? '')) ?>" <?= (($selectedUser['houseId'] ?? '') === ($house['id'] ?? '')) ? 'selected' : '' ?>><?= e($house['name'] ?? 'House') ?></option><?php endforeach; ?></select></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div>
+        </form>
+    </div></div>
+</div>
+<div class="modal fade" id="adminDeleteUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title text-danger">Delete User</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body">Delete <strong><?= e($selectedUser['name'] ?? 'this user') ?></strong>? This action cannot be undone.</div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/admin/users/delete/delete.php?id=' . urlencode($id)) ?>"><input type="hidden" name="id" value="<?= e($id) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div>
+    </div></div>
+</div>
+<?php endif; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

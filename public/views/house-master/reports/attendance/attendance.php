@@ -133,9 +133,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()">
                         <i class="bi bi-printer me-1"></i> Print
                     </button>
-                    <a class="btn btn-sm btn-outline-success" href="<?= url('views/house-master/reports/export/export.php?type=attendance&date=' . urlencode($date)) ?>">
-                        <i class="bi bi-filetype-csv me-1"></i> Export Attendance CSV
-                    </a>
+                    <?php
+                    $reportType = 'attendance';
+                    $reportExportBaseUrl = url('views/house-master/reports/export/export.php');
+                    $reportExportFormats = ['csv' => 'CSV'];
+                    $reportDownloadButtonLabel = 'Export Attendance CSV';
+                    $reportDownloadWrapperClass = 'd-flex';
+                    require APP_ROOT . '/app/views/components/report-downloads/report-downloads.php';
+                    ?>
                 </div>
             </div>
             <div class="table-responsive">

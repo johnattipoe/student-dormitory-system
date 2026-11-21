@@ -65,64 +65,54 @@
   text-shadow: 0 0 0 rgba(15, 118, 110, .15);
 }
 
-.startup-loader {
+.session-transition-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(6, 182, 212, .34), transparent 22rem),
-    radial-gradient(circle at 80% 12%, rgba(124, 58, 237, .32), transparent 24rem),
-    linear-gradient(135deg, #071226 0%, #123b8f 56%, #071226 100%);
-  color: #fff;
-  opacity: 1;
-  visibility: visible;
-  transition: opacity .45s ease, visibility .45s ease;
-}
-
-.startup-loader.is-hidden {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.startup-loader-card {
-  width: min(92vw, 430px);
-  padding: 2rem;
-  text-align: center;
-  border: 1px solid rgba(255, 255, 255, .24);
-  border-radius: 26px;
-  background: rgba(255, 255, 255, .12);
-  box-shadow: 0 26px 80px rgba(0, 0, 0, .34);
-  backdrop-filter: blur(14px);
-}
-
-.startup-logo {
-  width: 74px;
-  height: 74px;
-  margin: 0 auto 1rem;
+  z-index: 12000;
   display: grid;
   place-items: center;
-  border-radius: 22px;
-  background: linear-gradient(135deg, #38bdf8, #2563eb);
-  box-shadow: 0 18px 36px rgba(37, 99, 235, .35);
-  animation: startupPulse 1.3s ease-in-out infinite;
+  padding: 1rem;
+  background: rgba(15, 23, 42, .42);
+  backdrop-filter: blur(4px);
 }
 
-.startup-logo i {
-  font-size: 2.35rem;
+.session-transition-overlay[hidden] {
+  display: none;
 }
 
-.startup-logo img {
-  width: 62px;
-  height: 62px;
-  object-fit: contain;
-  border-radius: 18px;
+.session-transition-card {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid rgba(47, 95, 187, .16);
+  border-radius: 1rem;
   background: #fff;
-  padding: .2rem;
+  box-shadow: 0 18px 45px rgba(20, 30, 60, .16);
+  color: #475569;
+}
+
+.startup-spinner.startup-button-spinner.session-transition-spinner {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-width: .2rem;
+  color: #2f5fbb;
+}
+
+.startup-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255, 255, 255, .28);
+  border-top-color: #67e8f9;
+  border-radius: 50%;
+  animation: startupSpin .8s linear infinite;
+}
+
+.startup-button-spinner {
+  display: inline-block;
+  width: .9em;
+  height: .9em;
+  vertical-align: -.1em;
 }
 
 .login-crest {
@@ -131,40 +121,12 @@
   object-fit: contain;
 }
 
-.startup-loader-title {
-  font-size: 1.2rem;
-  font-weight: 800;
-  letter-spacing: .01em;
+@keyframes startupSpin {
+  to { transform: rotate(360deg); }
 }
 
-.startup-loader-text {
-  margin-top: .35rem;
-  color: rgba(255, 255, 255, .78);
-}
-
-.startup-progress {
-  height: 8px;
-  margin-top: 1.5rem;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .18);
-}
-
-.startup-progress span {
-  display: block;
-  width: 48%;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #22c55e, #38bdf8, #a78bfa);
-  animation: startupBar 1s ease-in-out infinite;
-}
-
-@keyframes startupPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.06); }
-}
-
-@keyframes startupBar {
-  0% { transform: translateX(-110%); }
-  100% { transform: translateX(230%); }
+@media (prefers-reduced-motion: reduce) {
+  .startup-spinner {
+    animation: none;
+  }
 }

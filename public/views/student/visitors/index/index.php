@@ -58,6 +58,8 @@ $approved = count(array_filter($filteredVisitors, fn($v) => ($v['status'] ?? '')
 $pending = count(array_filter($filteredVisitors, fn($v) => ($v['status'] ?? '') === 'pending'));
 $rejected = count(array_filter($filteredVisitors, fn($v) => ($v['status'] ?? '') === 'rejected'));
 $total = count($filteredVisitors);
+$studentVisitorModalId = 'studentVisitorRequest';
+$studentVisitorReturnTo = 'visitors';
 
 $pageTitle = 'Student Visitors';
 $navItems = [
@@ -86,9 +88,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <p class="text-muted mb-0">Keep track of all visitor requests and approvals</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="<?= url('views/visitors/request/request.php') ?>" class="btn btn-primary btn-sm">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#studentVisitorRequest">
                     <i class="bi bi-plus-lg me-1"></i>Request Visitor
-                </a>
+                </button>
             </div>
         </div>
 
@@ -249,7 +251,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     if ($modalVisitorId === '') continue;
     ?>
     <div class="modal fade" id="studentVisitorView-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Visitor Request Details</h5>
@@ -277,18 +279,26 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     </div>
 
     <div class="modal fade" id="studentVisitorEdit-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Visitor Request</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="mb-0">Open the full edit form to modify this visitor request.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
+                <form method="POST" action="<?= url('views/student/visitors/edit/edit.php?id=' . urlencode($modalVisitorId)) ?>" class="student-modal-form">
+                    <input type="hidden" name="id" value="<?= e($modalVisitorId) ?>">
+                    <input type="hidden" name="returnToStudentVisitors" value="1">
+                    <input type="hidden" name="returnSearch" value="<?= e($search) ?>">
+                    <input type="hidden" name="returnDateFrom" value="<?= e($dateFrom) ?>">
+                    <input type="hidden" name="returnDateTo" value="<?= e($dateTo) ?>">
+                    <input type="hidden" name="returnStatus" value="<?= e($status) ?>">
+                    <input type="hidden" name="returnPage" value="<?= e((string) $page) ?>">
+                    <input type="hidden" name="returnLimit" value="<?= e((string) $limit) ?>">
+                    <div class="modal-header"><h5 class="modal-title">Edit Visitor Request</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body">
+                        <label class="form-label">Visitor Name</label><input name="visitorName" class="form-control mb-3" value="<?= e($visitor['visitorName'] ?? '') ?>" required>
+                        <label class="form-label">Relationship</label><input name="relationship" class="form-control mb-3" value="<?= e($visitor['relationship'] ?? '') ?>">
+                        <label class="form-label">Visit Date</label><input type="date" name="visitDate" class="form-control mb-3" value="<?= e($visitor['visitDate'] ?? '') ?>" required>
+                        <label class="form-label">Purpose</label><textarea name="purpose" class="form-control" rows="4"><?= e($visitor['purpose'] ?? '') ?></textarea>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
+                </form>
             </div>
         </div>
     </div>
@@ -303,6 +313,13 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <form method="POST" action="<?= url('views/student/visitors/delete/delete.php') ?>">
                     <div class="modal-body">
                         <input type="hidden" name="id" value="<?= e($modalVisitorId) ?>">
+                        <input type="hidden" name="returnToStudentVisitors" value="1">
+                        <input type="hidden" name="returnSearch" value="<?= e($search) ?>">
+                        <input type="hidden" name="returnDateFrom" value="<?= e($dateFrom) ?>">
+                        <input type="hidden" name="returnDateTo" value="<?= e($dateTo) ?>">
+                        <input type="hidden" name="returnStatus" value="<?= e($status) ?>">
+                        <input type="hidden" name="returnPage" value="<?= e((string) $page) ?>">
+                        <input type="hidden" name="returnLimit" value="<?= e((string) $limit) ?>">
                         <p class="mb-0">Delete the pending visitor request for <strong><?= e($visitor['visitorName'] ?? 'this visitor') ?></strong>?</p>
                     </div>
                     <div class="modal-footer">
@@ -314,4 +331,5 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 <?php endforeach; ?>
+<?php require __DIR__ . '/../../components/visitor-request-modal.php'; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

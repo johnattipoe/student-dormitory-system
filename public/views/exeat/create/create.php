@@ -71,8 +71,8 @@ if ($canCreateForStudent) {
     }
 }
 
-$selectedType = sanitize($_GET['type'] ?? 'internal');
-if (!in_array($selectedType, ['internal', 'external'], true)) {
+$selectedType = sanitize($_POST['exeatType'] ?? $_GET['type'] ?? 'internal');
+if (!in_array($selectedType, ['internal', 'external', 'vacation'], true)) {
     $selectedType = 'internal';
 }
 
@@ -118,7 +118,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'createdByRole' => $role,
     ]);
 
-    flash($result['success'] ? 'success' : 'error', $result['message']);
+    if (!$result['success']) {
+        flash('error', $result['message']);
+    } elseif ($exeatType !== 'vacation') {
+        flash('success', $result['message']);
+    }
     if ($result['success']) {
         // Send SMS notification to parent/guardian
         $guardianPhone = sanitize($_POST['guardianPhone'] ?? $requestStudent['guardianPhone'] ?? '');
@@ -152,38 +156,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($exeatType === 'internal') {
                     $reasonStr = !empty($reason) ? " for {$reason}" : '';
                     $smsMessage = "Your ward {$studentName} has been approved for internal exeat on {$startDate}{$reasonStr} by the {$roleSender}.";
+                } elseif ($exeatType === 'vacation') {
+                    $smsMessage = $canCreateForStudent
+                        ? "Your ward {$studentName} has been approved for vacation from {$startDate} to {$endDate} by the {$roleSender}."
+                        : "Your ward {$studentName} has submitted a vacation request from {$startDate} to {$endDate} for review.";
                 } else {
                     $destStr = !empty($destination) ? " to {$destination}" : '';
                     $reasonStr = !empty($reason) ? " for {$reason}" : '';
                     $smsMessage = "Your ward {$studentName} has been approved for external exeat from {$startDate} to {$endDate}{$destStr}{$reasonStr} by the {$roleSender}.";
                 }
                 
-                $logMsg = "[" . date('H:i:s') . "] [CREATE] Sending SMS to {$guardianPhone}, length: " . mb_strlen($smsMessage) . "\n";
+                $phoneSuffix = substr(preg_replace('/\D+/', '', $guardianPhone), -4);
+                $logMsg = "[" . date('H:i:s') . "] [CREATE] Sending SMS to phone ending {$phoneSuffix}, length: " . mb_strlen($smsMessage) . "\n";
                 @file_put_contents($logFile, $logMsg, FILE_APPEND);
                 
                 $smsResult = $smsService->send($guardianPhone, $smsMessage);
                 
                 if ($smsResult['success']) {
-                    $logMsg = "[" . date('H:i:s') . "] [CREATE] ✓ SMS SENT to {$guardianPhone}\n";
+                    $campaignId = (string) ($smsResult['campaign_id'] ?? '');
+                    $logMsg = "[" . date('H:i:s') . "] [CREATE] SMS ACCEPTED BY PROVIDER; campaign ID: " . ($campaignId !== '' ? $campaignId : 'not returned') . "; delivery not confirmed\n";
                     @file_put_contents($logFile, $logMsg, FILE_APPEND);
-                    flash('info', 'Exeat created successfully. Parent/guardian has been notified via SMS.');
+                    $confirmationMessage = $exeatType === 'vacation'
+                        ? ($canCreateForStudent
+                            ? 'Vacation created successfully. The SMS provider accepted the notification request, but delivery to the parent/guardian is not confirmed.'
+                            : 'Vacation request submitted successfully. The SMS provider accepted the notification request, but delivery to the parent/guardian is not confirmed.')
+                        : 'Exeat created successfully. The SMS provider accepted the notification request, but delivery to the parent/guardian is not confirmed.';
+                    if ($campaignId !== '') {
+                        $confirmationMessage .= ' SMS campaign ID: ' . $campaignId . '; check its delivery report with BMS Africa.';
+                    }
+                    flash('info', $confirmationMessage);
                 } else {
-                    $logMsg = "[" . date('H:i:s') . "] [CREATE] ✗ SMS FAILED: " . ($smsResult['message'] ?? 'Unknown error') . " | Response: " . json_encode($smsResult['provider_response'] ?? []) . "\n";
+                    $logMsg = "[" . date('H:i:s') . "] [CREATE] SMS RESULT UNKNOWN/FAILED: " . ($smsResult['message'] ?? 'Unknown error') . "\n";
                     @file_put_contents($logFile, $logMsg, FILE_APPEND);
-                    flash('warning', 'Exeat created successfully, but SMS notification could not be sent: ' . ($smsResult['message'] ?? 'Unknown error'));
+                    flash('warning', ($exeatType === 'vacation'
+                        ? ($canCreateForStudent ? 'Vacation created successfully' : 'Vacation request submitted successfully')
+                        : 'Exeat created successfully') . ', but SMS delivery could not be confirmed: ' . ($smsResult['message'] ?? 'Unknown error') . ' Do not submit again just to retry the SMS; that may create a duplicate vacation record.');
                 }
             } catch (Throwable $e) {
                 $logMsg = "[" . date('H:i:s') . "] [CREATE] ✗ ERROR: " . $e->getMessage() . "\n";
                 @file_put_contents($logFile, $logMsg, FILE_APPEND);
-                flash('warning', 'Exeat created successfully, but SMS notification failed: ' . $e->getMessage());
+                flash('warning', ($exeatType === 'vacation'
+                    ? ($canCreateForStudent ? 'Vacation created successfully' : 'Vacation request submitted successfully')
+                    : 'Exeat created successfully') . ', but SMS delivery could not be confirmed: ' . $e->getMessage() . ' Do not submit again just to retry the SMS; that may create a duplicate vacation record.');
             }
         } elseif ($guardianPhone === '' && $smsEnabled === '1') {
             $logMsg = "[" . date('H:i:s') . "] [CREATE] ⚠ No guardian phone for student " . ($requestStudent['id'] ?? 'UNKNOWN') . "\n";
             @file_put_contents($logFile, $logMsg, FILE_APPEND);
-            flash('info', 'Exeat created successfully. No guardian phone number was found to send SMS notification.');
+            flash('info', $exeatType === 'vacation'
+                ? 'Vacation created successfully, but no parent/guardian phone number is on file, so no SMS was sent.'
+                : 'Exeat created successfully. No guardian phone number was found to send SMS notification.');
         } elseif ($guardianPhone !== '' && $smsEnabled !== '1') {
             $logMsg = "[" . date('H:i:s') . "] [CREATE] ⚠ SMS notifications disabled in app settings\n";
             @file_put_contents($logFile, $logMsg, FILE_APPEND);
+            if ($exeatType === 'vacation') {
+                flash('info', 'Vacation created successfully, but SMS notifications are disabled in app settings, so no message was sent to the parent/guardian.');
+            }
+        } elseif ($exeatType === 'vacation') {
+            flash('info', 'Vacation created successfully, but no SMS was sent because notifications are disabled and no parent/guardian phone number is available.');
         }
         
         redirect(url('views/exeat/index.php'));
@@ -196,7 +225,9 @@ $dashboardHref = match ($role) {
     ROLE_SENIOR_HOUSEPARENT => 'views/senior-houseparent/dashboard/index.php',
     default => 'views/house-master/dashboard/index.php',
 };
-$pageTitle = $canCreateForStudent ? 'Create Exeat' : 'Request Exeat';
+$pageTitle = $selectedType === 'vacation'
+    ? ($canCreateForStudent ? 'Create Vacation' : 'Request Vacation')
+    : ($canCreateForStudent ? 'Create Exeat' : 'Request Exeat');
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url($dashboardHref)],
     ['icon' => 'bi-calendar2-week', 'label' => 'Exeat', 'href' => url('views/exeat/index.php'), 'active' => true],
@@ -282,8 +313,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="title-wrap">
                 <span class="title-icon"><i class="bi bi-calendar2-plus"></i></span>
                 <div>
-                    <h4><?= e($pageTitle) ?></h4>
-                    <p><?= $canCreateForStudent ? 'Issue internal (hours/day pass) or external (travel/home pass) exeat for students' : 'Submit your dormitory exeat request' ?></p>
+                    <h4 id="exeatPageTitle"><?= e($pageTitle) ?></h4>
+                    <p><?= $canCreateForStudent ? 'Issue an internal pass, external exeat, or vacation request for students' : 'Submit your dormitory exeat request' ?></p>
                 </div>
             </div>
             <a href="<?= url('views/exeat/index.php') ?>" class="btn btn-outline-secondary btn-sm">
@@ -295,13 +326,18 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="card-header bg-white py-3">
                 <ul class="nav nav-pills card-header-pills" id="exeatTypeTabs" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link <?= $selectedType === 'internal' ? 'active' : '' ?>" id="internal-tab" data-bs-toggle="pill" data-bs-target="#internal-form" type="button" role="tab" onclick="setType('internal')">
+                        <button class="nav-link <?= $selectedType === 'internal' ? 'active' : '' ?>" id="internal-tab" data-bs-toggle="pill" data-bs-target="#internal-form" type="button" role="tab" aria-selected="<?= $selectedType === 'internal' ? 'true' : 'false' ?>" onclick="setType('internal')">
                             <i class="bi bi-clock-history me-1"></i>Internal Exeat (Start &amp; Close Time)
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link <?= $selectedType === 'external' ? 'active' : '' ?>" id="external-tab" data-bs-toggle="pill" data-bs-target="#external-form" type="button" role="tab" onclick="setType('external')">
+                        <button class="nav-link <?= $selectedType === 'external' ? 'active' : '' ?>" id="external-tab" data-bs-toggle="pill" data-bs-target="#external-form" type="button" role="tab" aria-selected="<?= $selectedType === 'external' ? 'true' : 'false' ?>" onclick="setType('external')">
                             <i class="bi bi-calendar2-range me-1"></i>External Exeat (Start &amp; End Date)
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link <?= $selectedType === 'vacation' ? 'active' : '' ?>" id="vacation-tab" data-bs-toggle="pill" data-bs-target="#vacation-form" type="button" role="tab" aria-selected="<?= $selectedType === 'vacation' ? 'true' : 'false' ?>" onclick="setType('vacation')">
+                            <i class="bi bi-sun me-1"></i>Vacation
                         </button>
                     </li>
                 </ul>
@@ -349,7 +385,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <?php endif; ?>
 
                     <!-- Internal Exeat Section -->
-                    <div id="internalFields" class="<?= $selectedType === 'external' ? 'd-none' : '' ?>">
+                    <div id="internalFields" class="<?= $selectedType !== 'internal' ? 'd-none' : '' ?>">
                         <div class="alert alert-info small mb-3">
                             <i class="bi bi-info-circle-fill me-1"></i>
                             <strong>Internal Exeat:</strong> Single-day pass with specific time to start and time to close/return.
@@ -384,7 +420,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div id="externalFields" class="<?= $selectedType === 'internal' ? 'd-none' : '' ?>">
                         <div class="alert alert-primary small mb-3">
                             <i class="bi bi-info-circle-fill me-1"></i>
-                            <strong>External Exeat:</strong> Multi-day off-campus pass with start date and end date.
+                            <span id="externalDescription" class="<?= $selectedType === 'vacation' ? 'd-none' : '' ?>"><strong>External Exeat:</strong> Multi-day off-campus pass with start date and end date.</span>
+                            <span id="vacationDescription" class="<?= $selectedType === 'vacation' ? '' : 'd-none' ?>"><strong>Vacation:</strong> Multi-day vacation request with start date and expected return date.</span>
                         </div>
 
                         <div class="row g-3">
@@ -419,21 +456,22 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <label class="form-label fw-semibold">Parent / Guardian Phone Number <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-white"><i class="bi bi-telephone"></i></span>
-                                <input type="tel" name="guardianPhone" id="guardianPhone" class="form-control" value="<?= e($requestStudent['guardianPhone'] ?? '') ?>" placeholder="e.g. +233 24 000 0000" required>
+                                <input type="tel" name="guardianPhone" id="guardianPhone" class="form-control" value="<?= e($requestStudent['guardianPhone'] ?? '') ?>" placeholder="e.g. +233 24 000 0000" <?= $selectedType === 'internal' ? '' : 'required' ?>>
                             </div>
                             <small id="guardianPhoneHint" class="text-muted">This will be filled from the selected student's registered parent contact when available.</small>
                         </div>
 
                         <div class="col-12">
                             <label class="form-label fw-semibold">Reason <span class="text-danger">*</span></label>
-                            <textarea name="reason" class="form-control" rows="4" required placeholder="Provide clear explanation for the exeat request..."></textarea>
+                            <textarea name="reason" id="reasonField" class="form-control" rows="4" required placeholder="Provide clear explanation for the exeat request..." <?= $selectedType === 'vacation' ? 'readonly' : '' ?>><?= $selectedType === 'vacation' ? 'Vacation' : '' ?></textarea>
+                            <small id="reasonHint" class="text-muted"><?= $selectedType === 'vacation' ? 'Vacation reason is fixed.' : 'Provide a clear explanation for the exeat request.' ?></small>
                         </div>
                     </div>
 
                     <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
                         <a href="<?= url('views/exeat/index.php') ?>" class="btn btn-outline-secondary">Cancel</a>
                         <button type="submit" class="btn btn-primary" id="submitBtn" <?= ($canCreateForStudent && empty($houseStudents)) ? 'disabled' : '' ?>>
-                            <i class="bi bi-send me-1"></i><?= $canCreateForStudent ? 'Create Exeat' : 'Submit Request' ?>
+                            <i class="bi bi-send me-1"></i><span id="submitButtonLabel"><?= $pageTitle ?></span>
                         </button>
                     </div>
                 </form>
@@ -444,20 +482,42 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
 <script>
 const studentData = <?php echo json_encode($studentDataMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+const canCreateForStudent = <?= $canCreateForStudent ? 'true' : 'false' ?>;
 
 function setType(type) {
     document.getElementById('selectedExeatType').value = type;
+    ['internal', 'external', 'vacation'].forEach(function (typeName) {
+        const tab = document.getElementById(typeName + '-tab');
+        if (tab) {
+            const active = typeName === type;
+            tab.classList.toggle('active', active);
+            tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        }
+    });
     const internalFields = document.getElementById('internalFields');
     const externalFields = document.getElementById('externalFields');
     const studentSelectorSection = document.getElementById('studentSelectorSection');
     const guardianPhoneSection = document.getElementById('guardianPhoneSection');
-    const searchInput = document.getElementById('studentSearchInput');
-    const studentIdInput = document.getElementById('studentId');
+    const externalDescription = document.getElementById('externalDescription');
+    const vacationDescription = document.getElementById('vacationDescription');
+    const reasonInput = document.getElementById('reasonField');
+    const reasonHint = document.getElementById('reasonHint');
+    const pageTitle = document.getElementById('exeatPageTitle');
+    const submitButtonLabel = document.getElementById('submitButtonLabel');
     const guardianPhoneInput = document.getElementById('guardianPhone');
 
-    if (searchInput) searchInput.value = '';
-    if (studentIdInput) studentIdInput.value = '';
-    if (guardianPhoneInput) guardianPhoneInput.value = '';
+    if (reasonInput && type === 'vacation') {
+        if (!reasonInput.readOnly) {
+            reasonInput.dataset.previousReason = reasonInput.value;
+        }
+        reasonInput.value = 'Vacation';
+        reasonInput.readOnly = true;
+    } else if (reasonInput && reasonInput.readOnly) {
+        reasonInput.value = reasonInput.dataset.previousReason || '';
+        delete reasonInput.dataset.previousReason;
+        reasonInput.readOnly = false;
+    }
+    if (guardianPhoneInput) guardianPhoneInput.required = type !== 'internal';
     updateStudentDetails();
     
     if (type === 'internal') {
@@ -471,6 +531,19 @@ function setType(type) {
         if (studentSelectorSection) studentSelectorSection.classList.remove('d-none');
         if (guardianPhoneSection) guardianPhoneSection.classList.remove('d-none');
     }
+
+    if (externalDescription) externalDescription.classList.toggle('d-none', type !== 'external');
+    if (vacationDescription) vacationDescription.classList.toggle('d-none', type !== 'vacation');
+    if (reasonHint) {
+        reasonHint.textContent = type === 'vacation'
+            ? 'Vacation reason is fixed.'
+            : 'Provide a clear explanation for the exeat request.';
+    }
+    const title = type === 'vacation'
+        ? (canCreateForStudent ? 'Create Vacation' : 'Request Vacation')
+        : (canCreateForStudent ? 'Create Exeat' : 'Request Exeat');
+    if (pageTitle) pageTitle.textContent = title;
+    if (submitButtonLabel) submitButtonLabel.textContent = title;
 }
 
 function updateStudentDetails() {
@@ -487,10 +560,13 @@ function updateStudentDetails() {
     const student = studentData[studentId] || null;
     const guardianPhone = student && student.guardianPhone ? student.guardianPhone : '';
 
-    guardianPhoneInput.value = guardianPhone;
+    if (guardianPhoneInput.dataset.studentId !== studentId) {
+        guardianPhoneInput.value = guardianPhone;
+        guardianPhoneInput.dataset.studentId = studentId;
+    }
 
     if (studentContactBox) {
-        if (student && studentId && document.getElementById('selectedExeatType').value === 'external') {
+        if (student && studentId && document.getElementById('selectedExeatType').value !== 'internal') {
             const name = student.name || 'Student';
             const phone = guardianPhone || 'No parent/guardian number on file';
             studentContactName.textContent = name;
@@ -525,6 +601,17 @@ function setupStudentSearch() {
 window.addEventListener('DOMContentLoaded', function () {
     updateStudentDetails();
     setupStudentSearch();
+
+    const createForm = document.querySelector('.exeat-create-form-body');
+    if (createForm) {
+        createForm.addEventListener('submit', function () {
+            if (document.getElementById('selectedExeatType').value === 'vacation' && window.SDS?.toast) {
+                window.SDS.toast('info', canCreateForStudent
+                    ? 'Creating vacation...'
+                    : 'Submitting vacation request...');
+            }
+        });
+    }
 });
 </script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

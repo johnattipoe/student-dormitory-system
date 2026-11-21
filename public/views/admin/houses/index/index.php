@@ -15,11 +15,167 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\HouseService;
-use App\Services\RoomService;
-use App\Services\StudentService;
+use App\Services\UserService;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 $pageTitle = 'Houses';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = sanitize($_POST['action'] ?? '');
+    if (in_array($action, ['create_house', 'import_houses'], true)) {
+        if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
+            flash('error', 'The form expired. Please refresh the page and try again.');
+            redirect(url('views/admin/houses/index/index.php'));
+        }
+
+        if ($action === 'create_house') {
+            $name = trim(sanitize($_POST['name'] ?? ''));
+            $gender = sanitize($_POST['gender'] ?? 'coed');
+            $capacity = (int) ($_POST['capacity'] ?? 1);
+            $status = sanitize($_POST['status'] ?? 'active');
+            if ($name === '') {
+                flash('error', 'House name is required.');
+            } elseif (!in_array($gender, ['male', 'female', 'coed'], true) || !in_array($status, ['active', 'inactive'], true) || $capacity < 1) {
+                flash('error', 'Enter a valid gender, positive bed capacity, and house status.');
+            } else {
+                try {
+                    HouseService::create([
+                        'name' => $name,
+                        'gender' => $gender,
+                        'capacity' => $capacity,
+                        'houseMasterId' => sanitize($_POST['houseMasterId'] ?? ''),
+                        'houseMistressId' => sanitize($_POST['houseMistressId'] ?? ''),
+                        'location' => sanitize($_POST['location'] ?? ''),
+                        'status' => $status,
+                    ]);
+                    flash('success', 'House created successfully.');
+                } catch (Throwable $e) {
+                    error_log('Unable to create house: ' . $e->getMessage());
+                    flash('error', 'Unable to create house. Please try again.');
+                }
+            }
+            redirect(url('views/admin/houses/index/index.php'));
+        }
+
+        $imported = 0;
+        $file = $_FILES['houses_file'] ?? [];
+        $fileError = validate_uploaded_file($file, ['csv', 'xlsx']);
+        if ($fileError !== null) {
+            flash('error', $fileError);
+            redirect(url('views/admin/houses/index/index.php'));
+        }
+
+        try {
+            $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+            if ($extension === 'csv') {
+                $handle = fopen($file['tmp_name'], 'rb');
+                if ($handle === false) {
+                    throw new RuntimeException('Unable to open the CSV file.');
+                }
+
+                $rows = [];
+                try {
+                    while (($row = fgetcsv($handle)) !== false) {
+                        $rows[] = $row;
+                    }
+                } finally {
+                    fclose($handle);
+                }
+            } else {
+                $ioFactoryClass = 'PhpOffice\\PhpSpreadsheet\\IOFactory';
+                if (!class_exists($ioFactoryClass)) {
+                    throw new RuntimeException('Excel import support is unavailable. Please upload a CSV file or install PhpSpreadsheet.');
+                }
+                $rows = call_user_func([$ioFactoryClass, 'load'], $file['tmp_name'])
+                    ->getActiveSheet()
+                    ->toArray(null, true, true, false);
+            }
+
+            $header = array_map(static fn ($value) => strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $value)), array_shift($rows) ?: []);
+            $columns = [];
+            foreach ($header as $index => $column) {
+                $columns[$column] = $index;
+            }
+            if (!array_key_exists('name', $columns)) {
+                flash('error', 'The file must include a Name column.');
+                redirect(url('views/admin/houses/index/index.php'));
+            }
+
+            $value = static fn (array $row, string $column, string $default = ''): string =>
+                trim((string) ($row[$columns[$column] ?? -1] ?? $default));
+            $maxRecords = 1000;
+            $rowsToImport = array_slice($rows, 0, $maxRecords);
+            $importErrors = [];
+            foreach ($rowsToImport as $index => $row) {
+                if (count(array_filter($row, static fn ($cell): bool => trim((string) $cell) !== '')) === 0) {
+                    continue;
+                }
+
+                $rowNumber = $index + 2;
+                $name = $value($row, 'name');
+                $gender = strtolower($value($row, 'gender') ?: 'coed');
+                $capacityText = $value($row, 'capacity') ?: '1';
+                $status = strtolower($value($row, 'status') ?: 'active');
+                if ($name === '') {
+                    $importErrors[] = "Row {$rowNumber}: house name is required.";
+                    continue;
+                }
+                if (!in_array($gender, ['male', 'female', 'coed'], true)) {
+                    $importErrors[] = "Row {$rowNumber}: gender must be male, female, or coed.";
+                    continue;
+                }
+                if (!ctype_digit($capacityText) || (int) $capacityText < 1) {
+                    $importErrors[] = "Row {$rowNumber}: capacity must be a positive whole number.";
+                    continue;
+                }
+                if (!in_array($status, ['active', 'inactive'], true)) {
+                    $importErrors[] = "Row {$rowNumber}: status must be active or inactive.";
+                    continue;
+                }
+
+                HouseService::create([
+                    'name' => sanitize($name),
+                    'gender' => $gender,
+                    'capacity' => (int) $capacityText,
+                    'location' => sanitize($value($row, 'location')),
+                    'status' => $status,
+                    'houseMasterId' => sanitize($value($row, 'housemasterid')),
+                    'houseMistressId' => sanitize($value($row, 'housemistressid')),
+                ]);
+                $imported++;
+            }
+
+            if ($imported > 0) {
+                flash('success', "Imported {$imported} house(s) successfully.");
+            }
+            if ($importErrors !== []) {
+                $shownErrors = array_slice($importErrors, 0, 3);
+                $remainingErrors = count($importErrors) - count($shownErrors);
+                flash('warning', implode(' ', $shownErrors) . ($remainingErrors > 0 ? " {$remainingErrors} more row(s) could not be imported." : ''));
+            } elseif ($imported === 0) {
+                flash('error', 'No houses were imported. Check that the file contains valid data rows.');
+            }
+            if (count($rows) > $maxRecords) {
+                flash('info', "Only the first {$maxRecords} data rows were processed.");
+            }
+        } catch (Throwable $e) {
+            error_log('House import failed: ' . $e->getMessage());
+            flash(
+                $imported > 0 ? 'warning' : 'error',
+                $imported > 0
+                    ? "Import stopped after {$imported} house(s) were created. Check the house directory before retrying."
+                    : 'Import could not be completed. Check the house directory before retrying.'
+            );
+        }
+
+        redirect(url('views/admin/houses/index/index.php'));
+    }
+}
+
 $houses = HouseService::all();
+$staffUsers = (new UserService())->all();
+$houseMasters = array_values(array_filter($staffUsers, static fn (array $staff): bool => ($staff['role'] ?? '') === ROLE_HOUSE_MASTER));
+$houseMistresses = array_values(array_filter($staffUsers, static fn (array $staff): bool => ($staff['role'] ?? '') === ROLE_HOUSE_MISTRESS));
 $totalHouses = count($houses);
 $activeHouses = count(array_filter($houses, fn($h) => ($h['status'] ?? 'active') === 'active'));
 $totalCapacity = array_sum(array_map(fn($h) => (int) ($h['capacity'] ?? 0), $houses));
@@ -40,14 +196,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <h4 class="mb-0 fw-bold text-dark">Houses</h4>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="<?= url('views/admin/houses/bulk-import/bulk-import.php') ?>" class="btn btn-outline-success btn-sm">
+                <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#importHousesModal">
                     <i class="bi bi-file-earmark-arrow-up me-1"></i> Upload CSV/Excel
-                </a>
-                <a href="<?= url('views/admin/houses/create/create.php') ?>" class="btn btn-primary btn-sm">
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createHouseModal">
                     <i class="bi bi-plus-lg me-1"></i> Add House
-                </a>
+                </button>
             </div>
         </div>
+        <br>
 
         <div class="row g-3 mb-4">
             <div class="col-sm-6 col-lg-4">
@@ -203,6 +360,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <form method="POST" action="<?= url('views/admin/houses/edit/edit.php?id=' . urlencode($hId)) ?>">
+                    <input type="hidden" name="id" value="<?= e($hId) ?>">
                     <div class="modal-header">
                         <h5 class="modal-title">Edit House</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -246,4 +404,110 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 <?php endforeach; ?>
+<div class="modal fade" id="createHouseModal" tabindex="-1" aria-labelledby="createHouseModalLabel" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openCreateHouse']) ? 'true' : 'false' ?>">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/admin/houses/index/index.php') ?>">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createHouseModalLabel">Add dormitory house</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="create_house">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="newHouseName">House name</label>
+                            <input id="newHouseName" name="name" class="form-control" placeholder="e.g. Mandela House" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="newHouseGender">Gender allocation</label>
+                            <select id="newHouseGender" name="gender" class="form-select" required>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="coed" selected>Co-ed</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="newHouseCapacity">Bed capacity</label>
+                            <input id="newHouseCapacity" type="number" name="capacity" class="form-control" min="1" value="1" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="newHouseLocation">Location / zone</label>
+                            <input id="newHouseLocation" name="location" class="form-control" placeholder="e.g. East Campus, Block B">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="newHouseMaster">Assigned house master</label>
+                            <select id="newHouseMaster" name="houseMasterId" class="form-select">
+                                <option value="">Not assigned</option>
+                                <?php foreach ($houseMasters as $staff): ?>
+                                    <?php $staffId = (string) ($staff['id'] ?? $staff['uid'] ?? ''); ?>
+                                    <option value="<?= e($staffId) ?>"><?= e($staff['name'] ?? '') ?> (<?= e($staff['email'] ?? '') ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="newHouseMistress">Assigned house mistress</label>
+                            <select id="newHouseMistress" name="houseMistressId" class="form-select">
+                                <option value="">Not assigned</option>
+                                <?php foreach ($houseMistresses as $staff): ?>
+                                    <?php $staffId = (string) ($staff['id'] ?? $staff['uid'] ?? ''); ?>
+                                    <option value="<?= e($staffId) ?>"><?= e($staff['name'] ?? '') ?> (<?= e($staff['email'] ?? '') ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="newHouseStatus">Status</label>
+                            <select id="newHouseStatus" name="status" class="form-select">
+                                <option value="active" selected>Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save house</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="importHousesModal" tabindex="-1" aria-labelledby="importHousesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="<?= url('views/admin/houses/index/index.php') ?>" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="importHousesModalLabel">Import houses</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="import_houses">
+                    <label class="form-label" for="housesImportFile">CSV or XLSX file</label>
+                    <input id="housesImportFile" type="file" name="houses_file" class="form-control mb-3" accept=".csv,.xlsx" required>
+                    <p class="small text-muted mb-0">Required header: Name. Optional headers: Gender, Capacity, Location, Status, HouseMasterId, HouseMistressId. Maximum 1,000 rows.</p>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <a class="btn btn-outline-secondary" href="data:text/csv;charset=utf-8,Name%2CGender%2CCapacity%2CLocation%2CStatus%2CHouseMasterId%2CHouseMistressId%0AHouse%20A%2Cmale%2C100%2CNorth%20Block%2Cactive%2C%2C%0A" download="house-import-template.csv"><i class="bi bi-file-earmark-arrow-down me-1"></i>Download template</a>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-upload me-1"></i>Upload and import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.querySelectorAll('#createHouseModal, #importHousesModal').forEach(function (modal) {
+    modal.dataset.disableLoading = 'true';
+    document.body.appendChild(modal);
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.bootstrap) return;
+    document.querySelectorAll('.modal[data-open-on-load="true"]').forEach(function (modalElement) {
+        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    });
+});
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

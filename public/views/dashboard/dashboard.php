@@ -155,7 +155,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <?php foreach (array_slice($accessibleModules, 0, 5, true) as $quickModule): ?>
                                 <a href="<?= url($quickModule['href']) ?>" class="btn btn-light text-start d-flex align-items-center gap-2"><i class="bi <?= e($quickModule['icon']) ?> text-primary"></i><span><?= e($quickModule['label']) ?></span><i class="bi bi-arrow-up-right ms-auto text-muted"></i></a>
                             <?php endforeach; ?>
-                            <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="window.location.reload()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh dashboard data</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="SDS.showButtonLoading(this); window.location.reload()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh dashboard data</button>
                         </div>
                     </section>
                 </div>

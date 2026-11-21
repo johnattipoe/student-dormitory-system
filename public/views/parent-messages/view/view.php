@@ -75,10 +75,34 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </dl>
             <div class="border rounded p-3 mb-4" style="white-space:pre-line"><?= e($message['message'] ?? '') ?></div>
             <div class="d-flex gap-2">
-                <a class="btn btn-primary" href="<?= url('views/parent-messages/edit/edit.php?id=' . urlencode($id)) ?>"><i class="bi bi-pencil me-1"></i> Edit Message</a>
-                <a class="btn btn-outline-danger" href="<?= url('views/parent-messages/delete/delete.php?id=' . urlencode($id)) ?>"><i class="bi bi-trash me-1"></i> Delete Message</a>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#parentMessageDetailEditModal"><i class="bi bi-pencil me-1"></i> Edit Message</button>
+                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#parentMessageDetailDeleteModal"><i class="bi bi-trash me-1"></i> Delete Message</button>
             </div>
         </div>
     </div>
+</div>
+<div class="modal fade" id="parentMessageDetailEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <form method="POST" action="<?= url('views/parent-messages/edit/edit.php?id=' . urlencode($id)) ?>">
+            <input type="hidden" name="id" value="<?= e($id) ?>">
+            <div class="modal-header"><h5 class="modal-title">Edit Message Record</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">Recipient Parent / Guardian</label><input class="form-control" value="<?= e($message['guardianName'] ?? '-') ?> (Student: <?= e($message['studentName'] ?? '-') ?>)" readonly></div>
+                <div class="mb-3"><label class="form-label">Subject</label><input name="subject" class="form-control" value="<?= e($message['subject'] ?? '') ?>" required></div>
+                <div><label class="form-label">Message Content</label><textarea name="message" class="form-control" rows="5" required><?= e($message['message'] ?? '') ?></textarea></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
+        </form>
+    </div></div>
+</div>
+<div class="modal fade" id="parentMessageDetailDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <form method="POST" action="<?= url('views/parent-messages/delete/delete.php?id=' . urlencode($id)) ?>">
+            <input type="hidden" name="id" value="<?= e($id) ?>">
+            <div class="modal-header"><h5 class="modal-title text-danger">Delete Parent Message</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">Delete the message for <strong><?= e($message['guardianName'] ?? 'this parent') ?></strong> regarding <strong><?= e($message['studentName'] ?? 'this student') ?></strong>?</div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger">Delete</button></div>
+        </form>
+    </div></div>
 </div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

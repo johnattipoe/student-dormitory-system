@@ -127,7 +127,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                     <h5 class="fw-bold mb-0">House payment ledger</h5>
                     <div class="d-flex gap-2">
-                        <a href="<?= url('index.php?route=' . urlencode('/views/admin/finance/payments/index.php')) ?>" class="btn btn-primary btn-sm">Record Payment</a>
+                        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#houseRecordPaymentModal" <?= empty($students) ? 'disabled title="There are no students assigned to this house"' : '' ?>>Record Payment</button>
                         <a href="<?= url('index.php?route=' . urlencode('/views/admin/finance/export_csv/index.php') . '&houseId=' . urlencode((string) $houseId)) ?>" class="btn btn-outline-success btn-sm">Export CSV</a>
                     </div>
                 </div>
@@ -161,6 +161,75 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </table>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="houseRecordPaymentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="<?= e(url('index.php?route=' . urlencode('/views/admin/finance/payments/index.php'))) ?>" class="finance-modal-form">
+                <input type="hidden" name="action" value="add">
+                <input type="hidden" name="returnToHouseFinance" value="1">
+                <div class="modal-header">
+                    <h5 class="modal-title">Record a payment for this house</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Student</label>
+                            <select name="studentId" class="form-select" required>
+                                <option value="">Select student</option>
+                                <?php foreach ($students as $student): ?>
+                                    <?php
+                                    $studentId = (string) ($student['id'] ?? $student['uid'] ?? '');
+                                    $studentName = trim((string) (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')));
+                                    if ($studentId === '') continue;
+                                    ?>
+                                    <option value="<?= e($studentId) ?>"><?= e($studentName !== '' ? $studentName : $studentId) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Fee</label>
+                            <input type="text" name="feeName" class="form-control" value="<?= e((string) ($feeCategories[0]['name'] ?? 'Boarding Fee')) ?>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Amount</label>
+                            <input type="number" name="amount" min="0.01" step="0.01" class="form-control" placeholder="650.00" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Payment Method</label>
+                            <select name="paymentMethod" class="form-select">
+                                <option value="Cash">Cash</option>
+                                <option value="Mobile Money">Mobile Money</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="POS">POS</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="paid">Paid</option>
+                                <option value="pending">Pending</option>
+                                <option value="partial">Partial</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Reference</label>
+                            <input type="text" name="reference" class="form-control" placeholder="Receipt / transaction number">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea name="notes" class="form-control" rows="3" placeholder="Optional payment note"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Payment</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

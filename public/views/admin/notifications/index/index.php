@@ -21,30 +21,53 @@ use App\Services\UserService;
 $notificationService = new NotificationService();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (($_POST['action'] ?? '') === 'mark_all_read') {
+    $action = (string) ($_POST['action'] ?? '');
+    if ($action === 'mark_all_read') {
         foreach ($notificationService->all() as $notification) {
             if (!empty($notification['id'])) $notificationService->markAsReadById((string) $notification['id']);
         }
         flash('success', 'All notifications marked as read.');
         redirect(base_url('index.php?route=/views/admin/notifications/index/index.php'));
     }
-    if (($_POST['action'] ?? '') === 'mark_read') {
+    if ($action === 'mark_read') {
         $result = $notificationService->markAsReadById(sanitize($_POST['id'] ?? ''));
         flash($result['success'] ? 'success' : 'error', $result['message']);
         redirect(base_url('index.php?route=/views/admin/notifications/index/index.php'));
     }
 
-    $data = [
-        'title' => sanitize($_POST['title'] ?? ''),
-        'message' => sanitize($_POST['message'] ?? ''),
-        'type' => sanitize($_POST['type'] ?? 'info'),
-        'recipientType' => sanitize($_POST['recipientType'] ?? 'user'),
-        'role' => sanitize($_POST['role'] ?? ''),
-        'userId' => sanitize($_POST['userId'] ?? ''),
-    ];
-
-    $result = $notificationService->create($data);
-    flash($result['success'] ? 'success' : 'error', $result['message']);
+    if ($action === 'update_notification') {
+        $id = sanitize($_POST['id'] ?? '');
+        if (!$notificationService->findForAdmin($id)) {
+            flash('error', 'Notification not found.');
+        } else {
+            $result = $notificationService->update($id, [
+                'title' => sanitize($_POST['title'] ?? ''),
+                'message' => sanitize($_POST['message'] ?? ''),
+                'type' => sanitize($_POST['type'] ?? 'info'),
+            ]);
+            flash($result['success'] ? 'success' : 'error', $result['message']);
+        }
+    } elseif ($action === 'delete_notification') {
+        $id = sanitize($_POST['id'] ?? '');
+        if (!$notificationService->findForAdmin($id)) {
+            flash('error', 'Notification not found.');
+        } else {
+            $result = $notificationService->delete($id);
+            flash($result['success'] ? 'success' : 'error', $result['message']);
+        }
+    } elseif ($action === 'create_notification') {
+        $result = $notificationService->create([
+            'title' => sanitize($_POST['title'] ?? ''),
+            'message' => sanitize($_POST['message'] ?? ''),
+            'type' => sanitize($_POST['type'] ?? 'info'),
+            'recipientType' => sanitize($_POST['recipientType'] ?? 'user'),
+            'role' => sanitize($_POST['role'] ?? ''),
+            'userId' => sanitize($_POST['userId'] ?? ''),
+        ]);
+        flash($result['success'] ? 'success' : 'error', $result['message']);
+    } else {
+        flash('error', 'Unknown notification action.');
+    }
     redirect(base_url('index.php?route=/views/admin/notifications/index/index.php'));
 }
 
@@ -91,14 +114,15 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
         <div class="modal fade" id="createNotificationModal" tabindex="-1" aria-labelledby="createNotificationModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="createNotificationModalLabel">Create notification</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <form method="POST" action="<?= url('views/admin/notifications/index/index.php') ?>" class="row g-3">
+                        <form id="createNotificationForm" method="POST" action="<?= url('views/admin/notifications/index/index.php') ?>" class="row g-3">
+                <input type="hidden" name="action" value="create_notification">
                 <div class="col-md-4">
                     <label class="form-label">Title</label>
                     <input name="title" class="form-control" required>
@@ -120,12 +144,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <option value="all">All users</option>
                     </select>
                 </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <button class="btn btn-primary w-100" type="submit">Send</button>
-                </div>
                 <div class="col-md-6">
                     <label class="form-label">User</label>
-                    <select name="userId" class="form-select">
+                    <select name="userId" class="form-select" id="notificationUserId">
                         <option value="">Select user</option>
                         <?php foreach ($users as $user): ?>
                             <option value="<?= e((string) ($user['uid'] ?? $user['id'] ?? '')) ?>"><?= e((string) ($user['name'] ?? ($user['email'] ?? 'Unknown'))) ?> (<?= e((string) ($user['role'] ?? '')) ?>)</option>
@@ -134,7 +155,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Role</label>
-                    <select name="role" class="form-select">
+                    <select name="role" class="form-select" id="notificationRole">
                         <option value="">Select role</option>
                         <?php foreach (['admin', 'house_master', 'senior-houseparent', 'security', 'nurse', 'student'] as $role): ?>
                             <option value="<?= e($role) ?>"><?= ucfirst(str_replace('_', ' ', $role)) ?></option>
@@ -149,6 +170,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-primary" type="submit" form="createNotificationForm">Send notification</button>
                     </div>
                 </div>
             </div>
@@ -229,7 +251,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     <div class="modal fade" id="notificationEditModal-<?= e($notificationId) ?>" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
-                <form method="POST" action="<?= url('views/admin/notifications/edit/edit.php?id=' . urlencode($notificationId)) ?>">
+                <form method="POST" action="<?= url('views/admin/notifications/index/index.php') ?>">
+                    <input type="hidden" name="action" value="update_notification">
+                    <input type="hidden" name="id" value="<?= e($notificationId) ?>">
                     <div class="modal-header">
                         <h5 class="modal-title">Edit Notification</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -273,7 +297,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <form method="POST" action="<?= url('views/admin/notifications/delete/delete.php?id=' . urlencode($notificationId)) ?>">
+                    <form method="POST" action="<?= url('views/admin/notifications/index/index.php') ?>">
+                        <input type="hidden" name="action" value="delete_notification">
+                        <input type="hidden" name="id" value="<?= e($notificationId) ?>">
                         <button type="submit" class="btn btn-danger">Delete</button>
                     </form>
                 </div>
@@ -281,4 +307,19 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 <?php endforeach; ?>
+<script>
+const recipientTypeSelect = document.getElementById('recipientType');
+if (recipientTypeSelect) {
+    const userSelect = document.getElementById('notificationUserId');
+    const roleSelect = document.getElementById('notificationRole');
+    const updateRecipientFields = function () {
+        userSelect.required = recipientTypeSelect.value === 'user';
+        userSelect.disabled = recipientTypeSelect.value !== 'user';
+        roleSelect.required = recipientTypeSelect.value === 'role';
+        roleSelect.disabled = recipientTypeSelect.value !== 'role';
+    };
+    recipientTypeSelect.addEventListener('change', updateRecipientFields);
+    updateRecipientFields();
+}
+</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -11,19 +11,12 @@
 <link rel="stylesheet" href="/assets/css/login/login.css">
 </head>
 <body class="login-body d-flex align-items-center justify-content-center">
-  <div id="startupLoader" class="startup-loader is-hidden" hidden role="status" aria-live="polite" aria-label="Starting application">
-    <div class="startup-loader-card">
-      <div class="startup-logo">
-        <img src="/assets/images/mawuli-school-logo.png" alt="Mawuli School crest">
-      </div>
-      <div class="startup-loader-title"><?= e($appConfig['name'] ?? 'Student Dormitory System') ?></div>
-      <div class="startup-loader-text">Preparing your secure portal...</div>
-      <div class="startup-progress" aria-hidden="true">
-        <span></span>
-      </div>
+  <div id="sessionTransitionLoader" class="session-transition-overlay" hidden role="status" aria-live="polite" aria-label="Session transition">
+    <div class="session-transition-card">
+      <span class="startup-spinner startup-button-spinner session-transition-spinner" aria-hidden="true"></span>
+      <span data-session-transition-message>Signing in...</span>
     </div>
   </div>
-
   <div class="login-card card shadow-lg border-0">
     <div class="card-body p-4">
       <div class="text-center mb-4">

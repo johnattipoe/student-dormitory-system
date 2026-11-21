@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $action = sanitize($_POST['action'] ?? '');
 
-    if (($isStudent || $canCreateForStudent) && in_array($action, ['request', 'create_internal', 'create_external'], true)) {
+    if (($isStudent || $canCreateForStudent) && in_array($action, ['request', 'create_internal', 'create_external', 'create_vacation'], true)) {
         $requestStudent = $studentProfile;
         if ($canCreateForStudent) {
             $selectedStudentId = sanitize($_POST['studentId'] ?? '');
@@ -69,14 +69,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect(url('views/exeat/index.php'));
         }
 
-        $exeatType = sanitize($_POST['exeatType'] ?? ($action === 'create_internal' ? 'internal' : 'external'));
+        $defaultType = match ($action) {
+            'create_internal' => 'internal',
+            'create_vacation' => 'vacation',
+            default => 'external',
+        };
+        $exeatType = sanitize($_POST['exeatType'] ?? $defaultType);
 
         $result = $service->create([
             'studentId' => (string) ($requestStudent['id'] ?? ''),
             'studentName' => trim(($requestStudent['firstName'] ?? '') . ' ' . ($requestStudent['lastName'] ?? '')),
             'houseId' => $requestStudent['houseId'] ?? null,
             'roomId' => $requestStudent['roomId'] ?? null,
-            'guardianPhone' => $requestStudent['guardianPhone'] ?? '',
+            'guardianPhone' => sanitize($_POST['guardianPhone'] ?? $requestStudent['guardianPhone'] ?? ''),
             'exeatType' => $exeatType,
             'startDate' => sanitize($_POST['startDate'] ?? $_POST['date'] ?? ''),
             'endDate' => sanitize($_POST['endDate'] ?? $_POST['date'] ?? ''),
@@ -88,7 +93,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'createdByRole' => $role,
         ]);
 
-        flash($result['success'] ? 'success' : 'error', $result['message']);
+        if (!$result['success']) {
+            flash('error', $result['message']);
+        } elseif ($exeatType !== 'vacation') {
+            flash('success', $result['message']);
+        }
         
         // Send SMS notification for exeat creation
         if ($result['success']) {
@@ -122,28 +131,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($exeatType === 'internal') {
                         $reasonStr = !empty($reason) ? " for {$reason}" : '';
                         $smsMessage = "Your ward {$studentName} has been approved for internal exeat on {$startDate}{$reasonStr} by the {$roleSender}.";
+                    } elseif ($exeatType === 'vacation') {
+                        $smsMessage = $canCreateForStudent
+                            ? "Your ward {$studentName} has been approved for vacation from {$startDate} to {$endDate} by the {$roleSender}."
+                            : "Your ward {$studentName} has submitted a vacation request from {$startDate} to {$endDate} for review.";
                     } else {
                         $destStr = !empty($destination) ? " to {$destination}" : '';
                         $reasonStr = !empty($reason) ? " for {$reason}" : '';
                         $smsMessage = "Your ward {$studentName} has been approved for external exeat from {$startDate} to {$endDate}{$destStr}{$reasonStr} by the {$roleSender}.";
                     }
                     
-                    $logMsg = "[" . date('H:i:s') . "] [CREATE-INDEX] Sending SMS to {$guardianPhone}, length: " . mb_strlen($smsMessage) . "\n";
+                    $phoneSuffix = substr(preg_replace('/\D+/', '', $guardianPhone), -4);
+                    $logMsg = "[" . date('H:i:s') . "] [CREATE-INDEX] Sending SMS to phone ending {$phoneSuffix}, length: " . mb_strlen($smsMessage) . "\n";
                     @file_put_contents($logFile, $logMsg, FILE_APPEND);
                     
                     $smsResult = $smsService->send($guardianPhone, $smsMessage);
                     if ($smsResult['success']) {
-                        $logMsg = "[" . date('H:i:s') . "] [CREATE-INDEX] ✓ SMS SENT to {$guardianPhone}\n";
+                        $campaignId = (string) ($smsResult['campaign_id'] ?? '');
+                        $logMsg = "[" . date('H:i:s') . "] [CREATE-INDEX] SMS ACCEPTED BY PROVIDER; campaign ID: " . ($campaignId !== '' ? $campaignId : 'not returned') . "; delivery not confirmed\n";
                         @file_put_contents($logFile, $logMsg, FILE_APPEND);
+                        if ($exeatType === 'vacation') {
+                            $confirmationMessage = $canCreateForStudent
+                                ? 'Vacation created successfully. The SMS provider accepted the notification request, but delivery to the parent/guardian is not confirmed.'
+                                : 'Vacation request submitted successfully. The SMS provider accepted the notification request, but delivery to the parent/guardian is not confirmed.';
+                            if ($campaignId !== '') {
+                                $confirmationMessage .= ' SMS campaign ID: ' . $campaignId . '; check its delivery report with BMS Africa.';
+                            }
+                            flash('info', $confirmationMessage);
+                        }
                     } else {
-                        $logMsg = "[" . date('H:i:s') . "] [CREATE-INDEX] ✗ SMS FAILED: " . ($smsResult['message'] ?? 'Unknown error') . " | Response: " . json_encode($smsResult['provider_response'] ?? []) . "\n";
+                        $logMsg = "[" . date('H:i:s') . "] [CREATE-INDEX] SMS RESULT UNKNOWN/FAILED: " . ($smsResult['message'] ?? 'Unknown error') . "\n";
                         @file_put_contents($logFile, $logMsg, FILE_APPEND);
+                        if ($exeatType === 'vacation') {
+                            flash('warning', ($canCreateForStudent
+                                ? 'Vacation created successfully'
+                                : 'Vacation request submitted successfully')
+                                . ', but SMS delivery could not be confirmed: ' . ($smsResult['message'] ?? 'Unknown error') . ' Do not submit again just to retry the SMS; that may create a duplicate vacation record.');
+                        }
                     }
+                } elseif ($exeatType === 'vacation' && $smsEnabled === '1') {
+                    flash('info', 'Vacation created successfully, but no parent/guardian phone number is on file, so no SMS was sent.');
+                } elseif ($exeatType === 'vacation') {
+                    flash('info', 'Vacation created successfully, but SMS notifications are disabled in app settings, so no message was sent to the parent/guardian.');
                 }
             } catch (Throwable $e) {
                 $logFile = APP_ROOT . '/storage/logs/sms-exeat-' . date('Y-m-d') . '.log';
                 $logMsg = "[" . date('H:i:s') . "] [CREATE-INDEX] ✗ ERROR: " . $e->getMessage() . "\n";
                 @file_put_contents($logFile, $logMsg, FILE_APPEND);
+                if ($exeatType === 'vacation') {
+                    flash('warning', ($canCreateForStudent
+                        ? 'Vacation created successfully'
+                        : 'Vacation request submitted successfully')
+                        . ', but SMS delivery could not be confirmed: ' . $e->getMessage() . ' Do not submit again just to retry the SMS; that may create a duplicate vacation record.');
+                }
             }
         }
         
@@ -254,6 +294,16 @@ try {
     $houseMap = [];
 }
 
+$exeatModalStudents = [];
+if ($canCreateForStudent) {
+    foreach ($studentMap as $id => $student) {
+        $exeatModalStudents[$id] = [
+            'name' => (string) ($student['name'] ?? ''),
+            'phone' => (string) ($student['phone'] ?? ''),
+        ];
+    }
+}
+
 $hideExeatFilters = in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS, ROLE_SENIOR_HOUSEPARENT], true);
 $statusFilter = $hideExeatFilters ? '' : strtolower(trim(sanitize($_GET['status'] ?? '')));
 $typeFilter = $hideExeatFilters ? '' : strtolower(trim(sanitize($_GET['type'] ?? '')));
@@ -264,7 +314,7 @@ $searchTerm = $hideExeatFilters ? '' : trim(sanitize($_GET['search'] ?? ''));
 if ($statusFilter !== '' && in_array($statusFilter, ['pending', 'approved', 'rejected', 'departed', 'returned'], true)) {
     $records = array_values(array_filter($records, static fn(array $record): bool => strtolower((string) ($record['status'] ?? 'pending')) === $statusFilter));
 }
-if ($typeFilter !== '' && in_array($typeFilter, ['internal', 'external'], true)) {
+if ($typeFilter !== '' && in_array($typeFilter, ['internal', 'external', 'vacation'], true)) {
     $records = array_values(array_filter($records, static fn(array $record): bool => strtolower((string) ($record['exeatType'] ?? $record['type'] ?? 'external')) === $typeFilter));
 }
 if ($fromDate !== '') {
@@ -305,7 +355,12 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     foreach ($records as $record) {
         $recordStudentId = (string) ($record['studentId'] ?? '');
         $recordHouseId = (string) ($record['houseId'] ?? $studentMap[$recordStudentId]['houseId'] ?? '');
-        $recType = ($record['exeatType'] ?? $record['type'] ?? '') === 'internal' ? 'Internal' : 'External';
+        $recordType = strtolower((string) ($record['exeatType'] ?? $record['type'] ?? 'external'));
+        $recType = match ($recordType) {
+            'internal' => 'Internal',
+            'vacation' => 'Vacation',
+            default => 'External',
+        };
         fputcsv($output, [
             $studentMap[$recordStudentId]['name'] ?? $record['studentName'] ?? $recordStudentId,
             $studentMap[$recordStudentId]['admissionNo'] ?? '',
@@ -381,6 +436,39 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 .exeat-table th,
 .exeat-table td {
     white-space: nowrap;
+}
+.exeat-table th:last-child,
+.exeat-table td:last-child {
+    position: sticky;
+    right: 0;
+}
+.exeat-table th:nth-last-child(2),
+.exeat-table td:nth-last-child(2) {
+    position: sticky;
+    right: 160px;
+}
+.exeat-table th:last-child {
+    z-index: 3;
+    background-color: var(--bs-table-bg, #fff);
+    box-shadow: -6px 0 8px rgba(15, 23, 42, 0.08);
+}
+.exeat-table td:last-child {
+    z-index: 2;
+    background-color: var(--bs-table-bg, #fff);
+    box-shadow: -6px 0 8px rgba(15, 23, 42, 0.06);
+}
+.exeat-table td:last-child:has(.dropdown-menu.show) {
+    z-index: 4;
+}
+.exeat-table th:nth-last-child(2) {
+    z-index: 3;
+    background-color: var(--bs-table-bg, #fff);
+    box-shadow: -6px 0 8px rgba(15, 23, 42, 0.08);
+}
+.exeat-table td:nth-last-child(2) {
+    z-index: 2;
+    background-color: var(--bs-table-bg, #fff);
+    box-shadow: -6px 0 8px rgba(15, 23, 42, 0.06);
 }
 .exeat-table td:nth-child(6) {
     white-space: normal;
@@ -502,19 +590,109 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div>
                         <h6 class="mb-1 fw-bold"><i class="bi bi-send-plus me-2 text-primary"></i><?= $canCreateForStudent ? 'Create Exeat for Student' : 'Request Exeat Permission' ?></h6>
                         <p class="text-muted mb-0 small">
-                            <?= $canCreateForStudent 
-                                ? ($role === ROLE_ADMIN ? 'Issue an internal day/campus pass or external travel exeat for any student across all houses.' : 'Issue an internal day/campus pass or external travel exeat for dormitory residents.') 
-                                : 'Choose internal (hours/day pass) or external (date-range travel) exeat.' ?>
+                            <?= $canCreateForStudent
+                                ? ($role === ROLE_ADMIN ? 'Create an internal pass, external exeat, or vacation for any student across all houses.' : 'Create an internal pass, external exeat, or vacation for dormitory residents.')
+                                : 'Choose an internal, external, or vacation request.' ?>
                         </p>
                     </div>
                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <a href="<?= url('/views/exeat/create/create.php') ?>" class="btn btn-primary btn-sm">
-                            <i class="bi bi-plus-circle me-1"></i>Create Exeat
-                        </a>
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createExeatModal" data-exeat-type="internal">
+                            <i class="bi bi-clock-history me-1"></i>Internal
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createExeatModal" data-exeat-type="external">
+                            <i class="bi bi-calendar2-range me-1"></i>External
+                        </button>
+                        <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#createExeatModal" data-exeat-type="vacation">
+                            <i class="bi bi-sun me-1"></i>Vacation
+                        </button>
                     </div>
                 </div>
             </div>
 
+            <div class="modal fade" id="createExeatModal" tabindex="-1" aria-labelledby="createExeatModalTitle" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                    <form method="POST" action="<?= url('views/exeat/index.php') ?>" class="modal-content" id="createExeatModalForm">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="action" id="createExeatAction" value="create_internal">
+                        <input type="hidden" name="exeatType" id="createExeatType" value="internal">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="createExeatModalTitle">Create Internal Exeat</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                            <div class="modal-body">
+                                <?php if ($canCreateForStudent): ?>
+                                    <div class="mb-3">
+                                        <label for="createExeatStudentSearch" class="form-label fw-semibold">Select Student <span class="text-danger">*</span></label>
+                                        <input type="text" id="createExeatStudentSearch" class="form-control" list="createExeatStudentOptions" placeholder="Search by name or admission number..." autocomplete="off" required <?= empty($studentMap) ? 'disabled' : '' ?>>
+                                        <datalist id="createExeatStudentOptions">
+                                            <?php foreach ($studentMap as $optionStudentId => $student): ?>
+                                                <option value="<?= e($student['name'] . ' (' . $student['admissionNo'] . ')') ?>" data-student-id="<?= e((string) $optionStudentId) ?>"></option>
+                                            <?php endforeach; ?>
+                                        </datalist>
+                                        <input type="hidden" name="studentId" id="createExeatStudentId">
+                                    </div>
+                                <?php else: ?>
+                                    <div class="alert alert-light border py-2 mb-3">
+                                        Requesting for <strong><?= e($studentMap[$studentId]['name'] ?? trim(($studentProfile['firstName'] ?? '') . ' ' . ($studentProfile['lastName'] ?? ''))) ?></strong>
+                                    </div>
+                                <?php endif; ?>
+
+                                <div id="createExeatInternalFields">
+                                    <div class="alert alert-info small py-2">Internal exeat is a same-day pass with a start and return time.</div>
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label for="createExeatDate" class="form-label fw-semibold">Date <span class="text-danger">*</span></label>
+                                            <input type="date" name="date" id="createExeatDate" class="form-control" value="<?= e(date('Y-m-d')) ?>" min="<?= e(date('Y-m-d')) ?>" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="createExeatStartTime" class="form-label fw-semibold">Time to Start <span class="text-danger">*</span></label>
+                                            <input type="time" name="startTime" id="createExeatStartTime" class="form-control" value="08:00" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="createExeatCloseTime" class="form-label fw-semibold">Time to Close / Return <span class="text-danger">*</span></label>
+                                            <input type="time" name="closeTime" id="createExeatCloseTime" class="form-control" value="17:00" required>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="createExeatDateRangeFields" class="d-none">
+                                    <div class="alert alert-primary small py-2" id="createExeatTypeDescription"></div>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="createExeatStartDate" class="form-label fw-semibold">Start Date <span class="text-danger">*</span></label>
+                                            <input type="date" name="startDate" id="createExeatStartDate" class="form-control" value="<?= e(date('Y-m-d')) ?>" min="<?= e(date('Y-m-d')) ?>">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="createExeatEndDate" class="form-label fw-semibold">End Date <span class="text-danger">*</span></label>
+                                            <input type="date" name="endDate" id="createExeatEndDate" class="form-control" value="<?= e(date('Y-m-d', strtotime('+1 day'))) ?>" min="<?= e(date('Y-m-d')) ?>">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3">
+                                    <label for="createExeatDestination" class="form-label fw-semibold">Destination Address / Location</label>
+                                    <input type="text" name="destination" id="createExeatDestination" class="form-control" placeholder="Where will the student be going?">
+                                </div>
+                                <div class="mt-3 d-none" id="createExeatGuardianSection">
+                                    <label for="createExeatGuardianPhone" class="form-label fw-semibold">Parent / Guardian Phone Number <span class="text-danger">*</span></label>
+                                    <input type="tel" name="guardianPhone" id="createExeatGuardianPhone" class="form-control" value="<?= e($canCreateForStudent ? '' : ($studentProfile['guardianPhone'] ?? '')) ?>" placeholder="e.g. +233 24 000 0000">
+                                    <small class="text-muted" id="createExeatGuardianHint">Enter the parent or guardian number for the SMS notification.</small>
+                                </div>
+                                <div class="mt-3">
+                                    <label for="createExeatReason" class="form-label fw-semibold">Reason <span class="text-danger">*</span></label>
+                                    <textarea name="reason" id="createExeatReason" class="form-control" rows="3" required placeholder="Provide a clear explanation for the exeat request..."></textarea>
+                                    <small class="text-muted" id="createExeatReasonHint">Provide a clear explanation for the exeat request.</small>
+                                </div>
+                            </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary" id="createExeatSubmit" <?= ($canCreateForStudent && empty($studentMap)) ? 'disabled' : '' ?>>
+                                <i class="bi bi-send me-1"></i><span id="createExeatSubmitLabel">Create Internal Exeat</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         <?php endif; ?>
 
         <?php if (!$hideExeatFilters): ?>
@@ -537,6 +715,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <option value="">All types</option>
                             <option value="internal" <?= $typeFilter === 'internal' ? 'selected' : '' ?>>Internal Exeat</option>
                             <option value="external" <?= $typeFilter === 'external' ? 'selected' : '' ?>>External Exeat</option>
+                            <option value="vacation" <?= $typeFilter === 'vacation' ? 'selected' : '' ?>>Vacation</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -567,7 +746,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-journal-text me-2 text-primary"></i>Exeat Applications &amp; Travel Pass Records</h6>
                 <div class="d-flex align-items-center gap-2">
-                    <?php if (!$hideExeatFilters): ?>
+                    <?php if (!$hideExeatFilters || in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true)): ?>
                         <input type="search" class="form-control form-control-sm" data-ts-table-filter placeholder="Filter shown records..." aria-label="Filter shown records" style="max-width: 220px;">
                     <?php endif; ?>
                     <span class="badge bg-light text-dark border" data-ts-filter-count><?= count($records) ?> shown</span>
@@ -575,7 +754,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0 w-100 exeat-table" data-no-data-table="true" <?= !$hideExeatFilters ? 'data-ts-filter-table' : '' ?>>
+                    <table class="table table-hover align-middle mb-0 w-100 exeat-table" data-no-data-table="true" data-ts-filter-table>
                         <thead class="table-light">
                             <tr>
                                 <?php if (!$isStudent): ?>
@@ -589,7 +768,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 <th>Destination</th>
                                 <th>Reason</th>
                                 <th style="min-width: 90px;">Status</th>
-                                <th style="min-width: 95px;">Reviewed</th>
+                                <th style="min-width: 120px;">Reviewed Date</th>
                                 <th class="text-end" style="min-width: 160px;">Actions</th>
                             </tr>
                         </thead>
@@ -607,7 +786,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     $recordStatus = strtolower((string) ($record['status'] ?? 'pending'));
                                     $recordStudentId = (string) ($record['studentId'] ?? '');
                                     $recordHouseId = (string) ($record['houseId'] ?? $studentMap[$recordStudentId]['houseId'] ?? '');
-                                    $isInternal = ($record['exeatType'] ?? $record['type'] ?? '') === 'internal';
+                                    $recordType = strtolower((string) ($record['exeatType'] ?? $record['type'] ?? 'external'));
+                                    $isInternal = $recordType === 'internal';
                                     $recStudentName = $studentMap[$recordStudentId]['name'] ?? (string) ($record['studentName'] ?? $recordStudentId);
                                     $recStudentAdmissionNo = (string) ($studentMap[$recordStudentId]['admissionNo'] ?? '');
                                     ?>
@@ -629,6 +809,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <td>
                                             <?php if ($isInternal): ?>
                                                 <span class="badge bg-info-subtle text-info border"><i class="bi bi-clock me-1"></i>Internal</span>
+                                            <?php elseif ($recordType === 'vacation'): ?>
+                                                <span class="badge bg-success-subtle text-success border"><i class="bi bi-sun me-1"></i>Vacation</span>
                                             <?php else: ?>
                                                 <span class="badge bg-primary-subtle text-primary border"><i class="bi bi-calendar-range me-1"></i>External</span>
                                             <?php endif; ?>
@@ -723,6 +905,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </tbody>
                     </table>
                 </div>
+                <div class="exeat-pagination d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 px-3 py-2 border-top d-none"
+                     data-ts-pagination
+                     data-page-length="<?= e((string) max(1, (int) (app_config()['pagination_per_page'] ?? 25))) ?>">
+                    <small class="text-muted" data-ts-page-info></small>
+                    <nav aria-label="Exeat table pages">
+                        <ul class="pagination pagination-sm mb-0" data-ts-pagination-pages></ul>
+                    </nav>
+                </div>
             </div>
         </div>
 
@@ -736,7 +926,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 $recordStatus = strtolower((string) ($record['status'] ?? 'pending'));
                 $recordStudentId = (string) ($record['studentId'] ?? '');
                 $recordHouseId = (string) ($record['houseId'] ?? $studentMap[$recordStudentId]['houseId'] ?? '');
-                $isInternal = ($record['exeatType'] ?? $record['type'] ?? '') === 'internal';
+                $recordType = strtolower((string) ($record['exeatType'] ?? $record['type'] ?? 'external'));
+                $isInternal = $recordType === 'internal';
+                $typeLabel = match ($recordType) {
+                    'internal' => 'Internal Pass',
+                    'vacation' => 'Vacation',
+                    default => 'External Pass',
+                };
+                $typeBadgeClass = $isInternal ? 'info' : ($recordType === 'vacation' ? 'success' : 'primary');
                 $recStudentName = $studentLabel($record);
                 ?>
 
@@ -771,7 +968,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center mb-2">
                                                 <span class="text-muted small">Exeat Type:</span>
-                                                <span class="badge bg-<?= $isInternal ? 'info' : 'primary' ?>"><?= $isInternal ? 'Internal Pass' : 'External Pass' ?></span>
+                                                <span class="badge bg-<?= e($typeBadgeClass) ?>"><?= e($typeLabel) ?></span>
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <span class="text-muted small">Requested By:</span>
@@ -781,7 +978,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     </div>
 
                                     <div class="col-12">
-                                        <div class="alert <?= $isInternal ? 'alert-info' : 'alert-primary' ?> mb-0">
+                                        <div class="alert <?= $isInternal ? 'alert-info' : ($recordType === 'vacation' ? 'alert-success' : 'alert-primary') ?> mb-0">
                                             <h6 class="fw-bold mb-2"><i class="bi bi-calendar-event me-2"></i>Schedule &amp; Timings</h6>
                                             <?php if ($isInternal): ?>
                                                 <div class="row g-2">
@@ -791,8 +988,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                                 </div>
                                             <?php else: ?>
                                                 <div class="row g-2">
-                                                    <div class="col-sm-6"><strong>Departure Date:</strong> <?= e($record['startDate'] ?? '—') ?></div>
-                                                    <div class="col-sm-6 text-danger"><strong>Return Date:</strong> <?= e($record['endDate'] ?? '—') ?></div>
+                                                    <div class="col-sm-6"><strong><?= $recordType === 'vacation' ? 'Vacation Start Date' : 'Departure Date' ?>:</strong> <?= e($record['startDate'] ?? '—') ?></div>
+                                                    <div class="col-sm-6 text-danger"><strong><?= $recordType === 'vacation' ? 'Vacation End Date' : 'Return Date' ?>:</strong> <?= e($record['endDate'] ?? '—') ?></div>
                                                 </div>
                                             <?php endif; ?>
                                         </div>
@@ -842,29 +1039,55 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 </div>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                            <form method="POST" action="<?= url('views/exeat/index.php') ?>">
+                            <form method="POST" action="<?= url('views/exeat/edit/edit.php?id=' . urlencode($recId)) ?>">
                                 <div class="modal-body p-4">
                                     <?= csrf_field() ?>
-                                    <input type="hidden" name="action" value="edit">
-                                    <input type="hidden" name="recordId" value="<?= e($recId) ?>">
+                                    <input type="hidden" name="id" value="<?= e($recId) ?>">
 
+                                    <?php if ($isStaff): ?>
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold small">Status</label>
+                                            <select name="status" class="form-select">
+                                                <?php foreach (['pending', 'approved', 'rejected', 'departed', 'returned'] as $editStatus): ?>
+                                                    <option value="<?= e($editStatus) ?>" <?= $recordStatus === $editStatus ? 'selected' : '' ?>><?= ucfirst($editStatus) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    <?php endif; ?>
+                                    <input type="hidden" name="exeatType" id="edit_exeat_type_<?= $idx ?>" value="<?= e($recordType) ?>">
                                     <div class="mb-3">
                                         <label class="form-label fw-semibold small">Pass Type</label>
                                         <div class="d-flex gap-3">
                                             <div class="form-check">
-                                                <input class="form-check-input" type="radio" name="exeatType" id="edit_internal_<?= $idx ?>" value="internal" <?= $isInternal ? 'checked' : '' ?> onchange="toggleEditType('<?= $idx ?>', 'internal')">
+                                                <input class="form-check-input" type="radio" name="exeatTypeChoice_<?= $idx ?>" id="edit_internal_<?= $idx ?>" value="internal" <?= $recordType === 'internal' ? 'checked' : '' ?> onchange="toggleEditType('<?= $idx ?>', 'internal')">
                                                 <label class="form-check-label" for="edit_internal_<?= $idx ?>">Internal (Hours Pass)</label>
                                             </div>
                                             <div class="form-check">
-                                                <input class="form-check-input" type="radio" name="exeatType" id="edit_external_<?= $idx ?>" value="external" <?= !$isInternal ? 'checked' : '' ?> onchange="toggleEditType('<?= $idx ?>', 'external')">
+                                                <input class="form-check-input" type="radio" name="exeatTypeChoice_<?= $idx ?>" id="edit_external_<?= $idx ?>" value="external" <?= $recordType === 'external' ? 'checked' : '' ?> onchange="toggleEditType('<?= $idx ?>', 'external')">
                                                 <label class="form-check-label" for="edit_external_<?= $idx ?>">External (Date Range)</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="exeatTypeChoice_<?= $idx ?>" id="edit_vacation_<?= $idx ?>" value="vacation" <?= $recordType === 'vacation' ? 'checked' : '' ?> onchange="toggleEditType('<?= $idx ?>', 'vacation')">
+                                                <label class="form-check-label" for="edit_vacation_<?= $idx ?>">Vacation</label>
                                             </div>
                                         </div>
                                     </div>
-
+                                    <div id="edit_internal_fields_<?= $idx ?>" class="<?= $recordType !== 'internal' ? 'd-none' : '' ?> row g-3">
+                                        <div class="col-md-4"><label class="form-label">Date</label><input type="date" name="date" class="form-control" value="<?= e($record['startDate'] ?? $record['date'] ?? date('Y-m-d')) ?>"></div>
+                                        <div class="col-md-4"><label class="form-label">Start Time</label><input type="time" name="startTime" class="form-control" value="<?= e($record['startTime'] ?? '08:00') ?>"></div>
+                                        <div class="col-md-4"><label class="form-label">Close Time</label><input type="time" name="closeTime" class="form-control" value="<?= e($record['closeTime'] ?? $record['endTime'] ?? '17:00') ?>"></div>
+                                    </div>
+                                    <div id="edit_external_fields_<?= $idx ?>" class="<?= $recordType === 'internal' ? 'd-none' : '' ?> row g-3">
+                                        <div class="col-md-6"><label class="form-label">Start Date</label><input type="date" name="startDate" class="form-control" value="<?= e($record['startDate'] ?? date('Y-m-d')) ?>"></div>
+                                        <div class="col-md-6"><label class="form-label">End Date</label><input type="date" name="endDate" class="form-control" value="<?= e($record['endDate'] ?? date('Y-m-d', strtotime('+1 day'))) ?>"></div>
+                                    </div>
+                                    <div class="mt-3"><label class="form-label">Destination</label><input name="destination" class="form-control" value="<?= e($record['destination'] ?? '') ?>"></div>
+                                    <div class="mt-3"><label class="form-label">Parent / Guardian Phone</label><input name="guardianPhone" type="tel" class="form-control" value="<?= e($record['guardianPhone'] ?? $studentMap[$recordStudentId]['phone'] ?? '') ?>"></div>
+                                    <div class="mt-3"><label class="form-label">Reason</label><textarea name="reason" id="edit_reason_<?= $idx ?>" class="form-control" rows="3" required><?= $recordType === 'vacation' ? 'Vacation' : e($record['reason'] ?? '') ?></textarea><small class="text-muted" id="edit_reason_hint_<?= $idx ?>"></small></div>
                                 </div>
                                 <div class="modal-footer bg-light">
                                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Save Changes</button>
                                 </div>
                             </form>
                         </div>
@@ -909,18 +1132,145 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 </div>
 
 <script>
+const exeatModalStudentData = <?= json_encode($exeatModalStudents, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+const canCreateExeatForStudent = <?= $canCreateForStudent ? 'true' : 'false' ?>;
+
+window.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('createExeatModal');
+    const form = document.getElementById('createExeatModalForm');
+    if (!modal || !form) return;
+
+    const typeInput = document.getElementById('createExeatType');
+    const actionInput = document.getElementById('createExeatAction');
+    const title = document.getElementById('createExeatModalTitle');
+    const submitLabel = document.getElementById('createExeatSubmitLabel');
+    const internalFields = document.getElementById('createExeatInternalFields');
+    const dateRangeFields = document.getElementById('createExeatDateRangeFields');
+    const guardianSection = document.getElementById('createExeatGuardianSection');
+    const guardianPhone = document.getElementById('createExeatGuardianPhone');
+    const guardianHint = document.getElementById('createExeatGuardianHint');
+    const typeDescription = document.getElementById('createExeatTypeDescription');
+    const reason = document.getElementById('createExeatReason');
+    const reasonHint = document.getElementById('createExeatReasonHint');
+    const studentSearch = document.getElementById('createExeatStudentSearch');
+    const studentId = document.getElementById('createExeatStudentId');
+    const studentOptions = Array.from(document.querySelectorAll('#createExeatStudentOptions option'));
+    const submitButton = document.getElementById('createExeatSubmit');
+    const submitText = <?= json_encode($canCreateForStudent ? 'Create' : 'Request') ?>;
+
+    function setType(type) {
+        if (!['internal', 'external', 'vacation'].includes(type)) type = 'internal';
+        typeInput.value = type;
+        actionInput.value = 'create_' + type;
+
+        const isInternal = type === 'internal';
+        internalFields.classList.toggle('d-none', !isInternal);
+        dateRangeFields.classList.toggle('d-none', isInternal);
+        guardianSection.classList.toggle('d-none', isInternal);
+        internalFields.querySelectorAll('input').forEach(input => input.required = isInternal);
+        dateRangeFields.querySelectorAll('input').forEach(input => input.required = !isInternal);
+        guardianPhone.required = !isInternal;
+
+        if (type === 'vacation') {
+            if (!reason.readOnly) reason.dataset.previousReason = reason.value;
+            reason.value = 'Vacation';
+            reason.readOnly = true;
+            reasonHint.textContent = 'Vacation reason is fixed.';
+            typeDescription.textContent = 'Vacation is a multi-day request with a start date and expected return date.';
+        } else {
+            if (reason.readOnly) {
+                reason.value = reason.dataset.previousReason || '';
+                delete reason.dataset.previousReason;
+            }
+            reason.readOnly = false;
+            reasonHint.textContent = 'Provide a clear explanation for the exeat request.';
+            typeDescription.textContent = 'External exeat is a multi-day off-campus pass with start and end dates.';
+        }
+
+        const typeLabel = type === 'vacation' ? 'Vacation' : (type === 'internal' ? 'Internal Exeat' : 'External Exeat');
+        title.textContent = submitText + ' ' + typeLabel;
+        submitLabel.textContent = submitText + ' ' + typeLabel;
+    }
+
+    function updateSelectedStudent() {
+        if (!canCreateExeatForStudent || !studentSearch || !studentId) return;
+        const selectedOption = studentOptions.find(option => option.value === studentSearch.value);
+        const selectedId = selectedOption ? selectedOption.dataset.studentId : '';
+        studentSearch.setCustomValidity(studentSearch.value && !selectedId ? 'Select a student from the list.' : '');
+
+        if (studentId.value !== selectedId) {
+            studentId.value = selectedId;
+            guardianPhone.value = selectedId ? (exeatModalStudentData[selectedId]?.phone || '') : '';
+            guardianHint.textContent = guardianPhone.value
+                ? 'Using the selected student\'s registered parent/guardian number. You can edit it if needed.'
+                : 'No registered number found. Enter the parent or guardian number for the SMS notification.';
+        }
+    }
+
+    modal.addEventListener('show.bs.modal', function (event) {
+        setType(event.relatedTarget?.dataset.exeatType || 'internal');
+    });
+
+    if (studentSearch) {
+        studentSearch.addEventListener('input', updateSelectedStudent);
+        studentSearch.addEventListener('change', updateSelectedStudent);
+    }
+
+    form.addEventListener('submit', function (event) {
+        updateSelectedStudent();
+        if (canCreateExeatForStudent && !studentId.value) {
+            event.preventDefault();
+            studentSearch.reportValidity();
+            return;
+        }
+
+        submitButton.disabled = true;
+        submitLabel.textContent = 'Submitting...';
+    });
+});
+
 function toggleEditType(idx, type) {
     var internalDiv = document.getElementById('edit_internal_fields_' + idx);
     var externalDiv = document.getElementById('edit_external_fields_' + idx);
-    if (!internalDiv || !externalDiv) return;
-    
-    if (type === 'internal') {
-        internalDiv.classList.remove('d-none');
-        externalDiv.classList.add('d-none');
+    var typeInput = document.getElementById('edit_exeat_type_' + idx);
+    var reason = document.getElementById('edit_reason_' + idx);
+    var reasonHint = document.getElementById('edit_reason_hint_' + idx);
+    if (!internalDiv || !externalDiv || !typeInput || !reason || !reasonHint) return;
+    var isInternal = type === 'internal';
+    var isVacation = type === 'vacation';
+    typeInput.value = type;
+    internalDiv.classList.toggle('d-none', !isInternal);
+    externalDiv.classList.toggle('d-none', isInternal);
+    internalDiv.querySelectorAll('input').forEach(function (input) {
+        input.disabled = !isInternal;
+        input.required = isInternal;
+    });
+    externalDiv.querySelectorAll('input').forEach(function (input) {
+        input.disabled = isInternal;
+        input.required = !isInternal;
+    });
+    if (isVacation) {
+        reason.dataset.previousReason = reason.value;
+        reason.value = 'Vacation';
+        reason.readOnly = true;
+        reasonHint.textContent = 'Vacation reason is fixed.';
     } else {
-        internalDiv.classList.add('d-none');
-        externalDiv.classList.remove('d-none');
+        if (reason.readOnly) reason.value = reason.dataset.previousReason || '';
+        reason.readOnly = false;
+        reasonHint.textContent = 'Provide a clear explanation for the exeat request.';
     }
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[id^="edit_internal_"]').forEach(function (radio) {
+        if (radio.checked) toggleEditType(radio.id.replace('edit_internal_', ''), 'internal');
+    });
+    document.querySelectorAll('[id^="edit_external_"]').forEach(function (radio) {
+        if (radio.checked) toggleEditType(radio.id.replace('edit_external_', ''), 'external');
+    });
+    document.querySelectorAll('[id^="edit_vacation_"]').forEach(function (radio) {
+        if (radio.checked) toggleEditType(radio.id.replace('edit_vacation_', ''), 'vacation');
+    });
+});
 </script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

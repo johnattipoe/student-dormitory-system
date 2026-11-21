@@ -25,6 +25,7 @@ $portalPrefix = $isAdmin ? 'admin' : 'house-master';
 $roomsIndexRoute = 'views/' . $portalPrefix . '/rooms/index/index.php';
 $allocationRoute = 'views/' . $portalPrefix . '/rooms/allocation/allocation.php';
 $houseId = $isAdmin ? '' : (string) (current_user()['houseId'] ?? current_user()['house_id'] ?? '');
+$selectedRoomId = sanitize($_GET['roomId'] ?? '');
 $rooms = RoomService::all($isAdmin ? null : $houseId);
 $houses = $isAdmin ? HouseService::all() : ($houseId !== '' && ($house = HouseService::find($houseId)) ? [$house] : []);
 $students = StudentService::all($isAdmin ? null : $houseId);
@@ -68,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $room = RoomService::find($roomId);
         if (!$student || !$room || (string) ($student['houseId'] ?? '') !== $houseId || (string) ($room['houseId'] ?? '') !== $houseId) {
             flash('error', 'The student and room must belong to your assigned house.');
-            redirect(url('views/house-master/rooms/allocation/allocation.php'));
+            redirect(url('views/house-master/rooms/allocation/allocation.php?openAllocation=1'));
         }
     }
     if ($action === 'transfer') {
@@ -81,7 +82,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
     }
     flash(!empty($result['success']) ? 'success' : 'error', $result['message'] ?? 'Allocation action failed.');
-    redirect(url($allocationRoute));
+    $resultRoute = !$isAdmin && empty($result['success']) ? $allocationRoute . '?openAllocation=1' : $allocationRoute;
+    redirect(url($resultRoute));
 }
 
 if (isset($_GET['download']) && $_GET['download'] === 'csv') {
@@ -183,6 +185,44 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
         </div>
 
+        <?php if (!$isAdmin): ?>
+        <div class="card stat-card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-person-plus me-2 text-primary"></i>Assign or Transfer Student</h6>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#houseRoomAllocationModal"><i class="bi bi-plus-lg me-1"></i>New Allocation</button>
+            </div>
+            <div class="card-body text-muted small">Use the allocation form to assign a student to a room or transfer them to another room.</div>
+        </div>
+        <div class="modal fade" id="houseRoomAllocationModal" tabindex="-1" aria-hidden="true" data-open-on-load="<?= !empty($_GET['openAllocation']) ? 'true' : 'false' ?>">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="POST" action="<?= url($allocationRoute) ?>">
+                        <div class="modal-header"><h5 class="modal-title">Assign or Transfer Student</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                        <div class="modal-body">
+                            <label class="form-label">Student</label>
+                            <select name="studentId" class="form-select mb-3" required>
+                                <option value="">Select student...</option>
+                                <?php foreach ($students as $student): ?>
+                                    <option value="<?= e((string) ($student['id'] ?? '')) ?>"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?> (<?= e($student['admissionNo'] ?? '') ?>)<?= !empty($student['roomId']) ? ' — Assigned' : '' ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <label class="form-label">Destination Room</label>
+                            <select name="roomId" class="form-select mb-3" required>
+                                <option value="">Select destination room...</option>
+                                <?php foreach ($rooms as $room): ?>
+                                    <?php $occupied = (int) ($room['occupied'] ?? 0); $capacity = (int) ($room['capacity'] ?? 0); ?>
+                                    <option value="<?= e((string) ($room['id'] ?? '')) ?>" <?= (string) ($room['id'] ?? '') === $selectedRoomId ? 'selected' : '' ?> <?= (($room['status'] ?? '') === 'maintenance' || $occupied >= $capacity) ? 'disabled' : '' ?>>Room <?= e($room['roomNumber'] ?? '-') ?> — <?= e($houseMap[(string) ($room['houseId'] ?? '')] ?? '-') ?> (<?= $occupied ?>/<?= $capacity ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                            <label class="form-label">Action</label>
+                            <select name="action" class="form-select"><option value="allocate">New Allocation</option><option value="transfer">Transfer Student</option></select>
+                        </div>
+                        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i>Save</button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <?php else: ?>
         <!-- Allocation Form Card -->
         <div class="card stat-card shadow-sm border-0 mb-4">
             <div class="card-header bg-white py-3">
@@ -228,6 +268,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </form>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- Rooms Table -->
         <div class="card stat-card shadow-sm border-0 mb-4">
@@ -385,4 +426,11 @@ function printHouseRoomAllocation(targetId) {
     printWindow.document.close();
 }
 </script>
+<?php if (!$isAdmin): ?>
+<script>
+document.querySelectorAll('.modal[data-open-on-load="true"]').forEach(function (modalElement) {
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+});
+</script>
+<?php endif; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -61,7 +61,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <h5 class="mb-0">Roles</h5>
             <div class="d-flex gap-2">
                 <a href="<?= url('views/admin/users/index/index.php') ?>" class="btn btn-outline-secondary btn-sm">Back to Users</a>
-                <a href="<?= url('views/admin/roles/create/create.php') ?>" class="btn btn-success btn-sm">Add Role</a>
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#createRoleModal">Add Role</button>
                 <a href="<?= url('views/admin/permissions/index/index.php') ?>" class="btn btn-primary btn-sm">Permissions</a>
             </div>
         </div>
@@ -212,4 +212,21 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     <?php endif; ?>
 <?php endforeach; ?>
+<div class="modal fade" id="createRoleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <form method="POST" action="<?= url('views/admin/roles/create/create.php') ?>">
+            <div class="modal-header"><h5 class="modal-title">Create Role</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6"><label class="form-label">Role Key</label><input name="role_key" class="form-control" placeholder="e.g. senior_houseparent" pattern="[a-z][a-z0-9_]*" required><div class="form-text">Lowercase letters, numbers, and underscores.</div></div>
+                    <div class="col-md-6"><label class="form-label">Role Name</label><input name="name" class="form-control" placeholder="Senior Houseparent" required></div>
+                    <div class="col-md-6"><label class="form-label">Dashboard</label><input name="dashboard" class="form-control" value="Custom Dashboard"></div>
+                    <div class="col-md-6"><label class="form-label">House Access</label><input name="house_access" class="form-control" value="Custom"></div>
+                    <div class="col-12"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="3">Custom role created by admin.</textarea></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Role</button></div>
+        </form>
+    </div></div>
+</div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -59,7 +59,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <h5 class="mb-0">Permissions</h5>
             <div class="d-flex gap-2">
                 <a href="<?= url('views/admin/users/index/index.php') ?>" class="btn btn-outline-secondary btn-sm">Back to Users</a>
-                <a href="<?= url('views/admin/permissions/create/create.php') ?>" class="btn btn-success btn-sm">Add Permission</a>
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#createPermissionModal">Add Permission</button>
                 <a href="<?= url('views/admin/roles/index/index.php') ?>" class="btn btn-primary btn-sm">Roles</a>
             </div>
         </div>
@@ -218,4 +218,29 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Permission Matrix</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete the saved permission matrix for <strong><?= e(ucwords(str_replace('_', ' ', $roleKey))) ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/admin/permissions/delete/delete.php?id=' . urlencode($roleKey)) ?>"><input type="hidden" name="id" value="<?= e($roleKey) ?>"><button class="btn btn-danger" type="submit">Delete</button></form></div></div></div>
     </div>
 <?php endforeach; ?>
+<div class="modal fade" id="createPermissionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl"><div class="modal-content">
+        <form method="POST" action="<?= url('views/admin/permissions/create/create.php') ?>">
+            <div class="modal-header"><h5 class="modal-title">Create Permission Matrix</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <label class="form-label">Role</label>
+                <select name="role_key" class="form-select mb-3" required>
+                    <option value="">Select role</option>
+                    <?php foreach ($roles as $key => $label): ?><option value="<?= e($key) ?>"><?= e($label) ?></option><?php endforeach; ?>
+                </select>
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle mb-0">
+                        <thead><tr><th>Module</th><th>Access Level</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($permissionModules as $module): ?>
+                                <tr><td><?= e(ucfirst(str_replace('_', ' ', $module))) ?></td><td><select name="<?= e($module) ?>" class="form-select"><option value="none">None</option><option value="view">View</option><option value="manage">Manage</option><option value="full">Full</option><option value="own">Own</option><option value="limited">Limited</option></select></td></tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Permission</button></div>
+        </form>
+    </div></div>
+</div>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

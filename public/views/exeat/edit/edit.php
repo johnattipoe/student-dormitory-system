@@ -53,7 +53,10 @@ $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] 
 $admissionNo = $student['admissionNo'] ?? $student['studentId'] ?? $recStudentId;
 $guardianPhone = trim((string) ($exeat['guardianPhone'] ?? $student['guardianPhone'] ?? $student['phone'] ?? ''));
 
-$currentType = ($exeat['exeatType'] ?? $exeat['type'] ?? '') === 'internal' ? 'internal' : 'external';
+$currentType = strtolower((string) ($exeat['exeatType'] ?? $exeat['type'] ?? 'external'));
+if (!in_array($currentType, ['internal', 'external', 'vacation'], true)) {
+    $currentType = 'external';
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
@@ -62,6 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $exeatType = sanitize($_POST['exeatType'] ?? $currentType);
+    if (in_array($exeatType, ['internal', 'external', 'vacation'], true)) {
+        $currentType = $exeatType;
+    }
 
     $updateData = [
         'exeatType' => $exeatType,
@@ -124,13 +130,18 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="card-header bg-white py-3">
                 <ul class="nav nav-pills card-header-pills" id="exeatTypeTabs" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link <?= $currentType === 'internal' ? 'active' : '' ?>" id="internal-tab" data-bs-toggle="pill" type="button" onclick="setType('internal')">
+                        <button class="nav-link <?= $currentType === 'internal' ? 'active' : '' ?>" id="internal-tab" data-bs-toggle="pill" type="button" aria-selected="<?= $currentType === 'internal' ? 'true' : 'false' ?>" onclick="setType('internal')">
                             <i class="bi bi-clock-history me-1"></i>Internal Exeat (Start &amp; Close Time)
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link <?= $currentType === 'external' ? 'active' : '' ?>" id="external-tab" data-bs-toggle="pill" type="button" onclick="setType('external')">
+                        <button class="nav-link <?= $currentType === 'external' ? 'active' : '' ?>" id="external-tab" data-bs-toggle="pill" type="button" aria-selected="<?= $currentType === 'external' ? 'true' : 'false' ?>" onclick="setType('external')">
                             <i class="bi bi-calendar2-range me-1"></i>External Exeat (Start &amp; End Date)
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link <?= $currentType === 'vacation' ? 'active' : '' ?>" id="vacation-tab" data-bs-toggle="pill" type="button" aria-selected="<?= $currentType === 'vacation' ? 'true' : 'false' ?>" onclick="setType('vacation')">
+                            <i class="bi bi-sun me-1"></i>Vacation
                         </button>
                     </li>
                 </ul>
@@ -155,7 +166,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <?php endif; ?>
 
                     <!-- Internal Exeat Section -->
-                    <div id="internalFields" class="<?= $currentType === 'external' ? 'd-none' : '' ?>">
+                    <div id="internalFields" class="<?= $currentType !== 'internal' ? 'd-none' : '' ?>">
                         <div class="alert alert-info small mb-3">
                             <i class="bi bi-info-circle-fill me-1"></i>
                             <strong>Internal Exeat:</strong> Single-day pass with specific start and close time.
@@ -190,7 +201,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div id="externalFields" class="<?= $currentType === 'internal' ? 'd-none' : '' ?>">
                         <div class="alert alert-primary small mb-3">
                             <i class="bi bi-info-circle-fill me-1"></i>
-                            <strong>External Exeat:</strong> Multi-day travel with departure start date and expected return date.
+                            <span id="externalDescription" class="<?= $currentType === 'vacation' ? 'd-none' : '' ?>"><strong>External Exeat:</strong> Multi-day travel with departure start date and expected return date.</span>
+                            <span id="vacationDescription" class="<?= $currentType === 'vacation' ? '' : 'd-none' ?>"><strong>Vacation:</strong> Multi-day vacation with departure start date and expected return date.</span>
                         </div>
 
                         <div class="row g-3">
@@ -232,7 +244,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
                         <div class="col-12">
                             <label class="form-label fw-semibold">Reason <span class="text-danger">*</span></label>
-                            <textarea name="reason" class="form-control" rows="4" required placeholder="Explain the reason for the exeat..."><?= e($exeat['reason'] ?? '') ?></textarea>
+                            <textarea name="reason" id="reasonField" class="form-control" rows="4" required placeholder="Explain the reason for the exeat..." <?= $currentType === 'vacation' ? 'readonly' : '' ?>><?= $currentType === 'vacation' ? 'Vacation' : e($exeat['reason'] ?? '') ?></textarea>
+                            <small id="reasonHint" class="text-muted"><?= $currentType === 'vacation' ? 'Vacation reason is fixed.' : 'Provide a clear explanation for the exeat request.' ?></small>
                         </div>
                     </div>
 
@@ -251,8 +264,20 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 <script>
 function setType(type) {
     document.getElementById('selectedExeatType').value = type;
+    ['internal', 'external', 'vacation'].forEach(function (typeName) {
+        const tab = document.getElementById(typeName + '-tab');
+        if (tab) {
+            const active = typeName === type;
+            tab.classList.toggle('active', active);
+            tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        }
+    });
     const internalFields = document.getElementById('internalFields');
     const externalFields = document.getElementById('externalFields');
+    const externalDescription = document.getElementById('externalDescription');
+    const vacationDescription = document.getElementById('vacationDescription');
+    const reasonInput = document.getElementById('reasonField');
+    const reasonHint = document.getElementById('reasonHint');
     
     if (type === 'internal') {
         internalFields.classList.remove('d-none');
@@ -260,6 +285,25 @@ function setType(type) {
     } else {
         internalFields.classList.add('d-none');
         externalFields.classList.remove('d-none');
+    }
+
+    if (externalDescription) externalDescription.classList.toggle('d-none', type !== 'external');
+    if (vacationDescription) vacationDescription.classList.toggle('d-none', type !== 'vacation');
+    if (reasonInput && type === 'vacation') {
+        if (!reasonInput.readOnly) {
+            reasonInput.dataset.previousReason = reasonInput.value;
+        }
+        reasonInput.value = 'Vacation';
+        reasonInput.readOnly = true;
+    } else if (reasonInput && reasonInput.readOnly) {
+        reasonInput.value = reasonInput.dataset.previousReason || '';
+        delete reasonInput.dataset.previousReason;
+        reasonInput.readOnly = false;
+    }
+    if (reasonHint) {
+        reasonHint.textContent = type === 'vacation'
+            ? 'Vacation reason is fixed.'
+            : 'Provide a clear explanation for the exeat request.';
     }
 }
 </script>
