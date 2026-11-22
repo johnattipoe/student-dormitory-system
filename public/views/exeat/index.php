@@ -46,21 +46,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($canCreateForStudent) {
             $selectedStudentId = sanitize($_POST['studentId'] ?? '');
             try {
-                if ($role === ROLE_ADMIN) {
-                    $allowedStudents = StudentService::all();
-                } elseif ($houseId) {
-                    $allowedStudents = StudentService::all($houseId);
-                } else {
-                    $allowedStudents = StudentService::all();
+                $requestStudent = $selectedStudentId !== ''
+                    ? StudentService::find($selectedStudentId)
+                    : null;
+                if ($requestStudent && $role !== ROLE_ADMIN && $houseId
+                    && (string) ($requestStudent['houseId'] ?? '') !== (string) $houseId) {
+                    $requestStudent = null;
                 }
             } catch (Throwable $e) {
-                $allowedStudents = [];
-            }
-            foreach ($allowedStudents as $houseStudent) {
-                if ((string) ($houseStudent['id'] ?? '') === $selectedStudentId) {
-                    $requestStudent = $houseStudent;
-                    break;
-                }
+                $requestStudent = null;
             }
         }
 
@@ -263,8 +257,8 @@ $houseMap = [];
 
 try {
     $studentSource = ($isStaff && $role !== ROLE_ADMIN && $houseId)
-        ? StudentService::all($houseId)
-        : StudentService::all();
+        ? StudentService::allRecords($houseId)
+        : StudentService::allRecords();
 
     foreach ($studentSource as $student) {
         $id = (string) ($student['id'] ?? '');
