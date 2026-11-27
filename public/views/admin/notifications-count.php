@@ -10,7 +10,6 @@ use App\Services\NotificationService;
 
 RoleMiddleware::allow([ROLE_ADMIN]);
 
-$notifications = (new NotificationService())->all();
-$unreadCount = count(array_filter($notifications, static fn(array $notification): bool => empty($notification['read'])));
+$unreadCount = (new NotificationService())->unreadCount();
 
 json_success('Notification count', ['count' => $unreadCount]);

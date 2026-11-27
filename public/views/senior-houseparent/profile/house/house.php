@@ -18,16 +18,23 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\HouseService;
 use App\Services\RoomService;
 use App\Services\StudentService;
-use App\Services\UserService;
+use App\Services\FirebaseService;
 
 $user = current_user() ?? [];
 $houseId = (string) ($user['houseId'] ?? $user['house_id'] ?? '');
 $house = $houseId !== '' ? HouseService::find($houseId) : null;
 $houseName = $house['name'] ?? ($houseId ?: 'Assigned House');
 
-// Load house staff
-$allUsers = (new UserService())->all();
-$houseStaff = array_values(array_filter($allUsers, function ($u) use ($houseId) {
+$houseStaffById = [];
+if ($houseId !== '') {
+    $firebase = FirebaseService::getInstance();
+    foreach (['houseId', 'house_id'] as $field) {
+        foreach ($firebase->getCollection(COL_USERS, [[$field, '=', $houseId]], 150, 0, false) as $staff) {
+            $houseStaffById[(string) ($staff['id'] ?? '')] = $staff;
+        }
+    }
+}
+$houseStaff = array_values(array_filter($houseStaffById, function ($u) use ($houseId) {
     $uHouse = (string) ($u['houseId'] ?? $u['house_id'] ?? '');
     $role = (string) ($u['role'] ?? '');
     return $uHouse === $houseId && in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS, ROLE_SENIOR_HOUSEPARENT], true);

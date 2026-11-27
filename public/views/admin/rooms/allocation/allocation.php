@@ -202,7 +202,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <label class="form-label fw-semibold">Destination Room</label>
                         <select name="roomId" class="form-select select2" required>
                             <option value="">-- Choose destination room --</option>
-                            <?php foreach (RoomService::all() as $room): $occupied = (int) ($room['occupied'] ?? 0); $capacity = (int) ($room['capacity'] ?? 0); ?>
+                            <?php foreach ($rooms as $room): $occupied = (int) ($room['occupied'] ?? 0); $capacity = (int) ($room['capacity'] ?? 0); ?>
                                 <option value="<?= e((string) ($room['id'] ?? '')) ?>" <?= (($room['status'] ?? '') === 'maintenance' || $occupied >= $capacity) ? 'disabled' : '' ?>>
                                     Room <?= e($room['roomNumber'] ?? '-') ?> &bull; <?= e($houseMap[(string) ($room['houseId'] ?? '')] ?? '-') ?> (<?= e((string) $occupied) ?>/<?= e((string) $capacity) ?> beds)
                                 </option>

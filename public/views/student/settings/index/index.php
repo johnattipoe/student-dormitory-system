@@ -21,8 +21,8 @@ use App\Services\StudentService;
 $pageTitle = 'Student Settings';
 $pageStyles = ['student.css'];
 $currentUser = current_user() ?? [];
-$studentId = $currentUser['studentId'] ?? $currentUser['uid'] ?? null;
 $student = [];
+$studentId = $currentUser['studentId'] ?? $currentUser['uid'] ?? null;
 $preferences = [
     'emailNotifications' => true,
     'attendanceAlerts' => true,
@@ -35,32 +35,23 @@ $preferences = [
 ];
 $settingsNotice = null;
 
-if ($studentId) {
-    try {
-        $student = StudentService::find((string) $studentId) ?? [];
-    } catch (Throwable $e) {
-        $settingsNotice = 'Student profile details are temporarily unavailable.';
-    }
-}
-
-if (empty($student) && !empty($currentUser['email'])) {
-    try {
-        foreach (StudentService::all() as $candidate) {
-            if ((string) ($candidate['email'] ?? '') === (string) $currentUser['email']) {
-                $student = $candidate;
-                $studentId = $candidate['id'] ?? $studentId;
-                break;
-            }
-        }
-    } catch (Throwable $e) {
-        $settingsNotice = 'Student profile details are temporarily unavailable.';
-    }
+try {
+    $student = StudentService::findForUser($currentUser) ?? [];
+    $studentId = $student['id'] ?? $studentId;
+} catch (Throwable $e) {
+    $settingsNotice = 'Student profile details are temporarily unavailable.';
 }
 
 try {
     $userId = $currentUser['uid'] ?? $currentUser['id'] ?? null;
     if ($userId) {
-        $savedPrefs = FirebaseService::getInstance()->where('notification_preferences', 'userId', '=', $userId);
+        $savedPrefs = FirebaseService::getInstance()->getCollection(
+            'notification_preferences',
+            [['userId', '=', $userId]],
+            1,
+            0,
+            false
+        );
         if (!empty($savedPrefs[0]) && is_array($savedPrefs[0])) {
             $preferences = array_merge($preferences, $savedPrefs[0]);
         }

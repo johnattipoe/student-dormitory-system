@@ -24,8 +24,10 @@ $nurseMedicalStudents = $student ? [$student] : [];
 $nurseMedicalModalId = 'nurseMedicalRecordCreate';
 $nurseMedicalReturnTo = 'studentProfile';
 $nurseMedicalSelectedStudentId = $studentId;
-$records = (new MedicalService())->all();
-$studentRecords = array_values(array_filter($records, static fn(array $record): bool => (string) ($record['studentId'] ?? '') === (string) ($student['id'] ?? $studentId)));
+$recordStudentId = (string) ($student['id'] ?? $studentId);
+$studentRecords = $recordStudentId !== ''
+    ? (new MedicalService())->forStudents([$recordStudentId])
+    : [];
 $latestRecords = array_slice($studentRecords, 0, 5);
 
 $name = trim((string) (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')));

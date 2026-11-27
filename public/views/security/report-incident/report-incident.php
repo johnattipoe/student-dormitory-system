@@ -16,9 +16,6 @@ $allowedRoles = [ROLE_SECURITY];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\IncidentService;
-use App\Services\StudentService;
-
-$students = StudentService::all();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = (new IncidentService())->create([
@@ -94,13 +91,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <label class="form-label fw-semibold">Student Involved (Optional)</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-white"><i class="bi bi-person"></i></span>
-                                <select name="studentId" class="form-select">
+                                <select name="studentId" class="form-select" data-security-student-options="<?= e(url('views/security/dashboard/student-options.php')) ?>">
                                     <option value="">No specific student linked</option>
-                                    <?php foreach ($students as $student): ?>
-                                        <option value="<?= e((string) ($student['id'] ?? '')) ?>">
-                                            <?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?> (<?= e($student['admissionNo'] ?? 'No ID') ?>)
-                                        </option>
-                                    <?php endforeach; ?>
                                 </select>
                             </div>
                         </div>

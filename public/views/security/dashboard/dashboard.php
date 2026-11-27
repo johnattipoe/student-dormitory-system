@@ -14,7 +14,6 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\IncidentService;
 use App\Services\VisitorService;
 use App\Services\FirebaseService;
-use App\Services\StudentService;
 
 $user = current_user() ?? [];
 $officerName = trim(($user['name'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))) ?: 'Security Officer';
@@ -22,30 +21,44 @@ $guardPost   = (string)($user['guardPost'] ?? $user['station'] ?? 'Main Gate');
 
 $visitorService = new VisitorService();
 $incidentService = new IncidentService();
-$visitors  = $visitorService->all();
-$incidents = $incidentService->all();
-$securityStudents = StudentService::all();
-
-$insideVisitors  = array_values(array_filter($visitors, static fn($v) => ($v['status'] ?? '') === 'inside'));
-$pendingVisitors = array_values(array_filter($visitors, static fn($v) => ($v['status'] ?? '') === 'pending'));
-$todayVisitors   = array_values(array_filter($visitors, static function($v) {
-    $val = (string)($v['checkInTime'] ?? $v['visitDate'] ?? $v['createdAt'] ?? '');
-    return str_starts_with($val, date('Y-m-d'));
-}));
-$openIncidents   = array_values(array_filter($incidents, static fn($i) => ($i['status'] ?? 'open') === 'open'));
-$urgentIncidents = array_values(array_filter($incidents, static fn($i) => in_array(strtolower((string)($i['priority'] ?? '')), ['high', 'critical', 'urgent'], true)));
-
-usort($visitors,  static fn($a, $b) => strcmp((string)($b['checkInTime'] ?? $b['createdAt'] ?? ''), (string)($a['checkInTime'] ?? $a['createdAt'] ?? '')));
-usort($incidents, static fn($a, $b) => strcmp((string)($b['reportedAt'] ?? $b['createdAt'] ?? ''), (string)($a['reportedAt'] ?? $a['createdAt'] ?? '')));
-
-$recentVisitors  = array_slice($visitors, 0, 6);
-$recentIncidents = array_slice($incidents, 0, 5);
-
-// Bulletins
 $firebase = FirebaseService::getInstance();
-$allAnn   = $firebase->getCollection('announcements', [], 50);
+$visitorCount = $visitorService->count();
+$insideVisitorCount = $visitorService->currentlyInside();
+$pendingVisitorCount = $visitorService->pendingCount();
+$today = new DateTimeImmutable('today');
+$tomorrow = $today->modify('+1 day');
+$todayVisitorCount = $firebase->count(
+    'visitors',
+    [
+        ['createdAt', '>=', $today->format(DATE_ATOM)],
+        ['createdAt', '<', $tomorrow->format(DATE_ATOM)],
+    ]
+);
+$incidentCount = $incidentService->count();
+$openIncidentCount = $incidentService->openCount();
+$urgentIncidentCount = $firebase->count(
+    'incidents',
+    [['priority', 'in', ['high', 'critical', 'urgent']]]
+);
+$recentVisitors = $firebase->getCollection(
+    'visitors',
+    [],
+    6,
+    0,
+    true,
+    [['updatedAt', 'DESC']]
+);
+$recentIncidents = $firebase->getCollection(
+    'incidents',
+    [],
+    5,
+    0,
+    true,
+    [['reportedAt', 'DESC']]
+);
+
+$allAnn   = $firebase->getCollection('announcements', [], 20, 0, true, [['createdAt', 'DESC']]);
 $secAnn   = array_values(array_filter($allAnn, fn($a) => ($a['status'] ?? 'published') === 'published' && in_array($a['audience'] ?? 'all', ['all', 'role'])));
-usort($secAnn, fn($a, $b) => strcmp((string)($b['createdAt'] ?? ''), (string)($a['createdAt'] ?? '')));
 $topAnn = array_slice($secAnn, 0, 3);
 
 $pageTitle  = 'Security Dashboard';
@@ -97,8 +110,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold">Total Visitors</span>
-                            <h3 class="fw-bold my-1 text-primary"><?= e((string) count($visitors)) ?></h3>
-                            <span class="small text-muted"><?= count($todayVisitors) ?> registered today</span>
+                            <h3 class="fw-bold my-1 text-primary"><?= e((string) $visitorCount) ?></h3>
+                            <span class="small text-muted"><?= $todayVisitorCount ?> registered today</span>
                         </div>
                         <div class="rounded-3 bg-primary bg-opacity-10 p-2 text-primary"><i class="bi bi-people fs-4"></i></div>
                     </div>
@@ -110,8 +123,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold">Currently Inside</span>
-                            <h3 class="fw-bold my-1 text-success"><?= e((string) count($insideVisitors)) ?></h3>
-                            <span class="small text-muted"><?= count($pendingVisitors) ?> pending entry</span>
+                            <h3 class="fw-bold my-1 text-success"><?= e((string) $insideVisitorCount) ?></h3>
+                            <span class="small text-muted"><?= $pendingVisitorCount ?> pending entry</span>
                         </div>
                         <div class="rounded-3 bg-success bg-opacity-10 p-2 text-success"><i class="bi bi-door-open fs-4"></i></div>
                     </div>
@@ -119,12 +132,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
 
             <div class="col-sm-6 col-lg-3">
-                <div class="card stat-card h-100 p-3 border-start border-4 border-<?= count($openIncidents) > 0 ? 'danger' : 'secondary' ?> shadow-sm">
+                <div class="card stat-card h-100 p-3 border-start border-4 border-<?= $openIncidentCount > 0 ? 'danger' : 'secondary' ?> shadow-sm">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold">Open Incidents</span>
-                            <h3 class="fw-bold my-1 text-<?= count($openIncidents) > 0 ? 'danger' : 'dark' ?>"><?= e((string) count($openIncidents)) ?></h3>
-                            <span class="small text-muted"><?= count($incidents) ?> total logged</span>
+                            <h3 class="fw-bold my-1 text-<?= $openIncidentCount > 0 ? 'danger' : 'dark' ?>"><?= e((string) $openIncidentCount) ?></h3>
+                            <span class="small text-muted"><?= $incidentCount ?> total logged</span>
                         </div>
                         <div class="rounded-3 bg-danger bg-opacity-10 p-2 text-danger"><i class="bi bi-exclamation-triangle fs-4"></i></div>
                     </div>
@@ -132,11 +145,11 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
 
             <div class="col-sm-6 col-lg-3">
-                <div class="card stat-card h-100 p-3 border-start border-4 border-<?= count($urgentIncidents) > 0 ? 'warning' : 'secondary' ?> shadow-sm">
+                <div class="card stat-card h-100 p-3 border-start border-4 border-<?= $urgentIncidentCount > 0 ? 'warning' : 'secondary' ?> shadow-sm">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold">Urgent Incidents</span>
-                            <h3 class="fw-bold my-1 text-<?= count($urgentIncidents) > 0 ? 'warning' : 'dark' ?>"><?= e((string) count($urgentIncidents)) ?></h3>
+                            <h3 class="fw-bold my-1 text-<?= $urgentIncidentCount > 0 ? 'warning' : 'dark' ?>"><?= e((string) $urgentIncidentCount) ?></h3>
                             <span class="small text-muted">High / Critical priority</span>
                         </div>
                         <div class="rounded-3 bg-warning bg-opacity-10 p-2 text-warning"><i class="bi bi-exclamation-octagon fs-4"></i></div>
@@ -150,14 +163,14 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <div class="col-sm-6 col-md-3">
                 <div class="card stat-card p-3 h-100 shadow-sm">
                     <small class="text-muted fw-bold">TODAY'S VISITORS</small>
-                    <div class="fs-4 fw-bold text-primary mt-1"><?= count($todayVisitors) ?></div>
+                    <div class="fs-4 fw-bold text-primary mt-1"><?= $todayVisitorCount ?></div>
                     <small class="text-muted">Campus gate entries</small>
                 </div>
             </div>
             <div class="col-sm-6 col-md-3">
                 <div class="card stat-card p-3 h-100 shadow-sm">
                     <small class="text-muted fw-bold">AWAITING CLEARANCE</small>
-                    <div class="fs-4 fw-bold text-warning mt-1"><?= count($pendingVisitors) ?></div>
+                    <div class="fs-4 fw-bold text-warning mt-1"><?= $pendingVisitorCount ?></div>
                     <small class="text-muted">Pending check-in approval</small>
                 </div>
             </div>
@@ -410,7 +423,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6"><label class="form-label">Visitor Full Name</label><input type="text" name="visitorName" class="form-control" required></div>
-                        <div class="col-md-6"><label class="form-label">Host Student</label><select name="studentId" class="form-select" required><option value="">Select student being visited</option><?php foreach ($securityStudents as $student): ?><?php $studentId = (string) ($student['id'] ?? ''); if ($studentId === '') continue; ?><option value="<?= e($studentId) ?>"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: ($student['admissionNo'] ?? $studentId)) ?> (<?= e($student['admissionNo'] ?? 'No ID') ?>)</option><?php endforeach; ?></select></div>
+                        <div class="col-md-6"><label class="form-label">Host Student</label><select name="studentId" class="form-select" data-security-student-options="<?= e(url('views/security/dashboard/student-options.php')) ?>" required><option value="">Select student being visited</option></select></div>
                         <div class="col-md-4"><label class="form-label">Phone Number</label><input type="text" name="phone" class="form-control" required></div>
                         <div class="col-md-4"><label class="form-label">Identification Type</label><input type="text" name="idType" class="form-control" required></div>
                         <div class="col-md-4"><label class="form-label">ID / Document Number</label><input type="text" name="idNumber" class="form-control" required></div>
@@ -432,7 +445,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="row g-3">
                         <div class="col-md-6"><label class="form-label">Incident Title</label><input type="text" name="title" class="form-control" required></div>
                         <div class="col-md-6"><label class="form-label">Priority</label><select name="priority" class="form-select"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></div>
-                        <div class="col-12"><label class="form-label">Student Involved (Optional)</label><select name="studentId" class="form-select"><option value="">No specific student linked</option><?php foreach ($securityStudents as $student): ?><?php $studentId = (string) ($student['id'] ?? ''); if ($studentId === '') continue; ?><option value="<?= e($studentId) ?>"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: ($student['admissionNo'] ?? $studentId)) ?></option><?php endforeach; ?></select></div>
+                        <div class="col-12"><label class="form-label">Student Involved (Optional)</label><select name="studentId" class="form-select" data-security-student-options="<?= e(url('views/security/dashboard/student-options.php')) ?>"><option value="">No specific student linked</option></select></div>
                         <div class="col-12"><label class="form-label">Detailed Description</label><textarea name="description" class="form-control" rows="5" required></textarea></div>
                     </div>
                 </div>

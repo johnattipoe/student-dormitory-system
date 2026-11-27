@@ -16,34 +16,35 @@ $allowedRoles = [ROLE_NURSE];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\MedicalService;
-use App\Services\StudentService;
 
 $records = (new MedicalService())->incidents();
-$nurseMedicalStudents = StudentService::all();
+$nurseMedicalStudents = [];
+$nurseMedicalLazyStudentOptions = true;
 $nurseMedicalModalId = 'nurseMedicalRecordCreate';
 $nurseMedicalReturnTo = 'medicalIncidents';
 $nurseMedicalSelectedStudentId = '';
 $students = [];
-foreach ($nurseMedicalStudents as $student) {
-    $studentId = (string) ($student['id'] ?? '');
-    if ($studentId !== '') {
-        $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
+$studentName = static function (array $record): string {
+    $name = trim((string) ($record['studentName'] ?? ''));
+    return $name !== '' ? $name : (string) ($record['studentId'] ?? 'Not linked');
+};
+foreach ($records as $record) {
+    $studentId = trim((string) ($record['studentId'] ?? ''));
+    if ($studentId !== '' && !isset($students[$studentId])) {
         $students[$studentId] = [
-            'name' => $studentName !== '' ? $studentName : 'Unnamed student',
-            'admissionNo' => $student['admissionNo'] ?? $student['studentId'] ?? $studentId,
+            'name' => $studentName($record),
+            'admissionNo' => $record['admissionNo'] ?? $studentId,
         ];
     }
 }
 
 $search = strtolower(trim(sanitize($_GET['search'] ?? '')));
 $severityFilter = strtolower(trim(sanitize($_GET['severity'] ?? 'all')));
-$filteredRecords = array_values(array_filter($records, static function (array $record) use ($search, $severityFilter, $students): bool {
+$filteredRecords = array_values(array_filter($records, static function (array $record) use ($search, $severityFilter, $studentName): bool {
     $severity = strtolower((string) ($record['severity'] ?? 'normal'));
-    $studentId = (string) ($record['studentId'] ?? '');
-    $studentName = $students[$studentId]['name'] ?? '';
     $haystack = strtolower(implode(' ', [
-        $studentId,
-        $studentName,
+        $studentName($record),
+        (string) ($record['studentId'] ?? ''),
         (string) ($record['diagnosis'] ?? ''),
         (string) ($record['treatment'] ?? ''),
         (string) ($record['notes'] ?? ''),
@@ -54,14 +55,7 @@ $filteredRecords = array_values(array_filter($records, static function (array $r
         && ($search === '' || str_contains($haystack, $search));
 }));
 
-$studentLabel = static function (array $record) use ($students): string {
-    $studentId = (string) ($record['studentId'] ?? '');
-    if ($studentId !== '' && isset($students[$studentId])) {
-        return $students[$studentId]['name'] . ' (' . $students[$studentId]['admissionNo'] . ')';
-    }
-
-    return $studentId !== '' ? $studentId : 'Not linked';
-};
+$studentLabel = static fn(array $record): string => $studentName($record);
 
 $openCount = count(array_filter($records, static fn(array $record): bool => strtolower((string) ($record['caseStatus'] ?? 'open')) !== 'reviewed'));
 $emergencyCount = count(array_filter($records, static fn(array $record): bool => strtolower((string) ($record['severity'] ?? '')) === 'emergency'));

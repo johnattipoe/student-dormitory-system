@@ -23,7 +23,6 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 $rooms = RoomService::all();
 $houses = HouseService::all();
-$students = StudentService::all();
 $allBeds = BedService::all();
 $beds = $allBeds;
 $houseMap = [];
@@ -31,7 +30,17 @@ $roomMap = [];
 foreach ($houses as $house) $houseMap[(string) ($house['id'] ?? '')] = (string) ($house['name'] ?? $house['id'] ?? '');
 foreach ($rooms as $room) $roomMap[(string) ($room['id'] ?? '')] = $room;
 $studentMap = [];
-foreach ($students as $student) $studentMap[(string) ($student['id'] ?? '')] = $student;
+foreach ($allBeds as $bed) {
+    $studentId = trim((string) ($bed['studentId'] ?? ''));
+    if ($studentId === '' || array_key_exists($studentId, $studentMap)) {
+        continue;
+    }
+
+    $student = StudentService::find($studentId);
+    if ($student !== null) {
+        $studentMap[$studentId] = $student;
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = sanitize($_POST['action'] ?? '');
@@ -262,7 +271,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 </tr>
             <div class="modal fade" id="viewBed<?= e($bedId) ?>" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Bed <?= e($bed['bedNumber'] ?? '-') ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p><strong>Room:</strong> <?= e($room['roomNumber'] ?? '-') ?></p><p><strong>House:</strong> <?= e($houseMap[(string) ($room['houseId'] ?? '')] ?? '-') ?></p><p><strong>Student:</strong> <?= $student ? e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) : 'Unassigned' ?></p><p><strong>Status:</strong> <?= e($status) ?></p></div></div></div></div>
             <div class="modal fade" id="editBed<?= e($bedId) ?>" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="POST"><div class="modal-header"><h5 class="modal-title">Edit bed</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="action" value="update"><input type="hidden" name="bedId" value="<?= e($bedId) ?>"><label class="form-label">Bed number</label><input name="bedNumber" class="form-control mb-3" value="<?= e($bed['bedNumber'] ?? '') ?>" required><label class="form-label">Room</label><select name="roomId" class="form-select mb-3" required><?php foreach ($rooms as $optionRoom): ?><option value="<?= e((string) ($optionRoom['id'] ?? '')) ?>" <?= (string) ($bed['roomId'] ?? '') === (string) ($optionRoom['id'] ?? '') ? 'selected' : '' ?>><?= e($optionRoom['roomNumber'] ?? '-') ?> - <?= e($houseMap[(string) ($optionRoom['houseId'] ?? '')] ?? '-') ?></option><?php endforeach; ?></select><label class="form-label">Status</label><select name="status" class="form-select"><option value="available" <?= $status === 'available' ? 'selected' : '' ?>>Available</option><option value="maintenance" <?= $status === 'maintenance' ? 'selected' : '' ?>>Maintenance</option></select></div><div class="modal-footer"><button class="btn btn-primary">Save changes</button></div></form></div></div></div>
-            <?php if (!$student && $status !== 'maintenance'): ?><div class="modal fade" id="assignBed<?= e($bedId) ?>" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="POST"><div class="modal-header"><h5 class="modal-title">Assign bed <?= e($bed['bedNumber'] ?? '-') ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="action" value="assign"><input type="hidden" name="bedId" value="<?= e($bedId) ?>"><label class="form-label">Student</label><select name="studentId" class="form-select" required><option value="">Select student</option><?php foreach ($students as $optionStudent): ?><option value="<?= e((string) ($optionStudent['id'] ?? '')) ?>"><?= e(trim(($optionStudent['firstName'] ?? '') . ' ' . ($optionStudent['lastName'] ?? ''))) ?> (<?= e($optionStudent['admissionNo'] ?? '') ?>)</option><?php endforeach; ?></select></div><div class="modal-footer"><button class="btn btn-primary">Assign bed</button></div></form></div></div></div><?php endif; ?>
+            <?php if (!$student && $status !== 'maintenance'): ?><div class="modal fade" id="assignBed<?= e($bedId) ?>" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="POST"><div class="modal-header"><h5 class="modal-title">Assign bed <?= e($bed['bedNumber'] ?? '-') ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="action" value="assign"><input type="hidden" name="bedId" value="<?= e($bedId) ?>"><label class="form-label">Student</label><select name="studentId" class="form-select" data-admin-student-options="<?= e(url('views/admin/emergency-contacts/student-options.php')) ?>" required><option value="">Select student</option></select></div><div class="modal-footer"><button class="btn btn-primary">Assign bed</button></div></form></div></div></div><?php endif; ?>
         <?php endforeach; endif; ?></tbody></table></div>
             <?php
             $paginationQuery = [];

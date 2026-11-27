@@ -58,10 +58,22 @@ if (($role === ROLE_HOUSE_MASTER || $role === ROLE_HOUSE_MISTRESS) && $currentHo
 }
 
 $houses = [];
-foreach (HouseService::all() as $house) {
-    if (!empty($house['id'])) $houses[(string) $house['id']] = (string) ($house['name'] ?? $house['id']);
+if ($role === ROLE_ADMIN) {
+    foreach (HouseService::all() as $house) {
+        if (!empty($house['id'])) $houses[(string) $house['id']] = (string) ($house['name'] ?? $house['id']);
+    }
+    $students = StudentService::all();
+} else {
+    if ($currentHouseId !== '') {
+        $house = HouseService::find($currentHouseId);
+        if ($house !== null) {
+            $houses[$currentHouseId] = (string) ($house['name'] ?? $currentHouseId);
+        }
+        $students = StudentService::all($currentHouseId);
+    } else {
+        $students = [];
+    }
 }
-$students = StudentService::all($role === ROLE_ADMIN ? null : ($currentHouseId ?: null));
 $error = null;
 $newFileName = $fileName;
 $newStorageObject = (string) ($metadata['storageObject'] ?? '');

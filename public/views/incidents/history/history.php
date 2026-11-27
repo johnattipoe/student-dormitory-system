@@ -18,7 +18,13 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\FirebaseService;
 
 $pageTitle = 'Incident History';
-$incidents = FirebaseService::getInstance()->getCollection(COL_INCIDENTS, [], 200);
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$firebase = FirebaseService::getInstance();
+$totalRecords = $firebase->count(COL_INCIDENTS);
+$totalPages = max(1, (int) ceil($totalRecords / $limit));
+$page = min($page, $totalPages);
+$incidents = $firebase->getCollection(COL_INCIDENTS, [], $limit, ($page - 1) * $limit, false, [['createdAt', 'DESC']]);
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-clock-history', 'label' => 'Incident History', 'href' => url('views/incidents/history/history.php'), 'active' => true],
@@ -47,6 +53,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <?php endforeach; ?>
                 </tbody>
             </table>
+            <?php $paginationBaseUrl = url('views/incidents/history/history.php'); require APP_ROOT . '/app/views/components/pagination/pagination.php'; ?>
         </div>
     </div>
 </div>

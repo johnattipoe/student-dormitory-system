@@ -21,8 +21,14 @@ use App\Services\RoomService;
 $id = $_GET['id'] ?? '';
 $room = $id ? RoomService::find($id) : null;
 $houseMap = [];
-foreach (HouseService::all() as $house) {
-    $houseMap[(string) ($house['id'] ?? '')] = (string) ($house['name'] ?? $house['id'] ?? '');
+if ($room) {
+    $houseId = (string) ($room['houseId'] ?? '');
+    if ($houseId !== '') {
+        $house = HouseService::find($houseId);
+        if ($house !== null) {
+            $houseMap[$houseId] = (string) ($house['name'] ?? $houseId);
+        }
+    }
 }
 $pageTitle = 'Room Details';
 $navItems = [

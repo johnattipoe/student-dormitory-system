@@ -20,13 +20,7 @@ use App\Services\VisitorService;
 $id = sanitize($_GET['id'] ?? $_POST['id'] ?? '');
 $houseId = current_user()['houseId'] ?? null;
 $service = new VisitorService();
-$visitor = null;
-foreach ($service->byHouse($houseId) as $record) {
-    if (($record['id'] ?? '') === $id) {
-        $visitor = $record;
-        break;
-    }
-}
+$visitor = $service->findForHouse($id, $houseId);
 
 if (!$visitor) {
     flash('error', 'Visitor not found.');

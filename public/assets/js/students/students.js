@@ -1,5 +1,5 @@
 // students.js — client-side helpers for the students list/create/edit screens.
-document.addEventListener('DOMContentLoaded', function () {
+SDS.onPageLoad(function () {
   const filterForm = document.getElementById('studentListFilterForm');
   const filterInput = document.getElementById('studentSearchField');
   const filterButton = document.getElementById('studentFilterButton');

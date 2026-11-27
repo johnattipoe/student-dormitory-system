@@ -21,13 +21,7 @@ use App\Services\StudentService;
 
 $id = sanitize($_GET['id'] ?? $_POST['id'] ?? '');
 $houseId = current_user()['houseId'] ?? null;
-$entry = null;
-foreach (AttendanceService::byHouse($houseId) as $record) {
-    if (($record['id'] ?? '') === $id) {
-        $entry = $record;
-        break;
-    }
-}
+$entry = AttendanceService::findByHouse($id, $houseId);
 
 if (!$entry) {
     flash('error', 'Attendance record not found.');
@@ -35,13 +29,7 @@ if (!$entry) {
 }
 
 $student = StudentService::find((string) ($entry['studentId'] ?? ''));
-$bed = null;
-foreach (BedService::all() as $candidateBed) {
-    if ((string) ($candidateBed['studentId'] ?? '') === (string) ($entry['studentId'] ?? '')) {
-        $bed = $candidateBed;
-        break;
-    }
-}
+$bed = BedService::forStudent((string) ($entry['studentId'] ?? ''));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     AttendanceService::update($id, [

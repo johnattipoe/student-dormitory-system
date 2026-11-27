@@ -14,6 +14,91 @@ class BedService
         return FirebaseService::getInstance()->getDocument(\COL_BEDS, $id);
     }
 
+    public static function forStudent(string $studentId): ?array
+    {
+        if (trim($studentId) === '') {
+            return null;
+        }
+
+        $beds = FirebaseService::getInstance()->getCollection(
+            \COL_BEDS,
+            [['studentId', '=', $studentId]],
+            1,
+            0,
+            false
+        );
+
+        return $beds[0] ?? null;
+    }
+
+    public static function forStudents(array $studentIds, int $limit = 150): array
+    {
+        $limit = max(1, min(150, $limit));
+        $studentIds = array_values(array_unique(array_filter(array_map(
+            static fn($studentId): string => trim((string) $studentId),
+            $studentIds
+        ))));
+        $bedsById = [];
+
+        foreach (array_chunk($studentIds, 30) as $studentIdBatch) {
+            $remainingLimit = $limit - count($bedsById);
+            if ($remainingLimit <= 0) {
+                break;
+            }
+
+            foreach (FirebaseService::getInstance()->getCollection(
+                \COL_BEDS,
+                [['studentId', 'in', $studentIdBatch]],
+                $remainingLimit,
+                0,
+                false
+            ) as $bed) {
+                $bedsById[(string) ($bed['id'] ?? count($bedsById))] = $bed;
+            }
+        }
+
+        return array_values($bedsById);
+    }
+
+    public static function forRoom(string $roomId, int $limit = 150): array
+    {
+        $roomId = trim($roomId);
+        if ($roomId === '') {
+            return [];
+        }
+
+        return FirebaseService::getInstance()->getCollection(
+            \COL_BEDS,
+            [['roomId', '=', $roomId]],
+            max(1, min(150, $limit)),
+            0,
+            false
+        );
+    }
+
+    public static function forRooms(array $roomIds, int $limit = 150): array
+    {
+        $limit = max(1, min(150, $limit));
+        $bedsById = [];
+        $roomIds = array_unique(array_filter(array_map(
+            static fn($roomId): string => trim((string) $roomId),
+            $roomIds
+        )));
+
+        foreach ($roomIds as $roomId) {
+            $remainingLimit = $limit - count($bedsById);
+            if ($remainingLimit <= 0) {
+                break;
+            }
+
+            foreach (self::forRoom($roomId, $remainingLimit) as $bed) {
+                $bedsById[(string) ($bed['id'] ?? count($bedsById))] = $bed;
+            }
+        }
+
+        return array_values($bedsById);
+    }
+
     public static function create(array $data): array
     {
         $bedNumber = trim((string) ($data['bedNumber'] ?? ''));
@@ -122,11 +207,7 @@ class BedService
 
     private static function bedsForRoom(string $roomId): array
     {
-        return FirebaseService::getInstance()->getCollection(
-            \COL_BEDS,
-            [['roomId', '=', $roomId]],
-            150
-        );
+        return self::forRoom($roomId);
     }
 
     private static function bedsForStudent(string $studentId): array

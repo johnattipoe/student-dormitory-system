@@ -20,14 +20,13 @@ use App\Services\RoomService;
 
 $houseId = current_user()['houseId'] ?? null;
 $studentId = sanitize($_GET['studentId'] ?? $_GET['id'] ?? '');
-$students = StudentService::all($houseId);
 $student = $studentId ? StudentService::find($studentId) : null;
-$room = ($student && !empty($student['roomId'])) ? RoomService::find((string) $student['roomId']) : null;
-$roomName = $room['roomNumber'] ?? ($student['roomId'] ?? '—');
-
 if ($student && ($student['houseId'] ?? null) !== $houseId) {
     $student = null;
 }
+$students = $student ? [] : StudentService::all($houseId);
+$room = ($student && !empty($student['roomId'])) ? RoomService::find((string) $student['roomId']) : null;
+$roomName = $room['roomNumber'] ?? ($student['roomId'] ?? '—');
 
 $studentName = $student ? trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) : 'Student';
 $initials = strtoupper(substr((string) ($student['firstName'] ?? 'S'), 0, 1) . substr((string) ($student['lastName'] ?? ''), 0, 1));

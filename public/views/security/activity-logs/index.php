@@ -23,8 +23,14 @@ $createLogErrors = $_SESSION['_security_log_create_errors'] ?? [];
 unset($_SESSION['_security_log_create_old'], $_SESSION['_security_log_create_errors']);
 
 $firebase = FirebaseService::getInstance();
-$allLogs = $firebase->getCollection(COL_ACTIVITY_LOGS, [], 500);
-$visitorLogs = $firebase->getCollection('visitors', [], 500);
+$search = strtolower(sanitize($_GET['search'] ?? ''));
+$categoryFilter = sanitize($_GET['category'] ?? '');
+$fromDate = sanitize($_GET['from_date'] ?? '');
+$toDate = sanitize($_GET['to_date'] ?? '');
+$hasFilters = $search !== '' || $categoryFilter !== '' || $fromDate !== '' || $toDate !== '';
+$sourceLimit = $hasFilters ? 150 : 50;
+$allLogs = $firebase->getCollection(COL_ACTIVITY_LOGS, [], $sourceLimit, 0, false, [['createdAt', 'DESC']]);
+$visitorLogs = $firebase->getCollection('visitors', [], $sourceLimit, 0, false, [['createdAt', 'DESC']]);
 
 $securityLogs = [];
 foreach ($allLogs as $l) {
@@ -54,11 +60,6 @@ usort($securityLogs, function ($a, $b) {
     return $tB <=> $tA;
 });
 
-$search = strtolower(sanitize($_GET['search'] ?? ''));
-$categoryFilter = sanitize($_GET['category'] ?? '');
-$fromDate = sanitize($_GET['from_date'] ?? '');
-$toDate = sanitize($_GET['to_date'] ?? '');
-
 $logs = array_values(array_filter($securityLogs, function ($log) use ($search, $categoryFilter, $fromDate, $toDate) {
     $event = strtolower((string) ($log['event'] ?? $log['action'] ?? ''));
     $details = strtolower((string) ($log['details'] ?? $log['description'] ?? ''));
@@ -81,10 +82,14 @@ $logs = array_values(array_filter($securityLogs, function ($log) use ($search, $
     return true;
 }));
 
-$totalCount = count($securityLogs);
+if (!$hasFilters) {
+    $logs = array_slice($logs, 0, 50);
+}
+
+$totalCount = count($logs);
 $todayDate = date('Y-m-d');
-$todayCount = count(array_filter($securityLogs, fn($l) => str_starts_with((string)($l['timestamp'] ?? $l['createdAt'] ?? ''), $todayDate)));
-$manualCount = count(array_filter($securityLogs, fn($l) => !empty($l['isManual'])));
+$todayCount = count(array_filter($logs, fn($l) => str_starts_with((string)($l['timestamp'] ?? $l['createdAt'] ?? ''), $todayDate)));
+$manualCount = count(array_filter($logs, fn($l) => !empty($l['isManual'])));
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/security/dashboard/dashboard.php')],
@@ -119,21 +124,21 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="row g-3 mb-4">
             <div class="col-sm-6 col-lg-4">
                 <div class="card stat-card p-3 h-100 border-start border-4 border-primary">
-                    <small class="text-muted">Total Security Log Records</small>
+                    <small class="text-muted">Security Records Loaded</small>
                     <strong class="fs-2 text-primary my-1"><?= e((string) $totalCount) ?></strong>
-                    <span class="small text-muted">Gate & access operations</span>
+                    <span class="small text-muted">Latest <?= e((string) ($sourceLimit * 2)) ?> per source at most</span>
                 </div>
             </div>
             <div class="col-sm-6 col-lg-4">
                 <div class="card stat-card p-3 h-100 border-start border-4 border-success">
-                    <small class="text-muted">Gate Events Today</small>
+                    <small class="text-muted">Loaded Records Dated Today</small>
                     <strong class="fs-2 text-success my-1"><?= e((string) $todayCount) ?></strong>
                     <span class="small text-muted"><?= e(date('F d, Y')) ?></span>
                 </div>
             </div>
             <div class="col-sm-6 col-lg-4">
                 <div class="card stat-card p-3 h-100 border-start border-4 border-warning">
-                    <small class="text-muted">Officer Patrol Notes</small>
+                    <small class="text-muted">Manual Notes In Loaded Records</small>
                     <strong class="fs-2 text-warning my-1"><?= e((string) $manualCount) ?></strong>
                     <span class="small text-muted">Field observations</span>
                 </div>

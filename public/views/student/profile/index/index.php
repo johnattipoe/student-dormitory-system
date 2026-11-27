@@ -20,21 +20,9 @@ use App\Services\RoomService;
 use App\Services\HouseService;
 use App\Services\BedService;
 
-$studentId = current_user()['studentId'] ?? current_user()['uid'] ?? null;
-$student = [];
-
-if ($studentId) {
-    $student = StudentService::find((string) $studentId) ?? [];
-}
-
-if (empty($student) && !empty(current_user()['email'])) {
-    foreach (StudentService::all() as $candidate) {
-        if ((string) ($candidate['email'] ?? '') === (string) current_user()['email']) {
-            $student = $candidate;
-            break;
-        }
-    }
-}
+$currentUser = current_user() ?? [];
+$student = StudentService::findForUser($currentUser) ?? [];
+$studentId = $student['id'] ?? $currentUser['studentId'] ?? $currentUser['uid'] ?? null;
 
 $room = !empty($student['roomId']) ? RoomService::find((string) $student['roomId']) : null;
 $roomLabel = $room['roomNumber'] ?? ($student['roomId'] ?? 'Not assigned');
@@ -44,12 +32,7 @@ $houseLabel = $house['name'] ?? 'Not assigned';
 
 $bed = null;
 if (!empty($student['id'])) {
-    foreach (BedService::all() as $candidateBed) {
-        if ((string) ($candidateBed['studentId'] ?? '') === (string) $student['id']) {
-            $bed = $candidateBed;
-            break;
-        }
-    }
+    $bed = BedService::forStudent((string) $student['id']);
 }
 $bedLabel = $bed['bedNumber'] ?? 'Not assigned';
 

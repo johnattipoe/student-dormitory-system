@@ -21,10 +21,12 @@ $houseId = current_user()['houseId'] ?? null;
 
 // Handle bulk flag operations
 $errors = [];
+$students = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = sanitize($_POST['action'] ?? '');
     $studentIds = (array) ($_POST['studentIds'] ?? []);
-    $allowedStudentIds = array_map(fn($student) => (string) ($student['id'] ?? ''), StudentService::all($houseId));
+    $students = StudentService::all($houseId);
+    $allowedStudentIds = array_map(fn($student) => (string) ($student['id'] ?? ''), $students);
     $studentIds = array_values(array_intersect(array_map('strval', $studentIds), $allowedStudentIds));
     
     if ($action === 'bulk_flag' && !empty($studentIds)) {
@@ -63,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$students = StudentService::all($houseId);
+$students = $students ?? StudentService::all($houseId);
 $studentIdsInHouse = array_map(fn($student) => (string) ($student['id'] ?? ''), $students);
 $flaggedStudents = array_filter($students, fn($s) => ($s['flagged'] ?? false) == true);
 $unflaggedStudents = array_filter($students, fn($s) => ($s['flagged'] ?? false) != true);

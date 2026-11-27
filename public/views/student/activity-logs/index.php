@@ -23,50 +23,65 @@ $userId = (string) ($user['uid'] ?? $user['id'] ?? '');
 $studentId = (string) ($user['studentId'] ?? $userId);
 
 $firebase = FirebaseService::getInstance();
-$allLogs = $firebase->getCollection(COL_ACTIVITY_LOGS, [], 500);
-
-// Filter to this student's events
-$myLogs = array_values(array_filter($allLogs, function ($log) use ($userId, $studentId) {
-    foreach (['studentId', 'student_id', 'targetId', 'target_id', 'userId', 'user_id'] as $k) {
-        $val = (string) ($log[$k] ?? '');
-        if ($val !== '' && ($val === $userId || $val === $studentId)) {
-            return true;
+$studentIdentifiers = array_values(array_unique(array_filter([$studentId, $userId])));
+$myLogsById = [];
+if ($studentIdentifiers !== []) {
+    foreach (['studentId', 'student_id', 'targetId', 'target_id', 'userId', 'user_id'] as $field) {
+        foreach ($firebase->getCollection(
+            COL_ACTIVITY_LOGS,
+            [[$field, 'in', $studentIdentifiers]],
+            50,
+            0,
+            false
+        ) as $log) {
+            $logId = (string) ($log['id'] ?? '');
+            if ($logId !== '') {
+                $myLogsById[$logId] = $log;
+            }
         }
     }
-    return false;
-}));
+}
+$myLogs = array_values($myLogsById);
 
 // Also fetch attendance and exeat records for this student to enrich personal activity history
-$attendanceRecords = $firebase->getCollection('attendance', [], 300);
+$attendanceRecords = $studentIdentifiers === [] ? [] : $firebase->getCollection(
+    'attendance',
+    [['studentId', 'in', $studentIdentifiers]],
+    150,
+    0,
+    false
+);
 foreach ($attendanceRecords as $att) {
-    if ((string)($att['studentId'] ?? '') === $studentId || (string)($att['studentId'] ?? '') === $userId) {
-        $status = ucfirst((string)($att['status'] ?? 'present'));
-        $myLogs[] = [
-            'id' => $att['id'] ?? null,
-            'event' => 'Daily Roll Call',
-            'action' => 'Attendance: ' . $status,
-            'type' => 'attendance',
-            'details' => 'Roll call recorded as "' . $status . '" for date ' . ($att['date'] ?? 'today'),
-            'performedByName' => $att['markedByName'] ?? 'House Master',
-            'timestamp' => $att['createdAt'] ?? $att['date'] ?? date(DATE_ATOM),
-        ];
-    }
+    $status = ucfirst((string)($att['status'] ?? 'present'));
+    $myLogs[] = [
+        'id' => $att['id'] ?? null,
+        'event' => 'Daily Roll Call',
+        'action' => 'Attendance: ' . $status,
+        'type' => 'attendance',
+        'details' => 'Roll call recorded as "' . $status . '" for date ' . ($att['date'] ?? 'today'),
+        'performedByName' => $att['markedByName'] ?? 'House Master',
+        'timestamp' => $att['createdAt'] ?? $att['date'] ?? date(DATE_ATOM),
+    ];
 }
 
-$exeatRecords = $firebase->getCollection('exeats', [], 100);
+$exeatRecords = $studentIdentifiers === [] ? [] : $firebase->getCollection(
+    'exeats',
+    [['studentId', 'in', $studentIdentifiers]],
+    100,
+    0,
+    false
+);
 foreach ($exeatRecords as $ex) {
-    if ((string)($ex['studentId'] ?? '') === $studentId || (string)($ex['studentId'] ?? '') === $userId) {
-        $status = ucfirst((string)($ex['status'] ?? 'pending'));
-        $myLogs[] = [
-            'id' => $ex['id'] ?? null,
-            'event' => 'Exeat Request',
-            'action' => 'Exeat: ' . $status,
-            'type' => 'exeat',
-            'details' => 'Exeat application for "' . ($ex['reason'] ?? 'Leave') . '" is currently ' . $status,
-            'performedByName' => $ex['approvedByName'] ?? 'House Master / Senior Staff',
-            'timestamp' => $ex['updatedAt'] ?? $ex['createdAt'] ?? date(DATE_ATOM),
-        ];
-    }
+    $status = ucfirst((string)($ex['status'] ?? 'pending'));
+    $myLogs[] = [
+        'id' => $ex['id'] ?? null,
+        'event' => 'Exeat Request',
+        'action' => 'Exeat: ' . $status,
+        'type' => 'exeat',
+        'details' => 'Exeat application for "' . ($ex['reason'] ?? 'Leave') . '" is currently ' . $status,
+        'performedByName' => $ex['approvedByName'] ?? 'House Master / Senior Staff',
+        'timestamp' => $ex['updatedAt'] ?? $ex['createdAt'] ?? date(DATE_ATOM),
+    ];
 }
 
 usort($myLogs, function ($a, $b) {

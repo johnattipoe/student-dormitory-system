@@ -15,24 +15,17 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_SENIOR_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
-use App\Services\StudentService;
 use App\Services\VisitorService;
 
 $houseId = current_user()['houseId'] ?? null;
-$students = StudentService::all($houseId);
-$studentMap = [];
-foreach ($students as $student) {
-    $studentMap[(string) ($student['id'] ?? '')] = $student;
-}
 $visitors = (new VisitorService())->byHouse($houseId);
 $insideVisitors = array_values(array_filter($visitors, fn($visitor) => ($visitor['status'] ?? '') === 'inside'));
 $pendingVisitors = array_values(array_filter($visitors, fn($visitor) => ($visitor['status'] ?? '') === 'pending'));
 $visitorSearch = strtolower(sanitize($_GET['search'] ?? ''));
 if ($visitorSearch !== '') {
-    $visitors = array_values(array_filter($visitors, function ($visitor) use ($visitorSearch, $studentMap) {
-        $student = $studentMap[(string) ($visitor['studentId'] ?? '')] ?? [];
+    $visitors = array_values(array_filter($visitors, function ($visitor) use ($visitorSearch) {
         return str_contains(strtolower((string) ($visitor['visitorName'] ?? '')), $visitorSearch)
-            || str_contains(strtolower(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))), $visitorSearch);
+            || str_contains(strtolower((string) ($visitor['studentName'] ?? '')), $visitorSearch);
     }));
 }
 $page = max(1, (int) ($_GET['page'] ?? 1));
@@ -160,10 +153,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             </tr>
                         <?php else: ?>
                             <?php foreach ($visitors as $visitor): ?>
-                                <?php $visitorStudent = $studentMap[(string) ($visitor['studentId'] ?? '')] ?? null; ?>
                                 <tr>
                                     <td class="fw-medium"><?= e($visitor['visitorName'] ?? '—') ?></td>
-                                    <td><?= e(trim((($visitorStudent['firstName'] ?? '') . ' ' . ($visitorStudent['lastName'] ?? '')))) ?: e($visitor['studentId'] ?? '—') ?></td>
+                                    <td><?= e((string) ($visitor['studentName'] ?? '')) ?: e($visitor['studentId'] ?? '—') ?></td>
                                     <td class="small"><?= e($visitor['purpose'] ?? $visitor['relationship'] ?? '—') ?></td>
                                     <td class="small text-muted"><?= e($visitor['visitDate'] ?? ($visitor['checkInTime'] ?? '—')) ?></td>
                                     <td><span class="badge bg-<?= ($visitor['status'] ?? '') === 'inside' || ($visitor['status'] ?? '') === 'checked_in' ? 'success' : (($visitor['status'] ?? '') === 'pending' ? 'warning text-dark' : 'secondary') ?>"><?= e(ucfirst($visitor['status'] ?? 'pending')) ?></span></td>
@@ -180,7 +172,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     </div>
 </div>
 <?php foreach ($visitors as $visitor): ?>
-    <?php $modalVisitorId = (string) ($visitor['id'] ?? ''); $modalVisitorStudent = $studentMap[(string) ($visitor['studentId'] ?? '')] ?? []; ?>
-    <div class="modal fade" id="seniorVisitorView-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Visitor Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Visitor</dt><dd class="col-sm-7"><?= e($visitor['visitorName'] ?? 'Visitor') ?></dd><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e(trim(($modalVisitorStudent['firstName'] ?? '') . ' ' . ($modalVisitorStudent['lastName'] ?? '')) ?: ($visitor['studentId'] ?? '—')) ?></dd><dt class="col-sm-5">Purpose</dt><dd class="col-sm-7"><?= e($visitor['purpose'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucwords(str_replace('_', ' ', (string) ($visitor['status'] ?? 'pending')))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+    <?php $modalVisitorId = (string) ($visitor['id'] ?? ''); $modalVisitorStudentName = (string) ($visitor['studentName'] ?? '') ?: ($visitor['studentId'] ?? '—'); ?>
+    <div class="modal fade" id="seniorVisitorView-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Visitor Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Visitor</dt><dd class="col-sm-7"><?= e($visitor['visitorName'] ?? 'Visitor') ?></dd><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e($modalVisitorStudentName) ?></dd><dt class="col-sm-5">Purpose</dt><dd class="col-sm-7"><?= e($visitor['purpose'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucwords(str_replace('_', ' ', (string) ($visitor['status'] ?? 'pending')))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
 <?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

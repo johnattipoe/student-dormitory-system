@@ -182,23 +182,22 @@ class FirebaseAuthService
 
     private static function post(string $url, array $body): ?array
     {
-        if (self::apiKey() === '') {
-            return ['error' => ['message' => 'Firebase authentication is disabled by the administrator.']];
-        }
-
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_POSTFIELDS => json_encode($body),
+            CURLOPT_CONNECTTIMEOUT => 5,
             CURLOPT_TIMEOUT => 15,
         ]);
         $raw = curl_exec($ch);
         if ($raw === false) {
+            curl_close($ch);
             return null;
         }
 
+        curl_close($ch);
         return json_decode($raw, true);
     }
 }

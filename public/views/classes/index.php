@@ -98,10 +98,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$classes = $firebase->getCollection('classes', [], 500);
-if ($role === ROLE_HOUSE_MASTER) {
-    $classes = array_values(array_filter($classes, static fn(array $class): bool => (string) ($class['houseId'] ?? '') === $userHouseId));
-}
+$classWheres = $role === ROLE_HOUSE_MASTER
+    ? [['houseId', '=', $userHouseId]]
+    : [];
+$classes = $firebase->getCollection('classes', $classWheres, 500);
 
 usort($classes, static fn(array $first, array $second): int => strcasecmp(
     (string) ($first['className'] ?? ''),

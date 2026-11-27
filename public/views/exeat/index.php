@@ -233,16 +233,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($isStaff && in_array($action, ['reject', 'return'], true)) {
         $recordId = sanitize($_POST['recordId'] ?? '');
-        $visibleIds = array_fill_keys(array_map(static fn(array $record): string => (string) ($record['id'] ?? ''), $service->visibleForRole($role, $userId, $houseId, $studentId)), true);
+        $visibleRecords = $service->visibleForRole($role, $userId, $houseId, $studentId);
+        $visibleIds = array_fill_keys(array_map(static fn(array $record): string => (string) ($record['id'] ?? ''), $visibleRecords), true);
 
         if ($recordId === '' || !isset($visibleIds[$recordId])) {
             flash('error', 'Exeat request not found for your role.');
             redirect(url('views/exeat/index.php'));
         }
 
+        $recordToReturn = null;
+        if ($action === 'return') {
+            foreach ($visibleRecords as $visibleRecord) {
+                if ((string) ($visibleRecord['id'] ?? '') === $recordId) {
+                    $recordToReturn = $visibleRecord;
+                    break;
+                }
+            }
+        }
+
         $result = $service->updateStatus($recordId, $action, $userId);
         flash($result['success'] ? 'success' : 'error', $result['message']);
-        
+
+        if ($result['success'] && $action === 'return' && $recordToReturn) {
+            $exeatType = strtolower((string) ($recordToReturn['exeatType'] ?? $recordToReturn['type'] ?? 'external'));
+            if (in_array($exeatType, ['external', 'vacation'], true)) {
+                $smsEnabled = (string) (app_config()['advanced']['sms_notifications'] ?? '0');
+                if ($smsEnabled !== '1') {
+                    flash('warning', 'The exeat was marked returned, but parent SMS notifications are disabled in settings.');
+                } else {
+                    $studentIdForReturn = (string) ($recordToReturn['studentId'] ?? '');
+                    $studentForReturn = null;
+                    $guardianPhone = trim((string) ($recordToReturn['guardianPhone'] ?? ''));
+                    $contactLookupFailed = false;
+                    if ($studentIdForReturn !== '' && ($guardianPhone === '' || empty($recordToReturn['studentName']))) {
+                        try {
+                            $studentForReturn = StudentService::find($studentIdForReturn);
+                        } catch (Throwable $e) {
+                            $contactLookupFailed = true;
+                            error_log('Unable to load student contact for exeat return ' . $recordId . ': ' . $e->getMessage());
+                        }
+                    }
+                    if ($guardianPhone === '' && $studentForReturn) {
+                        $guardianPhone = trim((string) ($studentForReturn['guardianPhone'] ?? $studentForReturn['phone'] ?? ''));
+                    }
+
+                    if ($guardianPhone === '') {
+                        flash('warning', $contactLookupFailed
+                            ? 'The exeat was marked returned, but the parent/guardian contact could not be loaded, so no SMS was sent.'
+                            : 'The exeat was marked returned, but no parent/guardian phone number is on file, so no SMS was sent.');
+                    } else {
+                        $studentName = trim((string) ($recordToReturn['studentName'] ?? ''));
+                        if ($studentName === '' && $studentForReturn) {
+                            $studentName = trim((string) ($studentForReturn['firstName'] ?? '') . ' ' . (string) ($studentForReturn['lastName'] ?? ''));
+                        }
+                        if ($studentName === '') {
+                            $studentName = 'The student';
+                        }
+
+                        $passLabel = $exeatType === 'vacation' ? 'vacation' : 'external exeat';
+                        $message = $studentName . ' has returned safely from ' . $passLabel . ' on ' . date('M j, Y') . '.';
+                        $smsMaxLength = max(1, (int) (app_config()['sms_max_length'] ?? 160));
+                        $message = mb_substr($message, 0, $smsMaxLength);
+                        try {
+                            $smsResult = (new BmsSmsService())->send($guardianPhone, $message);
+                            if ($smsResult['success']) {
+                                flash('info', 'Parent notification accepted by the SMS provider; delivery is not confirmed.');
+                            } else {
+                                flash('warning', 'The exeat was marked returned, but the parent SMS could not be confirmed: ' . ($smsResult['message'] ?? 'Unknown SMS error'));
+                                error_log('Exeat return SMS was not confirmed for record ' . $recordId . ': ' . ($smsResult['message'] ?? 'Unknown SMS error'));
+                            }
+                        } catch (Throwable $e) {
+                            flash('warning', 'The exeat was marked returned, but the parent SMS could not be sent: ' . $e->getMessage());
+                            error_log('Exeat return SMS failed for record ' . $recordId . ': ' . $e->getMessage());
+                        }
+                    }
+                }
+            }
+        }
+
         redirect(url('views/exeat/index.php'));
     }
 

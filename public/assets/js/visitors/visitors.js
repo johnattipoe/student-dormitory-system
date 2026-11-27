@@ -1,6 +1,6 @@
 // visitors.js — visitors list helpers: quick phone/name search and a
 // live "who's on premises" refresh where the security dashboard shows it.
-document.addEventListener('DOMContentLoaded', function () {
+SDS.onPageLoad(function () {
   const search = document.getElementById('visitorQuickSearch');
   const table = document.querySelector('table.data-table');
   if (search && table && window.jQuery && jQuery.fn.DataTable) {

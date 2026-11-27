@@ -21,7 +21,10 @@ $pageTitle = 'Edit House';
 $id = $_GET['id'] ?? null;
 $house = $id ? HouseService::find($id) : null;
 $userService = new UserService();
-$staffUsers = $userService->all();
+$staffUsers = array_merge(
+    $userService->byRole(ROLE_HOUSE_MASTER),
+    $userService->byRole(ROLE_HOUSE_MISTRESS)
+);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postId = sanitize($_POST['id'] ?? '');

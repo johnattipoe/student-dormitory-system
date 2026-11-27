@@ -16,7 +16,6 @@ $allowedRoles = [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\RoomService;
-use App\Services\StudentService;
 
 $houseId = current_user()['houseId'] ?? null;
 
@@ -54,7 +53,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 $allRooms = RoomService::all($houseId);
-$students = StudentService::all($houseId);
 $totalRooms = count($allRooms);
 $totalPages = max(1, (int) ceil($totalRooms / $limit));
 $page = min($page, $totalPages);

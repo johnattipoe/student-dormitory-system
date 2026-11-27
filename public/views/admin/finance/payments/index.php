@@ -154,11 +154,26 @@ try {
     $feeCategories = $defaultFeeCategories;
 }
 
+$students = StudentService::all($isHouseScoped ? $assignedHouseId : null);
+$studentMap = [];
+foreach ($students as $student) {
+    $studentId = (string) ($student['id'] ?? $student['uid'] ?? '');
+    if ($studentId !== '') {
+        $studentMap[$studentId] = $student;
+    }
+}
+
 $paymentRecords = [];
 try {
-    $paymentRecords = FirebaseService::getInstance()->getCollection(COL_FINANCE_PAYMENTS, [], 1000);
-    if ($isHouseScoped) {
-        $paymentRecords = array_values(array_filter($paymentRecords, static fn(array $payment): bool => (string) ($payment['houseId'] ?? '') === (string) $assignedHouseId));
+    $paymentWheres = $isHouseScoped && !empty($assignedHouseId)
+        ? [['houseId', '=', $assignedHouseId]]
+        : [];
+    $paymentRecords = FirebaseService::getInstance()->getCollection(COL_FINANCE_PAYMENTS, $paymentWheres, 1000);
+    if ($isHouseScoped && empty($assignedHouseId)) {
+        $paymentRecords = array_values(array_filter(
+            $paymentRecords,
+            static fn(array $payment): bool => (string) ($payment['houseId'] ?? '') === (string) $assignedHouseId
+        ));
     }
 } catch (Throwable $e) {
     $paymentRecords = [];
@@ -167,8 +182,11 @@ try {
 $actualPaymentRows = [];
 foreach ($paymentRecords as $payment) {
     $studentId = (string) ($payment['studentId'] ?? $payment['student_id'] ?? '');
-    $student = StudentService::find($studentId);
+    $student = $studentMap[$studentId] ?? [];
     $studentName = trim((string) (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')));
+    if ($studentName === '') {
+        $studentName = trim((string) ($payment['studentName'] ?? ''));
+    }
     $actualPaymentRows[] = [
         'id' => (string) ($payment['id'] ?? $studentId . '-' . time()),
         'studentId' => $studentId,
@@ -203,7 +221,7 @@ if ($baseFee <= 0) {
 }
 
 $rows = [];
-foreach (StudentService::all($isHouseScoped ? $assignedHouseId : null) as $student) {
+foreach ($students as $student) {
     $studentId = (string) ($student['id'] ?? $student['uid'] ?? '');
     $name = trim((string) (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')));
     $houseName = $houseMap[(string) ($student['houseId'] ?? '')] ?? 'Unassigned';
@@ -237,7 +255,6 @@ if ($statusFilter !== 'all') {
     $rows = array_values(array_filter($rows, static fn (array $row): bool => $row['status'] === $statusFilter));
 }
 
-$students = StudentService::all($isHouseScoped ? $assignedHouseId : null);
 $editPaymentId = trim((string) ($_GET['editPaymentId'] ?? ''));
 $editPayment = null;
 if ($editPaymentId !== '') {

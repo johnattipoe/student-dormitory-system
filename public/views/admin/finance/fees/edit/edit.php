@@ -69,12 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'status' => 'active',
             ];
 
-            $recordExists = false;
-            try {
-                $recordExists = FirebaseService::getInstance()->getDocument(COL_FINANCE_FEES, $id) !== null;
-            } catch (Throwable $e) {
-                $recordExists = false;
-            }
+            $recordExists = $fee !== null;
 
             if ($recordExists) {
                 FirebaseService::getInstance()->updateDocument(COL_FINANCE_FEES, $id, $payload);

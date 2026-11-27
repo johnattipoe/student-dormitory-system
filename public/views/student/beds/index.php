@@ -29,42 +29,19 @@ $room = null;
 $house = null;
 $roomBeds = [];
 $pageNotice = null;
-$allBeds = [];
 
 try {
-    if ($studentId) {
-        $student = StudentService::find((string) $studentId);
-    }
-
-    if (!$student && !empty($currentUser['email'])) {
-        foreach (StudentService::all() as $candidate) {
-            if ((string) ($candidate['email'] ?? '') === (string) $currentUser['email']) {
-                $student = $candidate;
-                $studentId = $candidate['id'] ?? $studentId;
-                break;
-            }
-        }
-    }
-
-    $allBeds = BedService::all();
+    $student = StudentService::findForUser($currentUser);
 
     if ($student) {
         $studentDocumentId = (string) ($student['id'] ?? $studentId ?? '');
-        foreach ($allBeds as $candidate) {
-            if ((string) ($candidate['studentId'] ?? '') === $studentDocumentId) {
-                $bed = $candidate;
-                break;
-            }
-        }
+        $studentId = $student['id'] ?? $studentId;
+        $bed = BedService::forStudent($studentDocumentId);
 
         $roomId = (string) ($student['roomId'] ?? $bed['roomId'] ?? '');
         if ($roomId !== '') {
             $room = RoomService::find($roomId);
-            foreach ($allBeds as $candidate) {
-                if ((string) ($candidate['roomId'] ?? '') === $roomId) {
-                    $roomBeds[] = $candidate;
-                }
-            }
+            $roomBeds = BedService::forRoom($roomId);
         }
     }
 

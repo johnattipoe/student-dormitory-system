@@ -22,13 +22,7 @@ use App\Services\UserService;
 
 $id = sanitize($_GET['id'] ?? '');
 $houseId = current_user()['houseId'] ?? null;
-$entry = null;
-foreach (AttendanceService::byHouse($houseId) as $record) {
-    if (($record['id'] ?? '') === $id) {
-        $entry = $record;
-        break;
-    }
-}
+$entry = AttendanceService::findByHouse($id, $houseId);
 
 if (!$entry) {
     flash('error', 'Attendance record not found.');
@@ -36,13 +30,7 @@ if (!$entry) {
 }
 
 $student = StudentService::find((string) ($entry['studentId'] ?? ''));
-$bed = null;
-foreach (BedService::all() as $candidateBed) {
-    if ((string) ($candidateBed['studentId'] ?? '') === (string) ($entry['studentId'] ?? '')) {
-        $bed = $candidateBed;
-        break;
-    }
-}
+$bed = BedService::forStudent((string) ($entry['studentId'] ?? ''));
 
 $rawMarkedBy = (string) ($entry['markedBy'] ?? '');
 $markedByName = trim((string) ($entry['markedByName'] ?? ''));

@@ -42,10 +42,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'regis
 $pageTitle = 'Visitors';
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
-$allVisitors = FirebaseService::getInstance()->getCollection(COL_VISITORS, [], 200);
-$totalVisitors = count($allVisitors);
+$firebase = FirebaseService::getInstance();
+$totalVisitors = $firebase->count(COL_VISITORS);
 $totalPages = max(1, (int) ceil($totalVisitors / $limit));
-$visitors = array_slice($allVisitors, ($page - 1) * $limit, $limit);
+$page = min($page, $totalPages);
+$visitors = $firebase->getCollection(
+    COL_VISITORS,
+    [],
+    $limit,
+    ($page - 1) * $limit,
+    false,
+    [['createdAt', 'DESC']]
+);
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-person-badge', 'label' => 'Visitors', 'href' => url('views/visitors/index/index.php'), 'active' => true],

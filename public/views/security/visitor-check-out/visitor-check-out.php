@@ -18,15 +18,28 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\VisitorService;
 use App\Services\FirebaseService;
 
-$insideVisitors = array_values(array_filter((new VisitorService())->all(), static fn(array $visitor): bool => ($visitor['status'] ?? '') === 'inside'));
+$insideVisitors = [];
 $longestVisit = 0;
 $longestVisitor = null;
-foreach ($insideVisitors as $visitor) {
-    $checkIn = strtotime((string) ($visitor['checkInTime'] ?? ''));
-    $hoursInside = $checkIn ? max(0, round((time() - $checkIn) / 3600, 1)) : 0;
-    if ($hoursInside > $longestVisit) {
-        $longestVisit = $hoursInside;
-        $longestVisitor = $visitor;
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    try {
+        $insideVisitors = FirebaseService::getInstance()->getCollection(
+            COL_VISITORS,
+            [['status', '=', 'inside']],
+            150
+        );
+    } catch (Throwable $e) {
+        error_log('Inside visitor query unavailable: ' . $e->getMessage());
+        $insideVisitors = [];
+    }
+
+    foreach ($insideVisitors as $visitor) {
+        $checkIn = strtotime((string) ($visitor['checkInTime'] ?? ''));
+        $hoursInside = $checkIn ? max(0, round((time() - $checkIn) / 3600, 1)) : 0;
+        if ($hoursInside > $longestVisit) {
+            $longestVisit = $hoursInside;
+            $longestVisitor = $visitor;
+        }
     }
 }
 

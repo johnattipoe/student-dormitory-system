@@ -26,7 +26,11 @@ foreach ($students as $student) {
         $studentMap[$studentId] = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: 'Unnamed student';
     }
 }
-$records = array_values(array_filter((new MedicalService())->all(), static fn(array $record): bool => isset($studentMap[(string) ($record['studentId'] ?? '')])));
+$records = (new MedicalService())->forStudents(array_keys($studentMap));
+usort($records, static fn(array $first, array $second): int => strcmp(
+    (string) ($second['createdAt'] ?? ''),
+    (string) ($first['createdAt'] ?? '')
+));
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
 $totalRecords = count($records);

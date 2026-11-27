@@ -27,14 +27,7 @@ require_once APP_ROOT . '/fpdf19/fpdf.php';
 
 if (!empty($_GET['paymentId'])) {
     $paymentId = trim((string) $_GET['paymentId']);
-    $payment = null;
-    $records = FirebaseService::getInstance()->getCollection(COL_FINANCE_PAYMENTS, [], 1000);
-    foreach ($records as $record) {
-        if ((string) ($record['id'] ?? '') === $paymentId) {
-            $payment = $record;
-            break;
-        }
-    }
+    $payment = FirebaseService::getInstance()->getDocument(COL_FINANCE_PAYMENTS, $paymentId);
 
     if (!$payment) {
         flash('error', 'Payment not found.');
@@ -81,12 +74,20 @@ if (!empty($_GET['studentId'])) {
     }
 
     $studentName = trim((string) (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')));
+    $firebase = FirebaseService::getInstance();
     $payments = [];
-    foreach (FirebaseService::getInstance()->getCollection(COL_FINANCE_PAYMENTS, [], 1000) as $record) {
-        if ((string) ($record['studentId'] ?? $record['student_id'] ?? '') === $studentId) {
-            $payments[] = $record;
+    $paymentsById = [];
+    foreach ([['studentId', '=', $studentId], ['student_id', '=', $studentId]] as $where) {
+        foreach ($firebase->getCollection(COL_FINANCE_PAYMENTS, [$where], 150) as $record) {
+            $paymentId = (string) ($record['id'] ?? '');
+            if ($paymentId !== '') {
+                $paymentsById[$paymentId] = $record;
+            } else {
+                $payments[] = $record;
+            }
         }
     }
+    $payments = array_merge($payments, array_values($paymentsById));
 
     $totalPaid = 0.0;
     foreach ($payments as $payment) {

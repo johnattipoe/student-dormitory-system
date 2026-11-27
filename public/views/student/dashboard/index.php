@@ -25,6 +25,9 @@ $currentUser = current_user() ?? [];
 $studentId = $currentUser['studentId'] ?? $currentUser['uid'] ?? null;
 $student = null; $room = null; $house = null; $assignedBed = null;
 $attendance = []; $visitors = []; $incidents = []; $userNotifications = [];
+$attendanceSummary = ['present' => 0, 'absent' => 0, 'late' => 0, 'excused' => 0, 'total' => 0];
+$visitorCount = 0; $incidentCount = 0; $openIncidentCount = 0;
+$notificationCount = 0; $unreadNotificationCount = 0;
 $dashboardNotice = null;
 
 try {
@@ -32,34 +35,42 @@ try {
         $student = StudentService::find((string) $studentId);
     }
     if (!$student && !empty($currentUser['email'])) {
-        foreach (StudentService::all() as $candidate) {
-            if ((string)($candidate['email'] ?? '') === (string)$currentUser['email']) {
-                $student = $candidate;
-                $studentId = $candidate['id'] ?? $studentId;
-                break;
-            }
+        $student = StudentService::findByEmail((string) $currentUser['email']);
+        if ($student) {
+            $studentId = $student['id'] ?? $studentId;
         }
     }
     if ($studentId) {
-        $attendance = AttendanceService::history((string) $studentId, 60);
-        $visitors   = (new VisitorService())->studentVisitors((string) $studentId);
-        $incidents  = (new IncidentService())->studentIncidents((string) $studentId);
+        $visitorService = new VisitorService();
+        $incidentService = new IncidentService();
+        $notificationService = new NotificationService();
+        $attendanceSummary = AttendanceService::studentSummary((string) $studentId);
+        $attendance = AttendanceService::recentStudentHistory((string) $studentId, 6);
+
+        $visitorCount = $visitorService->countForStudent((string) $studentId);
+        $visitors = $visitorService->recentStudentVisitors((string) $studentId, 5);
+
+        $incidentCount = $incidentService->countForStudent((string) $studentId);
+        $openIncidentCount = $incidentService->countForStudent((string) $studentId, true);
+        $incidents = $incidentService->recentStudentIncidents((string) $studentId, 5);
+
+        $notificationUid = (string) ($currentUser['uid'] ?? $currentUser['id'] ?? '');
+        $notificationCount = $notificationService->countForUser($notificationUid);
+        $unreadNotificationCount = $notificationService->unreadCount($notificationUid);
+        $userNotifications = $notificationService->recentForUser($notificationUid, 5);
     }
     $studentDocumentId = (string)($student['id'] ?? $studentId ?? '');
-    foreach (BedService::all() as $bed) {
-        if ((string)($bed['studentId'] ?? '') === $studentDocumentId) {
-            $assignedBed = $bed; break;
-        }
+    if ($studentDocumentId !== '') {
+        $assignedBed = BedService::forStudent($studentDocumentId);
     }
     $roomId = (string)($student['roomId'] ?? $assignedBed['roomId'] ?? '');
     if ($roomId !== '') $room = RoomService::find($roomId);
     $houseId = (string)($student['houseId'] ?? $room['houseId'] ?? '');
     if ($houseId !== '') $house = HouseService::find($houseId);
-    $userNotifications = (new NotificationService())->forUser($currentUser['uid'] ?? $currentUser['id'] ?? null);
 
     // Fetch announcements visible to students
     $firebase = FirebaseService::getInstance();
-    $allAnnouncements = $firebase->getCollection('announcements', [], 50);
+    $allAnnouncements = $firebase->getCollection('announcements', [], 20, 0, false, [['createdAt', 'DESC']]);
     $studentAnnouncements = array_values(array_filter($allAnnouncements, function($a) {
         if (($a['status'] ?? 'published') !== 'published') return false;
         $aud = $a['audience'] ?? 'all';
@@ -73,7 +84,6 @@ try {
     $topAnnouncements = [];
 }
 
-usort($attendance,  static fn($a, $b) => strcmp((string)($b['date'] ?? ''), (string)($a['date'] ?? '')));
 usort($visitors,    static fn($a, $b) => strcmp((string)($b['visitDate'] ?? $b['createdAt'] ?? ''), (string)($a['visitDate'] ?? $a['createdAt'] ?? '')));
 usort($incidents,   static fn($a, $b) => strcmp((string)($b['reportedAt'] ?? $b['createdAt'] ?? ''), (string)($a['reportedAt'] ?? $a['createdAt'] ?? '')));
 usort($userNotifications, static fn($a, $b) => strcmp((string)($b['createdAt'] ?? ''), (string)($a['createdAt'] ?? '')));
@@ -90,16 +100,9 @@ $roomCapacity = (int)($room['capacity'] ?? 0);
 $roomOccupied = (int)($room['occupied'] ?? 0);
 $roomRate = $roomCapacity > 0 ? min(100, round(($roomOccupied / $roomCapacity) * 100)) : 0;
 
-$summary = [
-    'present'  => count(array_filter($attendance, static fn($r) => ($r['status'] ?? '') === 'present')),
-    'absent'   => count(array_filter($attendance, static fn($r) => ($r['status'] ?? '') === 'absent')),
-    'late'     => count(array_filter($attendance, static fn($r) => ($r['status'] ?? '') === 'late')),
-    'excused'  => count(array_filter($attendance, static fn($r) => ($r['status'] ?? '') === 'excused')),
-];
-$totalAttendance = count($attendance);
+$summary = $attendanceSummary;
+$totalAttendance = (int) ($attendanceSummary['total'] ?? 0);
 $attendanceRate  = $totalAttendance > 0 ? round((($summary['present'] + $summary['excused']) / $totalAttendance) * 100) : 0;
-$openIncidents   = array_values(array_filter($incidents, static fn($i) => ($i['status'] ?? 'open') === 'open'));
-$unreadNotifications = array_values(array_filter($userNotifications, static fn($n) => empty($n['read'])));
 
 $pageTitle  = 'Student Dashboard';
 $pageStyles = ['student.css'];
@@ -192,12 +195,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             </div>
 
             <div class="col-sm-6 col-lg-3">
-                <div class="card stat-card h-100 p-3 border-start border-4 border-<?= count($openIncidents) > 0 ? 'danger' : 'secondary' ?> shadow-sm">
+                <div class="card stat-card h-100 p-3 border-start border-4 border-<?= $openIncidentCount > 0 ? 'danger' : 'secondary' ?> shadow-sm">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold">Open Incidents</span>
-                            <h3 class="fw-bold my-1 text-<?= count($openIncidents) > 0 ? 'danger' : 'dark' ?>"><?= count($openIncidents) ?></h3>
-                            <span class="small text-muted"><?= count($incidents) ?> total logged</span>
+                            <h3 class="fw-bold my-1 text-<?= $openIncidentCount > 0 ? 'danger' : 'dark' ?>"><?= e((string) $openIncidentCount) ?></h3>
+                            <span class="small text-muted"><?= e((string) $incidentCount) ?> total logged</span>
                         </div>
                         <div class="rounded-3 bg-danger bg-opacity-10 p-2 text-danger">
                             <i class="bi bi-flag fs-4"></i>
@@ -211,8 +214,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold">Unread Alerts</span>
-                            <h3 class="fw-bold my-1 text-info"><?= count($unreadNotifications) ?></h3>
-                            <span class="small text-muted"><?= count($userNotifications) ?> total received</span>
+                            <h3 class="fw-bold my-1 text-info"><?= e((string) $unreadNotificationCount) ?></h3>
+                            <span class="small text-muted"><?= e((string) $notificationCount) ?> total received</span>
                         </div>
                         <div class="rounded-3 bg-info bg-opacity-10 p-2 text-info">
                             <i class="bi bi-bell fs-4"></i>
@@ -390,7 +393,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="card-body p-3 d-grid gap-2">
                         <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#studentVisitorRequest"><i class="bi bi-person-plus me-1"></i>Request a Visitor</button>
                         <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#studentIncidentReport"><i class="bi bi-flag me-1"></i>Report Incident</button>
-                        <a href="<?= url('views/student/notifications/index/index.php') ?>" class="btn btn-outline-info btn-sm"><i class="bi bi-bell me-1"></i>Notifications <?php if (count($unreadNotifications) > 0): ?><span class="badge bg-danger ms-1"><?= count($unreadNotifications) ?></span><?php endif; ?></a>
+                        <a href="<?= url('views/student/notifications/index/index.php') ?>" class="btn btn-outline-info btn-sm"><i class="bi bi-bell me-1"></i>Notifications <?php if ($unreadNotificationCount > 0): ?><span class="badge bg-danger ms-1"><?= e((string) $unreadNotificationCount) ?></span><?php endif; ?></a>
                         <a href="<?= url('views/student/profile/index/index.php') ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-person-circle me-1"></i>My Profile</a>
                         <a href="<?= url('views/student/settings/index/index.php') ?>" class="btn btn-secondary btn-sm"><i class="bi bi-gear me-1"></i>Settings</a>
                     </div>

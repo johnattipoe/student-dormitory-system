@@ -20,13 +20,7 @@ use App\Services\FirebaseService;
 
 $id = sanitize($_GET['id'] ?? $_POST['id'] ?? '');
 $service = new VisitorService();
-$visitor = null;
-foreach ($service->byHouse(current_user()['houseId'] ?? null) as $record) {
-    if (($record['id'] ?? '') === $id) {
-        $visitor = $record;
-        break;
-    }
-}
+$visitor = $service->findForHouse($id, current_user()['houseId'] ?? null);
 
 if (!$visitor) {
     flash('error', 'Visitor not found.');

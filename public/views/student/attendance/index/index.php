@@ -31,18 +31,9 @@ $pageNotice = null;
 $attendance = [];
 
 try {
-    if ($studentId) {
-        $student = StudentService::find((string) $studentId);
-    }
-
-    if (!$student && !empty($currentUser['email'])) {
-        foreach (StudentService::all() as $candidate) {
-            if ((string) ($candidate['email'] ?? '') === (string) $currentUser['email']) {
-                $student = $candidate;
-                $studentId = $candidate['id'] ?? $studentId;
-                break;
-            }
-        }
+    $student = StudentService::findForUser($currentUser);
+    if ($student) {
+        $studentId = $student['id'] ?? $studentId;
     }
 
     if ($studentId) {
@@ -50,12 +41,7 @@ try {
     }
 
     $studentDocumentId = (string) ($student['id'] ?? $studentId ?? '');
-    foreach (BedService::all() as $bed) {
-        if ((string) ($bed['studentId'] ?? '') === $studentDocumentId) {
-            $assignedBed = $bed;
-            break;
-        }
-    }
+    $assignedBed = BedService::forStudent($studentDocumentId);
 } catch (Throwable $e) {
     $pageNotice = 'Attendance records are temporarily unavailable. Please try again later.';
 }

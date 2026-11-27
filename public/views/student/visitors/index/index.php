@@ -22,10 +22,11 @@ $dateFrom = sanitize($_GET['dateFrom'] ?? '');
 $dateTo = sanitize($_GET['dateTo'] ?? '');
 $status = sanitize($_GET['status'] ?? '');
 
-$studentId = current_user()['studentId'] ?? current_user()['uid'] ?? null;
+$studentId = trim((string) (current_user()['studentId'] ?? current_user()['uid'] ?? ''));
 $firebaseService = FirebaseService::getInstance();
-$allVisitors = $firebaseService->getCollection(COL_VISITOR_REQUESTS) ?? [];
-$visitors = array_values(array_filter($allVisitors, fn($v) => ((string) ($v['studentId'] ?? '')) === ((string) $studentId)));
+$visitors = $studentId !== ''
+    ? $firebaseService->getCollection(COL_VISITOR_REQUESTS, [['studentId', '=', $studentId]], 150, 0, false)
+    : [];
 
 if (!empty($search)) {
     $searchLower = strtolower($search);

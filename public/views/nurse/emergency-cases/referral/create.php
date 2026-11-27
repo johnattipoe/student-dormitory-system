@@ -16,18 +16,9 @@ $allowedRoles = [ROLE_NURSE];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\EmergencyReferralService;
-use App\Services\StudentService;
 
 $pageTitle = 'Create Referral';
 $referralService = new EmergencyReferralService();
-$students = [];
-foreach (StudentService::all() as $student) {
-    $studentId = (string) ($student['id'] ?? '');
-    if ($studentId === '') continue;
-
-    $name = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
-    $students[$studentId] = $name !== '' ? $name : 'Unnamed student';
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $studentId = sanitize($_POST['studentId'] ?? '');
@@ -92,11 +83,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Student</label>
-                            <select name="studentId" class="form-select" required>
+                            <select name="studentId" class="form-select" data-nurse-student-options="<?= e(url('views/nurse/dashboard/student-options.php')) ?>" required>
                                 <option value="">Select student</option>
-                                <?php foreach ($students as $studentId => $name): ?>
-                                    <option value="<?= e((string) $studentId) ?>"><?= e($name) ?></option>
-                                <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-md-6">

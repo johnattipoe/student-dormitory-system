@@ -25,15 +25,10 @@ if (!$room) {
     redirect(url('views/admin/rooms/index/index.php'));
 }
 
-$houses = HouseService::all();
-$houseMap = [];
-foreach ($houses as $house) {
-    $houseMap[(string) ($house['id'] ?? '')] = (string) ($house['name'] ?? $house['id'] ?? '');
-}
-
 $houseId = (string) ($room['houseId'] ?? '');
-$houseName = $houseMap[$houseId] ?? ($houseId ?: '—');
-$students = array_values(array_filter(StudentService::all(), fn($student) => ($student['roomId'] ?? '') === $id));
+$house = $houseId !== '' ? HouseService::find($houseId) : null;
+$houseName = (string) ($house['name'] ?? ($houseId !== '' ? $houseId : '—'));
+$students = StudentService::forRoom($id, 150, $houseId);
 
 $capacity = (int) ($room['capacity'] ?? 0);
 $occupied = (int) ($room['occupied'] ?? count($students));

@@ -18,30 +18,45 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\StudentService;
 use App\Services\RoomService;
 
-$students = StudentService::all(current_user()['houseId'] ?? null);
-$rooms = RoomService::all(current_user()['houseId'] ?? null);
+$houseId = trim((string) (current_user()['houseId'] ?? current_user()['house_id'] ?? ''));
+$studentSearch = strtolower(sanitize($_GET['search'] ?? ''));
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$students = [];
+$studentStats = ['total' => 0, 'active' => 0, 'assignedRooms' => 0];
+
+if ($houseId !== '') {
+    if ($studentSearch !== '') {
+        $students = StudentService::all($houseId);
+        $students = array_values(array_filter($students, function ($student) use ($studentSearch) {
+            $haystack = strtolower(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' ' . ($student['admissionNo'] ?? '') . ' ' . ($student['class'] ?? '') . ' ' . ($student['course'] ?? '')));
+            return str_contains($haystack, $studentSearch);
+        }));
+        $studentStats = [
+            'total' => count($students),
+            'active' => count(array_filter($students, static fn($student) => ($student['status'] ?? '') === 'active')),
+            'assignedRooms' => count(array_filter($students, static fn($student) => !empty($student['roomId']))),
+        ];
+    } else {
+        $studentStats = StudentService::stats($houseId);
+    }
+}
+
+$rooms = $houseId !== '' ? RoomService::all($houseId) : [];
 $roomMap = [];
 foreach ($rooms as $room) {
     $roomMap[(string) ($room['id'] ?? '')] = (string) ($room['roomNumber'] ?? $room['id'] ?? '');
 }
 
-$studentSearch = strtolower(sanitize($_GET['search'] ?? ''));
-$page = max(1, (int) ($_GET['page'] ?? 1));
-$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
-if ($studentSearch !== '') {
-    $students = array_values(array_filter($students, function ($student) use ($studentSearch) {
-        $haystack = strtolower(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' ' . ($student['admissionNo'] ?? '') . ' ' . ($student['class'] ?? '') . ' ' . ($student['course'] ?? '')));
-        return str_contains($haystack, $studentSearch);
-    }));
-}
-
-$totalStudents = count($students);
-$activeStudents = count(array_filter($students, fn($s) => ($s['status'] ?? '') === 'active'));
-$assignedRooms = count(array_filter($students, fn($s) => !empty($s['roomId'])));
+$totalStudents = (int) ($studentStats['total'] ?? 0);
+$activeStudents = (int) ($studentStats['active'] ?? 0);
+$assignedRooms = (int) ($studentStats['assignedRooms'] ?? 0);
 $unassignedRooms = max(0, $totalStudents - $assignedRooms);
 $totalPages = max(1, (int) ceil($totalStudents / $limit));
 $page = min($page, $totalPages);
-$students = array_slice($students, ($page - 1) * $limit, $limit);
+$students = $studentSearch !== ''
+    ? array_slice($students, ($page - 1) * $limit, $limit)
+    : ($houseId !== '' ? StudentService::page($houseId, $limit, $page) : []);
 
 $pageTitle = 'Senior Houseparent Students';
 $navItems = [

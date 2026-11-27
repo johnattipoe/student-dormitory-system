@@ -1,4 +1,8 @@
 <?php
+if (isset($GLOBALS['__SDS_APP_CONFIG_CACHE']) && is_array($GLOBALS['__SDS_APP_CONFIG_CACHE'])) {
+    return $GLOBALS['__SDS_APP_CONFIG_CACHE'];
+}
+
 $requestHost = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
 $defaultAppUrl = !empty($requestHost)
     ? ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . $requestHost)
@@ -63,14 +67,33 @@ $defaultSettings = [
 
 // Firestore is optional during CLI tasks, first-run setup, and local development.
 if (!defined('SKIP_REMOTE_SETTINGS') && defined('APP_ROOT') && class_exists(\App\Services\FirebaseService::class)) {
-    try {
-        $savedSettings = \App\Services\FirebaseService::getInstance()->getDocument(COL_SETTINGS, 'global');
-        if (!empty($savedSettings['values']) && is_array($savedSettings['values'])) {
-            $defaultSettings = array_merge($defaultSettings, $savedSettings['values']);
+    $settingsCacheKey = '_sds_remote_app_settings';
+    $cachedSettings = $_SESSION[$settingsCacheKey] ?? null;
+    $remoteSettings = is_array($cachedSettings)
+        && (int) ($cachedSettings['expiresAt'] ?? 0) > time()
+        && is_array($cachedSettings['values'] ?? null)
+            ? $cachedSettings['values']
+            : null;
+
+    if ($remoteSettings === null) {
+        $remoteSettings = [];
+        try {
+            $savedSettings = \App\Services\FirebaseService::getInstance()->getDocument(COL_SETTINGS, 'global');
+            $remoteSettings = !empty($savedSettings['values']) && is_array($savedSettings['values'])
+                ? $savedSettings['values']
+                : [];
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                $_SESSION[$settingsCacheKey] = [
+                    'expiresAt' => time() + 60,
+                    'values' => $remoteSettings,
+                ];
+            }
+        } catch (Throwable $e) {
+            error_log('Unable to load remote application settings; environment defaults will be used. (' . get_class($e) . ')');
         }
-    } catch (Throwable $e) {
-        // Environment defaults remain usable when Firestore is unavailable.
     }
+
+    $defaultSettings = array_merge($defaultSettings, $remoteSettings);
 }
 
 $resolvedTimezone = $defaultSettings['timezone'] ?? ($_ENV['APP_TIMEZONE'] ?? 'Africa/Lagos');
@@ -78,7 +101,7 @@ if (is_string($resolvedTimezone) && $resolvedTimezone !== '') {
     date_default_timezone_set($resolvedTimezone);
 }
 
-return [
+$appConfig = [
     'name' => $defaultSettings['app_name'],
     'version' => $defaultSettings['version'] ?? '1.0.0',
     'env' => $defaultSettings['env'] ?? ($_ENV['APP_ENV'] ?? 'local'),
@@ -108,3 +131,7 @@ return [
     'show_local_passwords' => !empty($defaultSettings['show_local_passwords']) && $defaultSettings['show_local_passwords'] !== '0',
     'advanced' => $defaultSettings,
 ];
+
+$GLOBALS['__SDS_APP_CONFIG_CACHE'] = $appConfig;
+
+return $appConfig;

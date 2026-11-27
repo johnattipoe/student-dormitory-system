@@ -1,6 +1,6 @@
 // medical.js — nurse medical-record form helpers: emergency toggle styling
 // and a confirmation step before saving a record marked as an emergency.
-document.addEventListener('DOMContentLoaded', function () {
+SDS.onPageLoad(function () {
   const emergencyCheckbox = document.getElementById('isEmergency');
   const form = emergencyCheckbox ? emergencyCheckbox.closest('form') : null;
 

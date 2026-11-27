@@ -20,11 +20,14 @@ use App\Services\RoomService;
 use App\Services\HouseService;
 use App\Services\AttendanceService;
 use App\Services\IncidentService;
-use App\Services\VisitorService;
 
 $studentId = sanitize($_GET['studentId'] ?? '');
-$student = $studentId ? StudentService::find($studentId) : null;
-$students = StudentService::all(current_user()['houseId'] ?? null);
+$houseId = (string) (current_user()['houseId'] ?? current_user()['house_id'] ?? '');
+$student = $studentId !== '' && $houseId !== '' ? StudentService::find($studentId) : null;
+if ($student && (string) ($student['houseId'] ?? '') !== $houseId) {
+    $student = null;
+}
+$students = $student || $houseId === '' ? [] : StudentService::all($houseId);
 $room = ($student && !empty($student['roomId'])) ? RoomService::find((string) $student['roomId']) : null;
 $roomName = $room['roomNumber'] ?? ($student['roomId'] ?? '—');
 $houseId = (string) ($student['houseId'] ?? '');
@@ -34,7 +37,7 @@ $houseName = $house['name'] ?? ($houseId !== '' ? $houseId : '—');
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'flag_student') {
     $flag = sanitize($_POST['flag'] ?? '');
     $reason = sanitize($_POST['reason'] ?? '');
-    if ($studentId && $flag) {
+    if ($student && $flag) {
         try {
             StudentService::updateFlags($studentId, [
                 'flagged' => true,
@@ -52,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'flag_
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'unflag_student') {
-    if ($studentId) {
+    if ($student) {
         try {
             StudentService::updateFlags($studentId, ['flagged' => false]);
             flash('success', 'Student flag removed');
@@ -63,9 +66,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'unfla
     }
 }
 
-$recentAttendance = $studentId ? AttendanceService::history($studentId, 10) : [];
-$studentIncidents = $studentId ? (new IncidentService())->studentIncidents($studentId) : [];
-$studentVisitors = $studentId ? (new VisitorService())->studentVisitors($studentId) : [];
+$recentAttendance = $student ? AttendanceService::history($studentId, 10) : [];
+$incidentService = new IncidentService();
+$studentIncidentCount = $student ? $incidentService->countForStudent($studentId) : 0;
+$studentIncidents = $student ? $incidentService->recentStudentIncidents($studentId, 5) : [];
 
 $attendanceSummary = [
     'present' => 0,
@@ -160,7 +164,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="col-sm-6 col-xl-3">
                         <div class="card stat-card p-3 text-center h-100">
                             <div class="text-muted small">Incidents</div>
-                            <div class="fs-2 fw-bold"><?= e((string) count($studentIncidents)) ?></div>
+                            <div class="fs-2 fw-bold"><?= e((string) $studentIncidentCount) ?></div>
                         </div>
                     </div>
                 </div>
@@ -242,7 +246,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                         <?php if (empty($studentIncidents)): ?>
                                             <tr><td colspan="3" class="text-center text-muted">No incidents recorded.</td></tr>
                                         <?php else: ?>
-                                            <?php foreach (array_slice($studentIncidents, 0, 5) as $incident): ?>
+                                            <?php foreach ($studentIncidents as $incident): ?>
                                                 <tr>
                                                     <td><?= e($incident['title'] ?? $incident['type'] ?? 'Incident') ?></td>
                                                     <td><span class="badge bg-<?= ($incident['priority'] ?? $incident['severity'] ?? '') === 'high' ? 'danger' : 'warning' ?>"><?= e(ucfirst($incident['priority'] ?? $incident['severity'] ?? 'medium')) ?></span></td>

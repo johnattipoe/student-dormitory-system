@@ -33,8 +33,7 @@ $houseId = (string) ($user['houseId'] ?? $user['house_id'] ?? '');
 $house = $houseId !== '' ? HouseService::find($houseId) : null;
 $houseName = $house['name'] ?? ($houseId ?: 'Not Assigned');
 
-$students = StudentService::all($houseId);
-$totalStudents = count($students);
+$totalStudents = $houseId !== '' ? StudentService::count($houseId) : 0;
 
 $rooms = RoomService::all($houseId);
 $totalRooms = count($rooms);

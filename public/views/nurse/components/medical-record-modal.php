@@ -17,7 +17,8 @@ $nurseMedicalSelectedStudentId = (string) ($nurseMedicalSelectedStudentId ?? '')
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Student</label>
-                            <select name="studentId" class="form-select nurse-medical-student-select" required>
+                            <select name="studentId" class="form-select nurse-medical-student-select" required
+                                <?= !empty($nurseMedicalLazyStudentOptions) ? 'data-nurse-student-options="' . e(url('views/nurse/dashboard/student-options.php')) . '"' : '' ?>>
                                 <option value="">Select student</option>
                                 <?php foreach ($nurseMedicalStudents as $student): ?>
                                     <?php
@@ -68,15 +69,15 @@ $nurseMedicalSelectedStudentId = (string) ($nurseMedicalSelectedStudentId ?? '')
     </div>
 </div>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('#<?= e($nurseMedicalModalId) ?> .nurse-medical-student-select').forEach(function (select) {
-        const phone = select.closest('form').querySelector('.nurse-medical-guardian-phone');
-        const updatePhone = function () {
-            const option = select.options[select.selectedIndex];
-            phone.value = option ? (option.dataset.guardianPhone || '') : '';
-        };
-        select.addEventListener('change', updatePhone);
-        updatePhone();
-    });
+document.querySelectorAll('#<?= e($nurseMedicalModalId) ?> .nurse-medical-student-select').forEach(function (select) {
+    if (select.dataset.guardianPhoneBound === 'true') return;
+    const phone = select.closest('form').querySelector('.nurse-medical-guardian-phone');
+    const updatePhone = function () {
+        const option = select.options[select.selectedIndex];
+        phone.value = option ? (option.dataset.guardianPhone || '') : '';
+    };
+    select.dataset.guardianPhoneBound = 'true';
+    select.addEventListener('change', updatePhone);
+    updatePhone();
 });
 </script>

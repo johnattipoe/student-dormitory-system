@@ -50,6 +50,6 @@ function initialiseSettingsDraft(form) {
         window.localStorage.removeItem(settingsDraftKey);
     });
 }
-document.addEventListener('DOMContentLoaded', () => {
+SDS.onPageLoad(() => {
     document.querySelectorAll('[data-ts-settings-form]').forEach(initialiseSettingsDraft);
 });

@@ -18,6 +18,7 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\UserService;
 use App\Services\VisitorService;
 use App\Services\IncidentService;
+use App\Services\FirebaseService;
 
 $user = current_user() ?? [];
 $userId = current_user_id();
@@ -27,12 +28,13 @@ if (is_array($profile)) {
     $user = array_merge($user, $profile);
 }
 
-$visitors = (new VisitorService())->all();
-$totalVisitors = count($visitors);
-$activeVisitors = count(array_filter($visitors, fn($v) => ($v['status'] ?? '') === 'checked_in' || ($v['status'] ?? '') === 'inside'));
-
-$incidents = (new IncidentService())->all();
-$totalIncidents = count($incidents);
+$visitorService = new VisitorService();
+$totalVisitors = $visitorService->count();
+$activeVisitors = FirebaseService::getInstance()->count(
+    COL_VISITORS,
+    [['status', 'in', ['checked_in', 'inside']]]
+);
+$totalIncidents = (new IncidentService())->count();
 
 $fullName = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')))) ?: 'Security Officer';
 $initials = strtoupper(substr($fullName, 0, 1) . (str_contains($fullName, ' ') ? substr(explode(' ', $fullName)[1], 0, 1) : 'S'));

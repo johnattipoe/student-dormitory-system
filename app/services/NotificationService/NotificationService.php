@@ -32,13 +32,85 @@ class NotificationService
         }
     }
 
+    public function recentAll(int $limit = 5): array
+    {
+        return $this->firebase->getCollection(
+            $this->collection,
+            [],
+            max(1, min(50, $limit)),
+            0,
+            false,
+            [['createdAt', 'DESC']]
+        );
+    }
+
     public function count(): int
     {
         try {
             return $this->firebase->count($this->collection);
         } catch (\Throwable $e) {
+            error_log('Notification count unavailable: ' . $e->getMessage());
             return 0;
         }
+    }
+
+    public function countForUser(?string $uid): int
+    {
+        if (!$uid) {
+            return 0;
+        }
+
+        try {
+            return $this->firebase->count(
+                $this->collection,
+                [['userId', '=', $uid]]
+            );
+        } catch (\Throwable $e) {
+            error_log('User notification count unavailable: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    public function recentForUser(?string $uid, int $limit = 5): array
+    {
+        if (!$uid) {
+            return [];
+        }
+
+        $limit = max(1, min(50, $limit));
+        $identifiers = $this->userIdentifiers($uid);
+        if ($identifiers === []) {
+            return [];
+        }
+
+        $notifications = [];
+        try {
+            foreach (array_chunk($identifiers, 10) as $identifierBatch) {
+                foreach ($this->firebase->getCollection(
+                    $this->collection,
+                    [['userId', 'in', $identifierBatch]],
+                    $limit,
+                    0,
+                    false,
+                    [['createdAt', 'DESC']]
+                ) as $notification) {
+                    $notificationId = (string) ($notification['id'] ?? '');
+                    if ($notificationId !== '') {
+                        $notifications[$notificationId] = $notification;
+                    }
+                }
+            }
+        } catch (\Google\Cloud\Core\Exception\FailedPreconditionException $exception) {
+            error_log('Recent notification query needs its Firestore composite index; using the bounded fallback.');
+            return $this->forUser($uid, 50);
+        }
+
+        usort($notifications, static fn(array $first, array $second): int => strcmp(
+            (string) ($second['createdAt'] ?? ''),
+            (string) ($first['createdAt'] ?? '')
+        ));
+
+        return array_slice(array_values($notifications), 0, $limit);
     }
 
     public function forUser(?string $uid, int $limit = 0): array
@@ -56,7 +128,13 @@ class NotificationService
             $notifications = [];
             foreach (array_chunk($identifiers, 10) as $identifierBatch) {
                 $batchLimit = $limit > 0 ? $limit : 150;
-                foreach ($this->firebase->getCollection($this->collection, [['userId', 'in', $identifierBatch]], $batchLimit) as $notification) {
+                foreach ($this->firebase->getCollection(
+                    $this->collection,
+                    [['userId', 'in', $identifierBatch]],
+                    $batchLimit,
+                    0,
+                    false
+                ) as $notification) {
                     $notificationId = (string) ($notification['id'] ?? '');
                     if ($notificationId !== '') {
                         $notifications[$notificationId] = $notification;
@@ -71,26 +149,15 @@ class NotificationService
 
             return array_values($notifications);
         } catch (\Throwable $e) {
+            error_log('User notification query failed: ' . $e->getMessage());
             return [];
         }
     }
 
     private function userIdentifiers(string $identifier): array
     {
-        $identifiers = [trim($identifier)];
-        try {
-            $user = (new UserService())->find($identifier);
-            if ($user) {
-                foreach ([$user['id'] ?? '', $user['uid'] ?? ''] as $userIdentifier) {
-                    if ($userIdentifier !== '' && !in_array((string) $userIdentifier, $identifiers, true)) {
-                        $identifiers[] = (string) $userIdentifier;
-                    }
-                }
-            }
-        } catch (\Throwable $e) {
-            // Keep the session identifier as a fallback.
-        }
-        return array_values(array_filter($identifiers));
+        $identifier = trim($identifier);
+        return $identifier === '' ? [] : [$identifier];
     }
 
     public function findForAdmin(string $id): ?array
@@ -406,6 +473,7 @@ class NotificationService
                 [['read', '=', false]]
             );
         } catch (\Throwable $e) {
+            error_log('Unread notification count unavailable: ' . $e->getMessage());
             return 0;
         }
     }

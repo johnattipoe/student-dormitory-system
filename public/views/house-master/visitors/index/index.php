@@ -19,17 +19,13 @@ use App\Services\StudentService;
 use App\Services\VisitorService;
 
 $houseId = current_user()['houseId'] ?? null;
-$students = StudentService::all($houseId);
 $visitorService = new VisitorService();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $studentId = sanitize($_POST['studentId'] ?? '');
-    $allowedStudentIds = array_fill_keys(array_filter(array_map(
-        static fn(array $student): string => (string) ($student['id'] ?? ''),
-        $students
-    )), true);
+    $student = $studentId !== '' ? StudentService::find($studentId) : null;
 
-    if ((string) $houseId === '' || !isset($allowedStudentIds[$studentId])) {
+    if ((string) $houseId === '' || !$student || (string) ($student['houseId'] ?? '') !== (string) $houseId) {
         flash('error', 'Select a student assigned to your house.');
     } else {
         $result = $visitorService->register([
@@ -45,17 +41,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect(url('views/house-master/visitors/index/index.php'));
 }
 
-$studentMap = [];
-foreach ($students as $student) {
-    $studentMap[(string) ($student['id'] ?? '')] = $student;
-}
 $visitors = $visitorService->byHouse($houseId);
 $visitorSearch = strtolower(sanitize($_GET['search'] ?? ''));
 $visitorStatus = sanitize($_GET['status'] ?? '');
 if ($visitorSearch !== '' || $visitorStatus !== '') {
-    $visitors = array_values(array_filter($visitors, function ($visitor) use ($visitorSearch, $visitorStatus, $studentMap) {
-        $student = $studentMap[(string) ($visitor['studentId'] ?? '')] ?? [];
-        $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
+    $visitors = array_values(array_filter($visitors, function ($visitor) use ($visitorSearch, $visitorStatus) {
+        $studentName = (string) ($visitor['studentName'] ?? '');
         return ($visitorSearch === '' || str_contains(strtolower((string) ($visitor['visitorName'] ?? '')), $visitorSearch) || str_contains(strtolower($studentName), $visitorSearch))
             && ($visitorStatus === '' || ($visitor['status'] ?? '') === $visitorStatus);
     }));
@@ -128,17 +119,11 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label fw-semibold">Student Being Visited <span class="text-danger">*</span></label>
-                                    <select name="studentId" class="form-select" required <?= empty($students) ? 'disabled' : '' ?>>
-                                        <option value="">Select resident student</option>
-                                        <?php foreach ($students as $student): ?>
-                                            <option value="<?= e((string) ($student['id'] ?? '')) ?>">
-                                                <?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?> (<?= e($student['admissionNo'] ?? '') ?>)
-                                            </option>
-                                        <?php endforeach; ?>
+                                    <select name="studentId" class="form-select" required disabled
+                                        data-house-student-options="<?= e(url('views/house-student-options.php')) ?>"
+                                        data-placeholder="Select resident student">
+                                        <option value="">Student options load when this form opens</option>
                                     </select>
-                                    <?php if (empty($students)): ?>
-                                        <div class="form-text text-danger">No students are assigned to your house.</div>
-                                    <?php endif; ?>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label fw-semibold">Purpose of Visit</label>
@@ -148,7 +133,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary" <?= empty($students) ? 'disabled' : '' ?>>
+                            <button type="submit" class="btn btn-primary" data-house-student-options-submit disabled>
                                 <i class="bi bi-person-check me-1"></i>Register Visitor
                             </button>
                         </div>
@@ -243,10 +228,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <tbody>
                         <?php if (!empty($visitors)): ?>
                             <?php foreach ($visitors as $visitor): ?>
-                                <?php $visitorStudent = $studentMap[(string) ($visitor['studentId'] ?? '')] ?? null; ?>
+                                <?php $visitorStudentName = (string) ($visitor['studentName'] ?? ''); ?>
                                 <tr>
                                     <td class="fw-medium"><?= e($visitor['visitorName'] ?? '') ?></td>
-                                    <td><?= e(trim((($visitorStudent['firstName'] ?? '') . ' ' . ($visitorStudent['lastName'] ?? '')))) ?: e($visitor['studentId'] ?? '—') ?></td>
+                                    <td><?= e($visitorStudentName) ?: e($visitor['studentId'] ?? '—') ?></td>
                                     <td><?= e($visitor['purpose'] ?? '—') ?></td>
                                     <td><span class="badge bg-<?= ($visitor['status'] ?? '') === 'inside' ? 'success' : (($visitor['status'] ?? '') === 'checked_out' ? 'dark' : 'secondary') ?>"><?= e($visitor['status'] ?? 'pending') ?></span></td>
                                     <td class="text-nowrap">
@@ -270,7 +255,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     </div>
 </div>
 <?php foreach ($visitors as $visitor): ?>
-    <?php $modalVisitorId = (string) ($visitor['id'] ?? ''); $modalVisitorStatus = (string) ($visitor['status'] ?? 'registered'); $modalStudent = $studentMap[(string) ($visitor['studentId'] ?? '')] ?? []; $modalStudentName = trim(($modalStudent['firstName'] ?? '') . ' ' . ($modalStudent['lastName'] ?? '')) ?: ($visitor['studentId'] ?? '—'); ?>
+    <?php $modalVisitorId = (string) ($visitor['id'] ?? ''); $modalVisitorStatus = (string) ($visitor['status'] ?? 'registered'); $modalStudentName = (string) ($visitor['studentName'] ?? '') ?: ($visitor['studentId'] ?? '—'); ?>
     <div class="modal fade" id="houseVisitorViewModal-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Visitor Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Name</dt><dd class="col-sm-7"><?= e($visitor['visitorName'] ?? 'Visitor') ?></dd><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e($modalStudentName) ?></dd><dt class="col-sm-5">Phone</dt><dd class="col-sm-7"><?= e($visitor['phone'] ?? '—') ?></dd><dt class="col-sm-5">Purpose</dt><dd class="col-sm-7"><?= e($visitor['purpose'] ?? '—') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucwords(str_replace('_', ' ', $modalVisitorStatus))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
     <div class="modal fade" id="houseVisitorEditModal-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="<?= url('views/house-master/visitors/edit/edit.php?id=' . urlencode($modalVisitorId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalVisitorId) ?>"><label class="form-label">Visitor Name</label><input name="visitorName" class="form-control mb-3" value="<?= e($visitor['visitorName'] ?? '') ?>" required><label class="form-label">Phone</label><input name="phone" class="form-control mb-3" value="<?= e($visitor['phone'] ?? '') ?>"><label class="form-label">Status</label><select name="status" class="form-select mb-3"><option value="registered" <?= $modalVisitorStatus === 'registered' ? 'selected' : '' ?>>Registered</option><option value="inside" <?= $modalVisitorStatus === 'inside' ? 'selected' : '' ?>>Inside</option><option value="checked_out" <?= $modalVisitorStatus === 'checked_out' ? 'selected' : '' ?>>Checked Out</option></select><label class="form-label">Purpose</label><textarea name="purpose" class="form-control" rows="3"><?= e($visitor['purpose'] ?? '') ?></textarea></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
     <div class="modal fade" id="houseVisitorDeleteModal-<?= e($modalVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete visitor <strong><?= e($visitor['visitorName'] ?? 'this visitor') ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/visitors/delete/delete.php?id=' . urlencode($modalVisitorId)) ?>"><input type="hidden" name="id" value="<?= e($modalVisitorId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>

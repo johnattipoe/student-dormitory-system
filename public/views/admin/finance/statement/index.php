@@ -27,7 +27,19 @@ if (!$student) {
 $studentName = trim((string) (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')));
 $payments = [];
 try {
-    $payments = FirebaseService::getInstance()->getCollection(COL_FINANCE_PAYMENTS, [], 1000);
+    $firebase = FirebaseService::getInstance();
+    $paymentsById = [];
+    foreach ([['studentId', '=', $studentId], ['student_id', '=', $studentId]] as $where) {
+        foreach ($firebase->getCollection(COL_FINANCE_PAYMENTS, [$where], 150) as $payment) {
+            $paymentId = (string) ($payment['id'] ?? '');
+            if ($paymentId !== '') {
+                $paymentsById[$paymentId] = $payment;
+            } else {
+                $payments[] = $payment;
+            }
+        }
+    }
+    $payments = array_merge($payments, array_values($paymentsById));
 } catch (Throwable $e) {
     $payments = [];
 }

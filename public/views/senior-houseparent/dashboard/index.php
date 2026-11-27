@@ -30,18 +30,24 @@ $houseId = (string) ($user['houseId'] ?? $user['house_id'] ?? '');
 $house = $houseId !== '' ? HouseService::find($houseId) : null;
 $houseName = $house['name'] ?? ($houseId ?: 'Assigned House');
 
-$students = StudentService::all($houseId);
-$studentMap = [];
-foreach ($students as $student) {
-    $studentMap[(string) ($student['id'] ?? '')] = $student;
-}
-
 $today = date('Y-m-d');
-$attendance = AttendanceService::todayByHouse($houseId);
+$attendance = $houseId !== '' ? AttendanceService::recentByHouseDate($houseId, $today, 6) : [];
 $visitors = (new VisitorService())->todayByHouse($houseId);
-$roomStats = RoomService::occupancyStats($houseId);
-$attendanceSummary = AttendanceService::summary($today, $houseId);
+$roomStats = $houseId !== '' ? RoomService::occupancyStats($houseId) : [];
+$attendanceSummary = $houseId !== '' ? AttendanceService::summary($today, $houseId) : [];
 $openIncidents = (new IncidentService())->openByHouse($houseId);
+
+$studentMap = [];
+$studentIds = array_unique(array_filter(array_map(
+    static fn(array $record): string => (string) ($record['studentId'] ?? ''),
+    array_slice($attendance, 0, 6)
+)));
+foreach ($studentIds as $studentId) {
+    $student = StudentService::find($studentId);
+    if ($student && (string) ($student['houseId'] ?? '') === $houseId) {
+        $studentMap[$studentId] = $student;
+    }
+}
 
 // Fetch latest urgent announcements for house / school
 $firebase = FirebaseService::getInstance();
@@ -55,12 +61,12 @@ $recentAnnouncements = array_values(array_filter($announcements, function ($a) u
 usort($recentAnnouncements, fn($a, $b) => strcmp((string)($b['publishedAt'] ?? $b['createdAt'] ?? ''), (string)($a['publishedAt'] ?? $a['createdAt'] ?? '')));
 $topAnnouncements = array_slice($recentAnnouncements, 0, 3);
 
-$totalStudents = count($students);
+$totalStudents = $houseId !== '' ? StudentService::count($houseId) : 0;
 $occupancyRate = (int) ($roomStats['occupancyRate'] ?? 0);
 $presentCount = (int) ($attendanceSummary['present'] ?? 0);
 $absentCount = (int) ($attendanceSummary['absent'] ?? 0);
 $vacantBeds = (int) ($roomStats['vacant'] ?? 0);
-$totalRooms = (int) ($roomStats['totalRooms'] ?? count(RoomService::all($houseId)));
+$totalRooms = (int) ($roomStats['totalRooms'] ?? ($houseId !== '' ? RoomService::count($houseId) : 0));
 
 $pageTitle = 'Senior Houseparent Dashboard';
 $navItems = [
@@ -319,8 +325,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <?php else: ?>
                                         <?php foreach (array_slice($visitors, 0, 5) as $visitor): ?>
                                             <?php
-                                            $vSt = $studentMap[(string) ($visitor['studentId'] ?? '')] ?? null;
-                                            $vStName = trim((($vSt['firstName'] ?? '') . ' ' . ($vSt['lastName'] ?? ''))) ?: ($visitor['studentId'] ?? '—');
+                                            $vStName = trim((string) ($visitor['studentName'] ?? '')) ?: ($visitor['studentId'] ?? '—');
                                             $vStatus = strtolower((string) ($visitor['status'] ?? 'pending'));
                                             $vBadge = match($vStatus) {
                                                 'checked_in', 'active' => 'bg-success',

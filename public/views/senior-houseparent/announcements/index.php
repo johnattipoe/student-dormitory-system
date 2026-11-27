@@ -16,32 +16,14 @@ $allowedRoles = [ROLE_SENIOR_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\FirebaseService;
-use App\Services\UserService;
 
 $role = current_role();
 $allRecords = FirebaseService::getInstance()->getCollection('announcements', [], 500);
 
-// Preload user map for author name resolution
 $userMap = [
     'default-admin' => 'Administrator (Admin)',
     'system' => 'System',
 ];
-try {
-    foreach ((new UserService())->all() as $u) {
-        $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
-        if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? $u['email'] ?? '';
-        if ($name !== '') {
-            $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
-            $displayName = $name . $roleLabel;
-            foreach ([$u['id'] ?? null, $u['uid'] ?? null, $u['userId'] ?? null, $u['firebaseUid'] ?? null] as $key) {
-                if ($key !== null && (string)$key !== '') {
-                    $userMap[(string)$key] = $displayName;
-                }
-            }
-        }
-    }
-} catch (\Throwable $e) {}
-
 $getAuthorName = function (?string $raw) use (&$userMap): string {
     $raw = (string) $raw;
     if ($raw === '' || $raw === 'system') return 'System';
@@ -51,14 +33,28 @@ $getAuthorName = function (?string $raw) use (&$userMap): string {
         $u = FirebaseService::getInstance()->getDocument('users', $raw);
         if ($u) {
             $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
-            if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? '';
+            if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? $u['email'] ?? '';
             if ($name !== '') {
                 $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
                 $userMap[$raw] = $name . $roleLabel;
                 return $userMap[$raw];
             }
         }
+        foreach (['uid', 'userId', 'firebaseUid', 'email'] as $field) {
+            $users = FirebaseService::getInstance()->getCollection('users', [[$field, '=', $raw]], 1);
+            if (isset($users[0])) {
+                $u = $users[0];
+                $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
+                if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? $u['email'] ?? '';
+                if ($name !== '') {
+                    $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
+                    $userMap[$raw] = $name . $roleLabel;
+                    return $userMap[$raw];
+                }
+            }
+        }
     } catch (\Throwable $e) {}
+    $userMap[$raw] = $raw;
     return $raw;
 };
 

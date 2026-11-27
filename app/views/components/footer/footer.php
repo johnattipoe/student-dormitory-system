@@ -25,9 +25,7 @@
 
     if (str_contains($currentScript, '/views/admin/')) {
         $autoScripts[] = 'admin.js';
-        if (str_ends_with($currentScript, '/views/admin/dashboard.php')) {
-            $autoScripts[] = 'dashboard.js';
-        }
+        $autoScripts[] = 'dashboard.js';
     }
     if (str_contains($currentScript, '/students/')) $autoScripts[] = 'students.js';
     if (str_contains($currentScript, '/rooms/') || str_contains($currentScript, '/room/')) $autoScripts[] = 'rooms.js';

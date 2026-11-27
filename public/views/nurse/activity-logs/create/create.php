@@ -22,7 +22,6 @@ $user = current_user() ?? [];
 $userId = current_user_id();
 $nurseName = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')))) ?: 'Staff Nurse';
 
-$students = StudentService::all();
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -38,12 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $studentName = '';
             if ($studentId !== '') {
-                foreach ($students as $st) {
-                    if ((string)($st['id'] ?? '') === $studentId) {
-                        $studentName = trim(($st['firstName'] ?? '') . ' ' . ($st['lastName'] ?? ''));
-                        break;
-                    }
-                }
+                $student = StudentService::find($studentId);
+                $studentName = trim((string) ($student['firstName'] ?? '') . ' ' . (string) ($student['lastName'] ?? ''));
             }
 
             $logEntry = [
@@ -143,14 +138,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
                 <div class="col-12">
                     <label class="form-label fw-bold" for="studentId">Student Patient (Optional)</label>
-                    <select class="form-select" id="studentId" name="studentId">
+                    <select class="form-select" id="studentId" name="studentId" data-nurse-student-options="<?= e(url('views/nurse/dashboard/student-options.php')) ?>" data-selected-student-id="<?= e($_POST['studentId'] ?? '') ?>">
                         <option value="">— General Clinic Event / Multiple Students —</option>
-                        <?php foreach ($students as $st): ?>
-                            <?php $fullName = trim(($st['firstName'] ?? '') . ' ' . ($st['lastName'] ?? '')); ?>
-                            <option value="<?= e($st['id'] ?? '') ?>" <?= ($_POST['studentId'] ?? '') === ($st['id'] ?? '') ? 'selected' : '' ?>>
-                                <?= e($fullName ?: 'Student') ?> <?= !empty($st['admissionNo']) ? '[' . e($st['admissionNo']) . ']' : '' ?>
-                            </option>
-                        <?php endforeach; ?>
                     </select>
                 </div>
 

@@ -19,56 +19,82 @@ if (!class_exists('App\\Services\\NotificationService', false)) {
     require_once APP_ROOT . '/app/services/NotificationService/NotificationService.php';
 }
 
-use App\Services\StudentService;
 use App\Services\FirebaseService;
 use App\Services\NotificationService;
+use App\Services\CacheService;
 
 $pageTitle = 'Admin Dashboard';
 
-$firebase = FirebaseService::getInstance();
 $user = current_user() ?? [];
 $adminName = trim(($user['name'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))) ?: 'Administrator';
+$dashboardData = CacheService::remember('dashboard:admin:v2', 30, static function (): array {
+    $firebase = FirebaseService::getInstance();
+    $safeCount = static function (string $collection, array $wheres = []) use ($firebase): int {
+        try {
+            return $firebase->count($collection, $wheres);
+        } catch (\Throwable $e) {
+            error_log('Dashboard metric unavailable (' . $collection . '): ' . $e->getMessage());
+            return 0;
+        }
+    };
+    $safeCollection = static function (string $collection, int $limit, array $orderBy = []) use ($firebase): array {
+        try {
+            return $firebase->getCollection($collection, [], $limit, 0, false, $orderBy);
+        } catch (\Throwable $e) {
+            error_log('Dashboard collection fetch failed for ' . $collection . ': ' . $e->getMessage());
+            return [];
+        }
+    };
 
-// Use aggregate counts for dashboard totals; only feeds need document data.
-$safeCount = static function (string $collection, array $wheres = []) use ($firebase): int {
-    try {
-        return $firebase->count($collection, $wheres);
-    } catch (\Throwable $e) {
-        return 0;
-    }
-};
+    $studentCount = $safeCount(COL_STUDENTS);
+    $houseCount = $safeCount(COL_HOUSES);
+    $roomCount = $safeCount(COL_ROOMS);
+    $incidentCount = $safeCount(COL_INCIDENTS);
+    $attendanceCount = $safeCount(COL_ATTENDANCE);
+    $allocationCount = $safeCount(COL_ROOM_ALLOCATIONS);
+    $activityLogCount = $safeCount(COL_ACTIVITY_LOGS);
+    $notificationCount = (new NotificationService())->count();
+    $openIncidentCount = $safeCount(COL_INCIDENTS, [['status', '=', 'open']]);
+    $unreadNotificationCount = $safeCount('notifications', [['read', '=', false]]);
 
-$studentCount       = $safeCount(COL_STUDENTS);
-$houseCount         = $safeCount(COL_HOUSES);
-$roomCount          = $safeCount(COL_ROOMS);
-$incidentCount      = $safeCount(COL_INCIDENTS);
-$attendanceCount    = $safeCount(COL_ATTENDANCE);
-$allocationCount    = $safeCount(COL_ROOM_ALLOCATIONS);
-$activityLogCount   = $safeCount(COL_ACTIVITY_LOGS);
-$notificationService = new NotificationService();
-$notificationCount  = $notificationService->count();
-$openIncidentCount  = $safeCount(COL_INCIDENTS, [['status', '=', 'open']]);
-$unreadNotificationCount = $safeCount('notifications', [['read', '=', false]]);
+    return [
+        'studentCount' => $studentCount,
+        'houseCount' => $houseCount,
+        'roomCount' => $roomCount,
+        'incidentCount' => $incidentCount,
+        'attendanceCount' => $attendanceCount,
+        'allocationCount' => $allocationCount,
+        'activityLogCount' => $activityLogCount,
+        'notificationCount' => $notificationCount,
+        'openIncidentCount' => $openIncidentCount,
+        'unreadNotificationCount' => $unreadNotificationCount,
+        'recentLogs' => $safeCollection(COL_ACTIVITY_LOGS, 8, [['createdAt', 'DESC']]),
+        'recentIncidents' => $safeCollection(COL_INCIDENTS, 5, [['reportedAt', 'DESC']]),
+    ];
+});
 
-// Keep the dashboard available if Firestore is temporarily unavailable.
-$safeCollection = static function (string $collection, int $limit) use ($firebase): array {
-    try {
-        return $firebase->getCollection($collection, [], $limit);
-    } catch (\Throwable $e) {
-        error_log('Dashboard collection fetch failed for ' . $collection . ': ' . $e->getMessage());
-        return [];
-    }
-};
-
-// Recent activity logs
-$recentLogs = $safeCollection(COL_ACTIVITY_LOGS, 8);
-usort($recentLogs, static fn($a, $b) => strcmp((string)($b['createdAt'] ?? ''), (string)($a['createdAt'] ?? '')));
-$recentLogs = array_slice($recentLogs, 0, 8);
-
-// Recent incidents
-$recentIncidents = $safeCollection(COL_INCIDENTS, 6);
-usort($recentIncidents, static fn($a, $b) => strcmp((string)($b['reportedAt'] ?? $b['createdAt'] ?? ''), (string)($a['reportedAt'] ?? $a['createdAt'] ?? '')));
-$recentIncidents = array_slice($recentIncidents, 0, 5);
+$studentCount = (int) $dashboardData['studentCount'];
+$houseCount = (int) $dashboardData['houseCount'];
+$roomCount = (int) $dashboardData['roomCount'];
+$incidentCount = (int) $dashboardData['incidentCount'];
+$attendanceCount = (int) $dashboardData['attendanceCount'];
+$allocationCount = (int) $dashboardData['allocationCount'];
+$activityLogCount = (int) $dashboardData['activityLogCount'];
+$notificationCount = (int) $dashboardData['notificationCount'];
+$openIncidentCount = (int) $dashboardData['openIncidentCount'];
+$unreadNotificationCount = (int) $dashboardData['unreadNotificationCount'];
+$recentLogs = $dashboardData['recentLogs'];
+$recentIncidents = $dashboardData['recentIncidents'];
+$dashboardMetrics = [
+    'students' => $studentCount,
+    'houses' => $houseCount,
+    'rooms' => $roomCount,
+    'incidents' => $incidentCount,
+    'attendance' => $attendanceCount,
+    'allocations' => $allocationCount,
+    'activityLogs' => $activityLogCount,
+    'notifications' => $notificationCount,
+];
 
 $occupancyPct = $roomCount > 0 ? min(100, round(($allocationCount / $roomCount) * 100)) : 0;
 
@@ -243,7 +269,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     </div>
                     <div class="card-body">
                         <div style="min-height: 280px;">
-                            <canvas id="dashboardChart"></canvas>
+                            <canvas id="dashboardChart" data-metrics="<?= e(json_encode($dashboardMetrics, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP)) ?>"></canvas>
                         </div>
                     </div>
                 </div>
@@ -403,10 +429,4 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     </div>
 </div>
 
-<script>
-    window.dashboardData = {
-        labels: ['Students', 'Houses', 'Rooms', 'Incidents', 'Attendance', 'Allocations', 'Logs', 'Notifications'],
-        values: [<?= $studentCount ?>, <?= $houseCount ?>, <?= $roomCount ?>, <?= $incidentCount ?>, <?= $attendanceCount ?>, <?= $allocationCount ?>, <?= $activityLogCount ?>, <?= $notificationCount ?>]
-    };
-</script>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

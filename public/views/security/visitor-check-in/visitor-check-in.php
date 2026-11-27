@@ -18,7 +18,19 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\VisitorService;
 use App\Services\FirebaseService;
 
-$eligibleVisitors = array_values(array_filter((new VisitorService())->all(), static fn(array $visitor): bool => in_array(($visitor['status'] ?? ''), ['registered', 'approved'], true)));
+$eligibleVisitors = [];
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    try {
+        $eligibleVisitors = FirebaseService::getInstance()->getCollection(
+            COL_VISITORS,
+            [['status', 'in', ['registered', 'approved']]],
+            150
+        );
+    } catch (Throwable $e) {
+        error_log('Eligible visitor query unavailable: ' . $e->getMessage());
+        $eligibleVisitors = [];
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $visitorId = sanitize($_POST['visitorId'] ?? '');

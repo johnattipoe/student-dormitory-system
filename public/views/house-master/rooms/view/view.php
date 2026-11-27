@@ -26,7 +26,7 @@ if (!$room || ($room['houseId'] ?? null) !== $houseId) {
     redirect(url('views/house-master/rooms/index/index.php'));
 }
 
-$students = array_values(array_filter(StudentService::all($houseId), fn($student) => ($student['roomId'] ?? '') === $id));
+$students = StudentService::forRoom($id, 150, $houseId);
 $capacity = (int) ($room['capacity'] ?? 0);
 $occupied = count($students);
 $available = max(0, $capacity - $occupied);

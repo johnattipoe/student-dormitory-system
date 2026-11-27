@@ -41,11 +41,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_
 $pageTitle = 'Attendance';
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
-$allRecords = FirebaseService::getInstance()->getCollection(COL_ATTENDANCE, [], 200);
-$totalRecords = count($allRecords);
+$firebase = FirebaseService::getInstance();
+$totalRecords = $firebase->count(COL_ATTENDANCE);
 $totalPages = max(1, (int) ceil($totalRecords / $limit));
-$records = array_slice($allRecords, ($page - 1) * $limit, $limit);
-$students = FirebaseService::getInstance()->getCollection(COL_STUDENTS, [], 500);
+$page = min($page, $totalPages);
+$records = $firebase->getCollection(
+    COL_ATTENDANCE,
+    [],
+    $limit,
+    ($page - 1) * $limit,
+    false,
+    [['createdAt', 'DESC']]
+);
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-calendar-check', 'label' => 'Attendance', 'href' => url('views/attendance/index/index.php'), 'active' => true],
@@ -107,7 +114,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <input type="hidden" name="action" value="mark_attendance">
             <div class="modal-header"><h5 class="modal-title">Mark Attendance</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
             <div class="modal-body">
-                <div class="mb-3"><label class="form-label">Student</label><select name="studentId" class="form-select" required><option value="">Select student</option><?php foreach ($students as $student): ?><option value="<?= e((string) ($student['id'] ?? '')) ?>"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?></option><?php endforeach; ?></select></div>
+                <div class="mb-3"><label class="form-label">Student</label><select name="studentId" class="form-select" data-attendance-student-options="<?= e(url('views/attendance/student-options.php')) ?>" required><option value="">Select student</option></select></div>
                 <div class="mb-3"><label class="form-label">Date</label><input type="date" name="date" class="form-control" value="<?= e(date('Y-m-d')) ?>" required></div>
                 <div><label class="form-label">Status</label><select name="status" class="form-select" required><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select></div>
             </div>

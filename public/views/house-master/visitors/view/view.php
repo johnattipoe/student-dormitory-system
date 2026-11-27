@@ -20,13 +20,7 @@ use App\Services\StudentService;
 
 $id = sanitize($_GET['id'] ?? '');
 $houseId = current_user()['houseId'] ?? null;
-$visitor = null;
-foreach ((new VisitorService())->byHouse($houseId) as $record) {
-    if (($record['id'] ?? '') === $id) {
-        $visitor = $record;
-        break;
-    }
-}
+$visitor = (new VisitorService())->findForHouse($id, $houseId);
 
 if (!$visitor) {
     flash('error', 'Visitor not found.');

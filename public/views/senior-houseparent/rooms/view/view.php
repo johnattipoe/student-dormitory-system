@@ -27,7 +27,7 @@ if (!$room || ($houseId && ($room['houseId'] ?? null) !== $houseId)) {
     redirect(url('views/senior-houseparent/rooms/index/index.php'));
 }
 
-$students = array_values(array_filter(StudentService::all($houseId), fn($student) => ($student['roomId'] ?? '') === $id));
+$students = StudentService::forRoom($id, 150, $houseId);
 $pageTitle = 'Room Details';
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/senior-houseparent/dashboard/index.php')],

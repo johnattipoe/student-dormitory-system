@@ -27,7 +27,6 @@ $houseId = (string) ($user['houseId'] ?? $user['house_id'] ?? '');
 $house = $houseId !== '' ? HouseService::find($houseId) : null;
 $houseName = $house['name'] ?? ($houseId ?: 'Assigned House');
 
-$students = StudentService::all($houseId);
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -48,14 +47,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors['description'] = 'Incident description is required.';
     }
 
+    $student = $studentId !== '' ? StudentService::find($studentId) : null;
+    if ($studentId !== '' && (!$student || (string) ($student['houseId'] ?? '') !== $houseId)) {
+        $errors['studentId'] = 'Select a student assigned to your house.';
+    }
+
     if (empty($errors)) {
-        $studentName = '';
-        foreach ($students as $st) {
-            if ((string)($st['id'] ?? '') === $studentId) {
-                $studentName = trim(($st['firstName'] ?? '') . ' ' . ($st['lastName'] ?? ''));
-                break;
-            }
-        }
+        $studentName = trim((string) ($student['firstName'] ?? '') . ' ' . (string) ($student['lastName'] ?? ''));
 
         $incidentData = [
             'title' => $title,
@@ -133,14 +131,11 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <form method="POST" class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label fw-bold" for="studentId">Involved Student <span class="text-danger">*</span></label>
-                    <select class="form-select <?= !empty($errors['studentId']) ? 'is-invalid' : '' ?>" id="studentId" name="studentId" required>
-                        <option value="">— Select Student —</option>
-                        <?php foreach ($students as $st): ?>
-                            <?php $fullName = trim(($st['firstName'] ?? '') . ' ' . ($st['lastName'] ?? '')); ?>
-                            <option value="<?= e($st['id'] ?? '') ?>" <?= ($_POST['studentId'] ?? '') === ($st['id'] ?? '') ? 'selected' : '' ?>>
-                                <?= e($fullName ?: 'Student') ?> <?= !empty($st['admissionNo']) ? '[' . e($st['admissionNo']) . ']' : '' ?>
-                            </option>
-                        <?php endforeach; ?>
+                    <select class="form-select <?= !empty($errors['studentId']) ? 'is-invalid' : '' ?>" id="studentId" name="studentId" required
+                        data-house-student-options="<?= e(url('views/house-student-options.php')) ?>"
+                        data-placeholder="— Select Student —"
+                        data-selected-id="<?= e($_POST['studentId'] ?? '') ?>">
+                        <option value="">Focus to load students</option>
                     </select>
                     <?php if (!empty($errors['studentId'])): ?>
                         <div class="invalid-feedback"><?= e($errors['studentId']) ?></div>
@@ -192,7 +187,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
                 <div class="col-12 d-flex justify-content-end gap-2 mt-4">
                     <a class="btn btn-outline-secondary" href="<?= url('views/senior-houseparent/incidents/index/index.php') ?>">Cancel</a>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" data-house-student-options-submit disabled>
                         <i class="bi bi-shield-check me-1"></i> Submit Incident Report
                     </button>
                 </div>

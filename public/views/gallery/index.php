@@ -24,11 +24,20 @@ $role = current_role();
 $firebase = FirebaseService::getInstance();
 $currentUser = current_user() ?? [];
 $currentHouseId = current_house_id();
+$isHouseScopedRole = in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true);
+$houseScopeUnavailable = $isHouseScopedRole && empty($currentHouseId);
 
 $houses = [];
-foreach (HouseService::all() as $house) {
+if ($isHouseScopedRole) {
+    $house = $currentHouseId ? HouseService::find((string) $currentHouseId) : null;
     if (!empty($house['id'])) {
         $houses[(string) $house['id']] = (string) ($house['name'] ?? $house['id']);
+    }
+} else {
+    foreach (HouseService::all() as $house) {
+        if (!empty($house['id'])) {
+            $houses[(string) $house['id']] = (string) ($house['name'] ?? $house['id']);
+        }
     }
 }
 
@@ -36,8 +45,16 @@ $selectedHouseId = sanitize($_GET['houseId'] ?? ($_POST['houseId'] ?? ''));
 $selectedStudentId = sanitize($_GET['studentId'] ?? ($_POST['studentId'] ?? ''));
 $searchTerm = sanitize($_GET['q'] ?? ($_POST['q'] ?? ''));
 $searchTermNormalized = strtolower(trim((string) $searchTerm));
-if ($role === ROLE_HOUSE_MASTER || $role === ROLE_HOUSE_MISTRESS) {
-    $selectedHouseId = $selectedHouseId !== '' ? $selectedHouseId : ($currentHouseId ?? '');
+if ($isHouseScopedRole) {
+    $selectedHouseId = (string) ($currentHouseId ?? '');
+    if ($selectedStudentId !== '' && !$houseScopeUnavailable) {
+        $selectedStudent = StudentService::find($selectedStudentId) ?? [];
+        if ((string) ($selectedStudent['houseId'] ?? '') !== $selectedHouseId) {
+            $selectedStudentId = '';
+        }
+    } elseif ($houseScopeUnavailable) {
+        $selectedStudentId = '';
+    }
 }
 if ($selectedStudentId !== '' && $selectedHouseId === '') {
     $selectedStudent = StudentService::find($selectedStudentId) ?? [];
@@ -51,8 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_student_photo'
     $uploadError = null;
     $mimeType = '';
 
-    if ($role === ROLE_HOUSE_MASTER || $role === ROLE_HOUSE_MISTRESS) {
-        if ($currentHouseId && $houseId !== $currentHouseId) {
+    if ($isHouseScopedRole) {
+        if (!$currentHouseId || $houseId !== $currentHouseId) {
             $uploadError = 'You can only upload photos for your own house.';
         }
     }
@@ -152,75 +169,82 @@ if (is_dir($galleryDir)) {
         $metadataByFile[(string) $meta['file']] = $meta;
     }
 }
-try {
-    foreach ($firebase->getCollection(COL_GALLERY_PHOTOS, [], 500) as $meta) {
-        if (!empty($meta['file'])) {
-            $metadataByFile[(string) $meta['file']] = $meta;
+if (!$houseScopeUnavailable) {
+    try {
+        $galleryFilters = $selectedStudentId !== ''
+            ? [['studentId', '=', $selectedStudentId]]
+            : ($selectedHouseId !== '' ? [['houseId', '=', $selectedHouseId]] : []);
+        foreach ($firebase->getCollection(COL_GALLERY_PHOTOS, $galleryFilters, 500) as $meta) {
+            if (!empty($meta['file'])) {
+                $metadataByFile[(string) $meta['file']] = $meta;
+            }
         }
+    } catch (Throwable $e) {
+        error_log('Gallery metadata read failed: ' . $e->getMessage());
     }
-} catch (Throwable $e) {
-    error_log('Gallery metadata read failed: ' . $e->getMessage());
 }
 
 foreach ($metadataByFile as $meta) {
-        if (!is_array($meta) || empty($meta['file'])) {
+    if ($houseScopeUnavailable) {
+        continue;
+    }
+    if (!is_array($meta) || empty($meta['file'])) {
+        continue;
+    }
+
+    $fileHouseId = (string) ($meta['houseId'] ?? '');
+    $filePath = $galleryDir . '/' . $meta['file'];
+    $storageObject = (string) ($meta['storageObject'] ?? '');
+    if ($storageObject === '' && !file_exists($filePath)) {
+        continue;
+    }
+
+    if ($isHouseScopedRole) {
+        if ($currentHouseId && $fileHouseId !== $currentHouseId) {
             continue;
         }
+    }
 
-        $fileHouseId = (string) ($meta['houseId'] ?? '');
-        $filePath = $galleryDir . '/' . $meta['file'];
-        $storageObject = (string) ($meta['storageObject'] ?? '');
-        if ($storageObject === '' && !file_exists($filePath)) {
-            continue;
-        }
+    if ($selectedHouseId !== '' && $fileHouseId !== $selectedHouseId) {
+        continue;
+    }
 
-        if ($role === ROLE_HOUSE_MASTER || $role === ROLE_HOUSE_MISTRESS) {
-            if ($currentHouseId && $fileHouseId !== $currentHouseId) {
-                continue;
-            }
-        }
+    if ($selectedStudentId !== '' && ($meta['studentId'] ?? '') !== $selectedStudentId) {
+        continue;
+    }
 
-        if ($selectedHouseId !== '' && $fileHouseId !== $selectedHouseId) {
-            continue;
-        }
+    $matchText = strtolower(trim((($meta['studentName'] ?? '') . ' ' . ($meta['studentId'] ?? '') . ' ' . ($meta['admissionNo'] ?? '') . ' ' . ($meta['originalName'] ?? ''))));
+    if ($searchTermNormalized !== '' && stripos($matchText, $searchTermNormalized) === false) {
+        continue;
+    }
 
-        if ($selectedStudentId !== '' && ($meta['studentId'] ?? '') !== $selectedStudentId) {
-            continue;
-        }
-
-        $matchText = strtolower(trim((($meta['studentName'] ?? '') . ' ' . ($meta['studentId'] ?? '') . ' ' . ($meta['admissionNo'] ?? '') . ' ' . ($meta['originalName'] ?? ''))));
-        if ($searchTermNormalized !== '' && stripos($matchText, $searchTermNormalized) === false) {
-            continue;
-        }
-
-        $imageUrl = $storageObject !== '' ? $firebase->storageUrl($storageObject) : url('uploads/student-gallery/' . $meta['file']);
-        $gallery[] = [
-            'id' => $meta['id'] ?? $meta['studentId'] ?? uniqid('gallery_', true),
-            'studentId' => $meta['studentId'] ?? '',
-            'studentName' => $meta['studentName'] ?? 'Student',
-            'houseId' => $fileHouseId,
-            'houseName' => $meta['houseName'] ?? ($houses[$fileHouseId] ?? 'House'),
-            'file' => $imageUrl,
-            'fileName' => $meta['file'],
-            'storageObject' => $storageObject,
-            'originalName' => $meta['originalName'] ?? $meta['file'],
-            'uploadedAt' => $meta['uploadedAt'] ?? '',
-        ];
+    $imageUrl = $storageObject !== '' ? $firebase->storageUrl($storageObject) : url('uploads/student-gallery/' . $meta['file']);
+    $gallery[] = [
+        'id' => $meta['id'] ?? $meta['studentId'] ?? uniqid('gallery_', true),
+        'studentId' => $meta['studentId'] ?? '',
+        'studentName' => $meta['studentName'] ?? 'Student',
+        'houseId' => $fileHouseId,
+        'houseName' => $meta['houseName'] ?? ($houses[$fileHouseId] ?? 'House'),
+        'file' => $imageUrl,
+        'fileName' => $meta['file'],
+        'storageObject' => $storageObject,
+        'originalName' => $meta['originalName'] ?? $meta['file'],
+        'uploadedAt' => $meta['uploadedAt'] ?? '',
+    ];
 }
 
 usort($gallery, static function ($a, $b) {
     return strcmp(($b['uploadedAt'] ?? ''), ($a['uploadedAt'] ?? ''));
 });
 
-$studentOptions = [];
-if ($selectedHouseId !== '') {
-    $studentOptions = StudentService::all($selectedHouseId);
+$studentOptionsUrl = url('views/gallery/student-options.php?houseId=' . urlencode($selectedHouseId));
+$galleryStudentOptionsEndpoint = url('views/gallery/student-options.php');
+if ($role === ROLE_ADMIN) {
+    $pageScripts[] = 'admin.js';
 } elseif ($role === ROLE_HOUSE_MASTER || $role === ROLE_HOUSE_MISTRESS) {
-    $studentOptions = StudentService::all($currentHouseId);
+    $pageScripts[] = 'house-master.js';
 } elseif ($role === ROLE_SENIOR_HOUSEPARENT) {
-    $studentOptions = StudentService::all($currentHouseId ?: null);
-} else {
-    $studentOptions = StudentService::all();
+    $pageScripts[] = 'senior-houseparent.js';
 }
 
 $pageTitle = 'Gallery';
@@ -255,13 +279,18 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Student</label>
-                            <select name="studentId" class="form-select">
+                            <select name="studentId" class="form-select"
+                                <?php if ($role === ROLE_ADMIN): ?>
+                                    data-admin-student-options="<?= e($studentOptionsUrl) ?>"
+                                <?php else: ?>
+                                    data-house-student-options="<?= e($studentOptionsUrl) ?>"
+                                <?php endif; ?>
+                                data-selected-id="<?= e($selectedStudentId) ?>"
+                                data-placeholder="All students">
                                 <option value="">All students</option>
-                                <?php foreach ($studentOptions as $student): ?>
-                                    <?php $studentHouseId = (string) ($student['houseId'] ?? ''); ?>
-                                    <?php if ($selectedHouseId !== '' && $studentHouseId !== $selectedHouseId) continue; ?>
-                                    <option value="<?= e($student['id'] ?? '') ?>" <?= ($selectedStudentId === (string) ($student['id'] ?? '')) ? 'selected' : '' ?>><?= e(trim((($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')))) ?> (<?= e($student['admissionNo'] ?? '') ?>)</option>
-                                <?php endforeach; ?>
+                                <?php if ($selectedStudentId !== ''): ?>
+                                    <option value="<?= e($selectedStudentId) ?>" selected>Selected student</option>
+                                <?php endif; ?>
                             </select>
                         </div>
                         <div class="col-md-3">
@@ -269,7 +298,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <select name="houseId" class="form-select">
                                 <option value="">All houses</option>
                                 <?php foreach ($houses as $houseId => $houseName): ?>
-                                    <?php if ($role === ROLE_HOUSE_MASTER || $role === ROLE_HOUSE_MISTRESS) {
+                                    <?php if ($isHouseScopedRole) {
                                         if ($currentHouseId && $houseId !== $currentHouseId) continue;
                                     } ?>
                                     <option value="<?= e($houseId) ?>" <?= ($selectedHouseId === $houseId) ? 'selected' : '' ?>><?= e($houseName) ?></option>
@@ -308,13 +337,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Student</label>
-                                <select name="studentId" class="form-select" required>
-                                    <option value="">Select student</option>
-                                    <?php foreach ($studentOptions as $student): ?>
-                                        <?php $studentHouseId = (string) ($student['houseId'] ?? ''); ?>
-                                        <?php if ($selectedHouseId !== '' && $studentHouseId !== $selectedHouseId) continue; ?>
-                                        <option value="<?= e($student['id'] ?? '') ?>"><?= e(trim((($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')))) ?> (<?= e($student['admissionNo'] ?? '') ?>)</option>
-                                    <?php endforeach; ?>
+                                <select name="studentId" class="form-select" required
+                                    data-gallery-student-options="<?= e($galleryStudentOptionsEndpoint) ?>"
+                                    data-placeholder="Select student">
+                                    <option value="">Select house first</option>
                                 </select>
                             </div>
                             <div class="col-md-4">
@@ -434,13 +460,12 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                                                 <?php endforeach; ?>
                                                             </select>
                                                             <label for="gallery-student-<?= e($modalId) ?>" class="form-label fw-semibold">Student</label>
-                                                            <select id="gallery-student-<?= e($modalId) ?>" name="studentId" class="form-select" required>
-                                                                <?php foreach ($studentOptions as $student): ?>
-                                                                    <?php $optionStudentId = (string) ($student['id'] ?? ''); $optionStudentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')); ?>
-                                                                    <?php $optionHouseId = (string) ($student['houseId'] ?? ''); ?>
-                                                                    <?php if ($item['houseId'] !== '' && $optionHouseId !== '' && $optionHouseId !== $item['houseId'] && $optionStudentId !== $item['studentId']) continue; ?>
-                                                                    <option value="<?= e($optionStudentId) ?>" <?= $item['studentId'] === $optionStudentId ? 'selected' : '' ?>><?= e($optionStudentName ?: $optionStudentId) ?><?= !empty($student['admissionNo']) ? ' (' . e($student['admissionNo']) . ')' : '' ?></option>
-                                                                <?php endforeach; ?>
+                                                            <select id="gallery-student-<?= e($modalId) ?>" name="studentId" class="form-select" required
+                                                                data-gallery-student-options="<?= e($galleryStudentOptionsEndpoint) ?>"
+                                                                data-selected-id="<?= e($item['studentId']) ?>"
+                                                                data-selected-label="<?= e($item['studentName']) ?>"
+                                                                data-placeholder="Select student">
+                                                                <option value="<?= e($item['studentId']) ?>" selected><?= e($item['studentName']) ?></option>
                                                             </select>
                                                             <div class="form-text">The current student remains available even if their house assignment differs.</div>
                                                             <label for="gallery-photo-<?= e($modalId) ?>" class="form-label fw-semibold mt-3">Replace Image <span class="text-muted fw-normal">(optional)</span></label>
@@ -486,5 +511,106 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    const selects = Array.from(document.querySelectorAll('select[data-gallery-student-options]'));
+    const requests = new Map();
+
+    function loadOptions(select) {
+        if (select.dataset.sdsStudentsLoaded === 'true' || select.dataset.sdsStudentsLoading === 'true') {
+            return;
+        }
+
+        const form = select.form;
+        const houseSelect = form ? form.querySelector('select[name="houseId"]') : null;
+        const endpoint = new URL(select.dataset.galleryStudentOptions, window.location.href);
+        if (houseSelect && houseSelect.value) {
+            endpoint.searchParams.set('houseId', houseSelect.value);
+        } else {
+            endpoint.searchParams.delete('houseId');
+        }
+
+        const selectedId = select.dataset.selectedId || select.value;
+        const selectedLabel = select.dataset.selectedLabel || select.selectedOptions[0]?.textContent || '';
+        const requestVersion = String(Number(select.dataset.sdsStudentRequestVersion || 0) + 1);
+        select.dataset.sdsStudentRequestVersion = requestVersion;
+        select.dataset.sdsStudentsLoading = 'true';
+        select.disabled = true;
+
+        let request = requests.get(endpoint.href);
+        if (!request) {
+            request = fetch(endpoint.href, {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Student options request failed (HTTP ' + response.status + ').');
+                    return response.json();
+                })
+                .then(function (response) {
+                    if (!response.success || !Array.isArray(response.students)) {
+                        throw new Error(response.message || 'Student options response was invalid.');
+                    }
+                    return response.students;
+                });
+            requests.set(endpoint.href, request);
+            request.catch(function () { requests.delete(endpoint.href); });
+        }
+
+        request
+            .then(function (students) {
+                if (select.dataset.sdsStudentRequestVersion !== requestVersion) return;
+
+                select.replaceChildren(new Option(select.dataset.placeholder || 'Select student', ''));
+                if (selectedId && !students.some(function (student) { return String(student.id) === selectedId; })) {
+                    select.add(new Option(selectedLabel || selectedId, selectedId));
+                }
+                students.forEach(function (student) {
+                    select.add(new Option(student.label, student.id));
+                });
+                if (!students.length && !selectedId) {
+                    select.add(new Option('No students available', '', true, true));
+                }
+                select.value = selectedId;
+                select.dataset.sdsStudentsLoaded = 'true';
+            })
+            .catch(function (error) {
+                if (select.dataset.sdsStudentRequestVersion !== requestVersion) return;
+                console.error('Unable to load gallery student options:', error);
+                if (window.SDS && typeof window.SDS.toast === 'function') {
+                    window.SDS.toast('error', 'Student options could not be loaded. Please try again.');
+                }
+            })
+            .finally(function () {
+                if (select.dataset.sdsStudentRequestVersion !== requestVersion) return;
+                select.dataset.sdsStudentsLoading = 'false';
+                select.disabled = false;
+            });
+    }
+
+    selects.forEach(function (select) {
+        const form = select.form;
+        const houseSelect = form ? form.querySelector('select[name="houseId"]') : null;
+        if (houseSelect) {
+            houseSelect.addEventListener('change', function () {
+                select.dataset.sdsStudentRequestVersion = String(Number(select.dataset.sdsStudentRequestVersion || 0) + 1);
+                select.dataset.sdsStudentsLoaded = 'false';
+                select.dataset.sdsStudentsLoading = 'false';
+                select.dataset.selectedId = '';
+                select.dataset.selectedLabel = '';
+                select.replaceChildren(new Option(select.dataset.placeholder || 'Select student', ''));
+                select.disabled = false;
+            });
+        }
+
+        select.addEventListener('focus', function () { loadOptions(select); });
+        const modal = select.closest('.modal');
+        if (modal) {
+            modal.addEventListener('show.bs.modal', function () { loadOptions(select); });
+        }
+    });
+})();
+</script>
 
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

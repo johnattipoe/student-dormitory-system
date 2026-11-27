@@ -67,12 +67,101 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
     redirect(url('views/admin/students/index/index.php?openAddStudent=1'));
 }
 
-$allStudents = StudentService::allRecords($houseId);
 $showGraduated = sanitize($_GET['show'] ?? '') === 'graduated';
+$search = strtolower(sanitize($_GET['search'] ?? ''));
+$firebase = FirebaseService::getInstance();
+$houseWheres = $houseId !== null && $houseId !== ''
+    ? [['houseId', '=', $houseId]]
+    : [];
+$allStudentCount = $firebase->count(COL_STUDENTS, $houseWheres);
+$graduatedWheres = array_merge($houseWheres, [['status', '=', 'graduated']]);
+$graduatedCount = $firebase->count(COL_STUDENTS, $graduatedWheres);
+$currentStudentCount = max(0, $allStudentCount - $graduatedCount);
+$assignedStudentCount = $houseId !== null && $houseId !== ''
+    ? $currentStudentCount
+    : max(
+        0,
+        $firebase->count(COL_STUDENTS, [['houseId', '!=', '']])
+            - $firebase->count(COL_STUDENTS, [['status', '=', 'graduated'], ['houseId', '!=', '']])
+    );
+$studentSummary = [
+    'total' => $currentStudentCount,
+    'active' => $firebase->count(COL_STUDENTS, array_merge($houseWheres, [['status', '=', 'active']])),
+    'inactive' => $firebase->count(COL_STUDENTS, array_merge($houseWheres, [['status', '=', 'inactive']])),
+    'suspended' => $firebase->count(COL_STUDENTS, array_merge($houseWheres, [['status', '=', 'suspended']])),
+    'assigned' => $assignedStudentCount,
+    'graduated' => $graduatedCount,
+];
+$pageSize = 50;
+$pageNumber = max(1, (int) ($_GET['page'] ?? 1));
+if ($search !== '') {
+    $allStudents = StudentService::allRecords($houseId);
+    $students = array_values(array_filter($allStudents, static function (array $student) use ($showGraduated, $search): bool {
+        if ((strtolower((string) ($student['status'] ?? 'active')) === 'graduated') !== $showGraduated) {
+            return false;
+        }
+
+        $haystack = strtolower(trim(
+            ($student['firstName'] ?? '') . ' ' .
+            ($student['lastName'] ?? '') . ' ' .
+            ($student['admissionNo'] ?? '') . ' ' .
+            ($student['class'] ?? '') . ' ' .
+            ($student['course'] ?? '')
+        ));
+
+        return str_contains($haystack, $search);
+    }));
+    $pageCount = max(1, (int) ceil(count($students) / $pageSize));
+    $pageNumber = min($pageNumber, $pageCount);
+    $students = array_slice($students, ($pageNumber - 1) * $pageSize, $pageSize);
+} else {
+    $pageRecordCount = $showGraduated ? $graduatedCount : $currentStudentCount;
+    $pageCount = max(1, (int) ceil($pageRecordCount / $pageSize));
+    $pageNumber = min($pageNumber, $pageCount);
+    $cursorSessionKey = '_student_list_cursors_' . hash('sha256', serialize([
+        $houseId,
+        $showGraduated,
+        current_role(),
+    ]));
+    $pageCursors = $_SESSION[$cursorSessionKey] ?? [1 => []];
+    if (!is_array($pageCursors) || ($pageNumber > 1 && !isset($pageCursors[$pageNumber]))) {
+        $pageNumber = 1;
+        $pageCursors = [1 => []];
+    }
+
+    $studentFilters = array_merge(
+        $houseWheres,
+        [$showGraduated ? ['status', '=', 'graduated'] : ['status', '!=', 'graduated']]
+    );
+    $studentOrder = $showGraduated
+        ? [['__name__', 'ASC']]
+        : [['status', 'ASC'], ['__name__', 'ASC']];
+    $pageResult = $firebase->getCollectionPage(
+        COL_STUDENTS,
+        $studentFilters,
+        $pageSize,
+        $studentOrder,
+        $pageCursors[$pageNumber] ?? []
+    );
+    $students = $pageResult['items'];
+    if ($pageResult['nextCursor'] !== null && $pageNumber < $pageCount) {
+        $pageCursors[$pageNumber + 1] = $pageResult['nextCursor'];
+    }
+    $_SESSION[$cursorSessionKey] = $pageCursors;
+}
+
 $studentListUrl = base_url(
     'index.php?route=' . urlencode('/views/admin/students/index/index.php')
     . ($showGraduated ? '' : '&show=graduated')
 );
+$studentPageUrl = static function (int $page) use ($showGraduated, $search): string {
+    $query = 'index.php?route=' . urlencode('/views/admin/students/index/index.php')
+        . ($showGraduated ? '&show=graduated' : '')
+        . ($search !== '' ? '&search=' . urlencode($search) : '')
+        . '&page=' . $page;
+
+    return base_url($query);
+};
 $roomNumbers = [];
 foreach (RoomService::all($houseId, 150) as $room) {
     $roomId = trim((string) ($room['id'] ?? ''));
@@ -80,33 +169,6 @@ foreach (RoomService::all($houseId, 150) as $room) {
         $roomNumbers[$roomId] = (string) ($room['roomNumber'] ?? '');
     }
 }
-$studentSummary = [
-    'total' => 0,
-    'active' => 0,
-    'inactive' => 0,
-    'suspended' => 0,
-    'assigned' => 0,
-    'graduated' => 0,
-];
-foreach ($allStudents as $student) {
-    $status = strtolower((string) ($student['status'] ?? 'active'));
-    if ($status === 'graduated') {
-        $studentSummary['graduated']++;
-        continue;
-    }
-
-    $studentSummary['total']++;
-    if (isset($studentSummary[$status])) {
-        $studentSummary[$status]++;
-    }
-    if (!empty($student['houseId'])) {
-        $studentSummary['assigned']++;
-    }
-}
-$students = array_values(array_filter(
-    $allStudents,
-    static fn(array $student): bool => (strtolower((string) ($student['status'] ?? 'active')) === 'graduated') === $showGraduated
-));
 $houses = [];
 foreach (HouseService::all() as $house) {
     if (!empty($house['id'])) {
@@ -140,14 +202,6 @@ $resolveHouseName = static function ($houseId) use (&$houses): string {
     }
     return $normalizedId;
 };
-$search = strtolower(sanitize($_GET['search'] ?? ''));
-if ($search !== '') {
-    $students = array_values(array_filter($students, function ($student) use ($search) {
-        $haystack = strtolower(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' ' . ($student['admissionNo'] ?? '') . ' ' . ($student['class'] ?? '') . ' ' . ($student['course'] ?? '')));
-        return str_contains($haystack, $search);
-    }));
-}
-
 if (isset($_GET['created'])) $_SESSION['_flash'] = ['type' => 'success', 'message' => 'Student created.'];
 if (isset($_GET['updated'])) $_SESSION['_flash'] = ['type' => 'success', 'message' => 'Student updated.'];
 if (isset($_GET['deleted'])) $_SESSION['_flash'] = ['type' => 'success', 'message' => 'Student deleted.'];
@@ -280,6 +334,29 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </tbody>
             </table>
         </div>
+        <?php if ($pageCount > 1): ?>
+            <div class="d-flex justify-content-between align-items-center gap-3 mt-3">
+                <small class="text-muted">Page <?= $pageNumber ?> of <?= $pageCount ?></small>
+                <nav aria-label="Student list pages">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item <?= $pageNumber <= 1 ? 'disabled' : '' ?>">
+                            <?php if ($pageNumber > 1): ?>
+                                <a class="page-link" href="<?= e($studentPageUrl($pageNumber - 1)) ?>">Previous</a>
+                            <?php else: ?>
+                                <span class="page-link">Previous</span>
+                            <?php endif; ?>
+                        </li>
+                        <li class="page-item <?= $pageNumber >= $pageCount ? 'disabled' : '' ?>">
+                            <?php if ($pageNumber < $pageCount): ?>
+                                <a class="page-link" href="<?= e($studentPageUrl($pageNumber + 1)) ?>">Next</a>
+                            <?php else: ?>
+                                <span class="page-link">Next</span>
+                            <?php endif; ?>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 

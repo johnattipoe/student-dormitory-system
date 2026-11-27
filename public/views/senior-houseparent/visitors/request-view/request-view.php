@@ -20,16 +20,13 @@ use App\Services\StudentService;
 
 $id = sanitize($_GET['id'] ?? '');
 $houseId = current_user()['houseId'] ?? null;
-$students = StudentService::all($houseId);
-$studentMap = [];
-foreach ($students as $student) {
-    $studentMap[(string) ($student['id'] ?? '')] = $student;
-}
-
 $request = FirebaseService::getInstance()->getDocument(COL_VISITOR_REQUESTS, $id);
-$student = $request ? ($studentMap[(string) ($request['studentId'] ?? '')] ?? null) : null;
+$studentId = trim((string) ($request['studentId'] ?? ''));
+$student = $studentId !== '' ? StudentService::find($studentId) : null;
 
-if (!$request || (!$student && ($request['houseId'] ?? null) !== $houseId)) {
+$studentBelongsToHouse = $student && (string) ($student['houseId'] ?? '') === (string) $houseId;
+$requestBelongsToHouse = (string) ($request['houseId'] ?? '') === (string) $houseId;
+if (!$request || (!$studentBelongsToHouse && !$requestBelongsToHouse)) {
     flash('error', 'Visitor request not found for your house.');
     redirect(url('views/senior-houseparent/visitors/requests/requests.php'));
 }

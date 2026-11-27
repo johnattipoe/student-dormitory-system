@@ -1,5 +1,51 @@
 // rooms.js — room create/edit validation and allocation-screen helpers.
-document.addEventListener('DOMContentLoaded', function () {
+function initializeRoomAllocationStudentOptions() {
+  const studentSelect = document.querySelector('select[data-room-allocation-student-options]');
+  if (!studentSelect) return;
+
+  let optionsLoaded = false;
+  let loading = false;
+  studentSelect.addEventListener('focus', function () {
+    if (optionsLoaded || loading) return;
+    loading = true;
+    studentSelect.disabled = true;
+    studentSelect.replaceChildren(new Option('Loading students...', ''));
+
+    fetch(studentSelect.dataset.roomAllocationStudentOptions, {
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function (response) {
+        if (!response.ok) throw new Error('Student options request failed (HTTP ' + response.status + ').');
+        return response.json();
+      })
+      .then(function (response) {
+        if (!response.success || !Array.isArray(response.students)) {
+          throw new Error(response.message || 'Student options response was invalid.');
+        }
+        studentSelect.replaceChildren(new Option('Select student', ''));
+        response.students.forEach(function (student) {
+          studentSelect.add(new Option(student.label, student.id));
+        });
+        studentSelect.value = '';
+        optionsLoaded = true;
+        loading = false;
+        studentSelect.disabled = false;
+        studentSelect.focus();
+      })
+      .catch(function (error) {
+        loading = false;
+        studentSelect.disabled = false;
+        studentSelect.replaceChildren(new Option('Select student', ''));
+        console.error('Unable to load room allocation student options:', error);
+        SDS.toast('error', 'Student options could not be loaded. Please try again.');
+      });
+  });
+}
+
+SDS.onPageLoad(function () {
+  initializeRoomAllocationStudentOptions();
+
   // On the edit-room form, don't let capacity drop below the current occupancy.
   const capacityInput = document.querySelector('input[name="capacity"]');
   if (capacityInput && capacityInput.min) {

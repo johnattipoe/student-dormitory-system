@@ -18,39 +18,44 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\MedicalService;
 use App\Services\StudentService;
 
-$records = (new MedicalService())->all();
-$nurseMedicalStudents = StudentService::all();
+$medicalService = new MedicalService();
+$nurseMedicalStudents = [];
+$nurseMedicalLazyStudentOptions = true;
 $nurseMedicalModalId = 'nurseMedicalRecordCreate';
 $nurseMedicalReturnTo = 'records';
 $nurseMedicalSelectedStudentId = '';
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
-$students = [];
-foreach ($nurseMedicalStudents as $student) {
-    $studentId = (string) ($student['id'] ?? '');
-    if ($studentId !== '') {
-        $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
-        $students[$studentId] = [
-            'name' => $studentName !== '' ? $studentName : 'Unnamed student',
-            'admissionNo' => $student['admissionNo'] ?? $student['studentId'] ?? $studentId,
-        ];
-    }
-}
-$studentLabel = static function (array $record) use ($students): string {
+$studentMap = [];
+$studentLabel = static function (array $record) use (&$studentMap): string {
     $studentId = (string) ($record['studentId'] ?? '');
-    if ($studentId !== '' && isset($students[$studentId])) {
-        return $students[$studentId]['name'] . ' (' . $students[$studentId]['admissionNo'] . ')';
+    if ($studentId !== '' && !array_key_exists($studentId, $studentMap)) {
+        $student = StudentService::find($studentId);
+        if ($student) {
+            $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
+            $studentMap[$studentId] = [
+                'name' => $studentName !== '' ? $studentName : 'Unnamed student',
+                'admissionNo' => $student['admissionNo'] ?? $student['studentId'] ?? $studentId,
+            ];
+        }
     }
 
-    return $studentId !== '' ? $studentId : 'Not linked';
+    return $studentId !== '' && isset($studentMap[$studentId])
+        ? $studentMap[$studentId]['name'] . ' (' . $studentMap[$studentId]['admissionNo'] . ')'
+        : ($studentId !== '' ? $studentId : 'Not linked');
 };
-$totalRecords = count($records);
-$criticalRecords = count(array_filter($records, fn($record) => in_array(strtolower((string) ($record['severity'] ?? '')), ['severe', 'critical', 'emergency'], true)));
-$moderateRecords = count(array_filter($records, fn($record) => strtolower((string) ($record['severity'] ?? '')) === 'moderate'));
-$routineRecords = count(array_filter($records, fn($record) => in_array(strtolower((string) ($record['severity'] ?? 'normal')), ['normal', 'minor', 'routine', 'mild'], true)));
+$totalRecords = $medicalService->count();
+$criticalRecords = $medicalService->countBySeverity('severe')
+    + $medicalService->countBySeverity('critical')
+    + $medicalService->countBySeverity('emergency');
+$moderateRecords = $medicalService->countBySeverity('moderate');
+$routineRecords = $medicalService->countBySeverity('normal')
+    + $medicalService->countBySeverity('minor')
+    + $medicalService->countBySeverity('routine')
+    + $medicalService->countBySeverity('mild');
 $totalPages = max(1, (int) ceil($totalRecords / $limit));
 $page = min($page, $totalPages);
-$records = array_slice($records, ($page - 1) * $limit, $limit);
+$records = $medicalService->page($limit, ($page - 1) * $limit);
 
 $pageTitle = 'Medical Records';
 $navItems = [

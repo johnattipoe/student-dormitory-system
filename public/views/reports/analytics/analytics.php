@@ -19,12 +19,8 @@ $fastApiBaseUrl = rtrim(getenv('FASTAPI_BASE_URL') ?: 'https://student-dormitory
 $allowedRoles = [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_SENIOR_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
-use App\Services\StudentService;
-use App\Services\AttendanceService;
-use App\Services\IncidentService;
-use App\Services\VisitorService;
-use App\Services\MedicalService;
 use App\Services\FirebaseService;
+use App\Services\StudentService;
 
 // Get filter parameters
 $dateFrom = sanitize($_GET['dateFrom'] ?? date('Y-m-d', strtotime('-30 days')));
@@ -41,38 +37,31 @@ $roleMetricOrder = [
 ];
 $visibleMetrics = $roleMetricOrder[$role] ?? $roleMetricOrder[ROLE_ADMIN];
 
-// Prepare date range for filtering
+// Prepare date range for server-side filtering
 $dateStart = strtotime($dateFrom);
 $dateEnd = strtotime($dateTo) + 86400;
+$dateEndExclusive = date('Y-m-d', $dateEnd);
+$dateStartAt = date('Y-m-d 00:00:00', $dateStart);
+$dateEndAt = date('Y-m-d 00:00:00', $dateEnd);
 
-// Fetch all data
+// Fetch only records in the selected date range
 $firebaseService = FirebaseService::getInstance();
-$students = ($role === ROLE_ADMIN) ? StudentService::all() : StudentService::all($houseId);
-$attendance = $firebaseService->getCollection(COL_ATTENDANCE, [], 1000);
-$incidents = (new IncidentService())->all();
-$visitors = (new VisitorService())->all();
-$medical = (new MedicalService())->all();
-
-// Filter by date range
-$attendanceFiltered = array_filter($attendance, function($a) use ($dateStart, $dateEnd) {
-    $t = strtotime($a['date'] ?? '');
-    return $t >= $dateStart && $t <= $dateEnd;
-});
-
-$incidentsFiltered = array_filter($incidents, function($i) use ($dateStart, $dateEnd) {
-    $t = strtotime($i['createdAt'] ?? '');
-    return $t >= $dateStart && $t <= $dateEnd;
-});
-
-$visitorsFiltered = array_filter($visitors, function($v) use ($dateStart, $dateEnd) {
-    $t = strtotime($v['visitDate'] ?? '');
-    return $t >= $dateStart && $t <= $dateEnd;
-});
-
-$medicalFiltered = array_filter($medical, function($m) use ($dateStart, $dateEnd) {
-    $t = strtotime($m['createdAt'] ?? '');
-    return $t >= $dateStart && $t <= $dateEnd;
-});
+$attendanceFiltered = $firebaseService->getCollection(COL_ATTENDANCE, [
+    ['date', '>=', $dateFrom],
+    ['date', '<', $dateEndExclusive],
+], 150);
+$incidentsFiltered = $firebaseService->getCollection(COL_INCIDENTS, [
+    ['createdAt', '>=', $dateStartAt],
+    ['createdAt', '<', $dateEndAt],
+], 150);
+$visitorsFiltered = $firebaseService->getCollection(COL_VISITORS, [
+    ['visitDate', '>=', $dateFrom],
+    ['visitDate', '<', $dateEndExclusive],
+], 150);
+$medicalFiltered = $firebaseService->getCollection(COL_MEDICAL_RECORDS, [
+    ['createdAt', '>=', $dateStartAt],
+    ['createdAt', '<', $dateEndAt],
+], 150);
 
 // Calculate key metrics
 $totalAttendance = count($attendanceFiltered);
@@ -439,6 +428,71 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             }).join('');
         }
 
+        function renderRoomOccupancy(data) {
+            const summary = document.getElementById('room-occupancy-summary');
+            const chart = document.getElementById('room-occupancy-chart');
+            const rooms = Array.isArray(data.rooms) ? data.rooms.slice(0, 5) : [];
+
+            if (summary) {
+                summary.textContent = `${Number(data.occupiedBeds ?? 0)} occupied / ${Number(data.totalCapacity ?? 0)} capacity (${Number(data.utilizationRate ?? 0)}% utilized)`;
+            }
+
+            const roomSummaryValue = document.getElementById('rooms-summary-value');
+            const roomSummaryMeta = document.getElementById('rooms-summary-meta');
+            if (roomSummaryValue) roomSummaryValue.textContent = String(Number(data.totalCapacity ?? 0));
+            if (roomSummaryMeta) roomSummaryMeta.textContent = `${Number(data.occupiedBeds ?? 0)} occupied`;
+
+            if (chart) {
+                chart.innerHTML = rooms.map(function (room) {
+                    const pct = room.capacity ? Math.min((Number(room.occupied || 0) / Number(room.capacity)) * 100, 100) : 0;
+                    return '<div class="mb-2"><div class="d-flex justify-content-between small mb-1"><span>' + (room.id || 'Room') + '</span><span>' + Number(room.occupied || 0) + '/' + Number(room.capacity || 0) + '</span></div><div class="progress" style="height: 10px;"><div class="progress-bar bg-success" role="progressbar" style="width: ' + pct + '%"></div></div></div>';
+                }).join('') || '<div class="text-muted small">No room data available.</div>';
+            }
+        }
+
+        function loadRoomOccupancy() {
+            fetch(roomsUrl, { headers: buildHeaders() })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Room occupancy request failed');
+                    return response.json();
+                })
+                .then(renderRoomOccupancy)
+                .catch(function () {
+                    const summary = document.getElementById('room-occupancy-summary');
+                    if (summary) summary.textContent = 'Room usage data unavailable.';
+                });
+        }
+
+        function renderIncidentBreakdown(data) {
+            const container = document.getElementById('incident-breakdown-chart');
+            if (!container) return;
+
+            const breakdown = Object.entries(data.byType || {}).slice(0, 5);
+            if (!breakdown.length) {
+                container.innerHTML = '<div class="text-muted small">No incident data.</div>';
+                return;
+            }
+
+            const maxCount = Math.max(...breakdown.map(function (entry) { return Number(entry[1] || 0); }), 1);
+            container.innerHTML = breakdown.map(function ([type, count]) {
+                const width = (Number(count || 0) / maxCount) * 100;
+                return '<div><div class="d-flex justify-content-between small text-capitalize mb-1"><span>' + type + '</span><span>' + count + '</span></div><div class="progress" style="height: 10px;"><div class="progress-bar bg-warning" role="progressbar" style="width: ' + width + '%"></div></div></div>';
+            }).join('');
+        }
+
+        function loadIncidentBreakdown() {
+            fetch(incidentsUrl, { headers: buildHeaders() })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Incident breakdown request failed');
+                    return response.json();
+                })
+                .then(renderIncidentBreakdown)
+                .catch(function () {
+                    const container = document.getElementById('incident-breakdown-chart');
+                    if (container) container.innerHTML = '<div class="text-muted small">Incident data unavailable.</div>';
+                });
+        }
+
         fetch(summaryUrl, { headers: buildHeaders() })
             .then(function (response) {
                 if (!response.ok) throw new Error('Live summary request failed');
@@ -481,66 +535,19 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     return { label: String(label), value: Number(value || 0) };
                 }).slice(0, 5);
                 renderBarChart('incident-type-chart', incidentTypeBreakdown.length ? incidentTypeBreakdown : [{ label: 'No data', value: 0 }], 'bg-warning');
+
+                if (data.status === 'live') {
+                    renderRoomOccupancy(data.roomOccupancy || {});
+                    renderIncidentBreakdown(data.incidentBreakdown || {});
+                } else {
+                    loadRoomOccupancy();
+                    loadIncidentBreakdown();
+                }
             })
             .catch(function () {
                 // Keep PHP-rendered values as the fallback when the FastAPI service is offline.
-            });
-
-        fetch(roomsUrl, { headers: buildHeaders() })
-            .then(function (response) {
-                if (!response.ok) throw new Error('Room occupancy request failed');
-                return response.json();
-            })
-            .then(function (data) {
-                const summary = document.getElementById('room-occupancy-summary');
-                const chart = document.getElementById('room-occupancy-chart');
-                const rooms = Array.isArray(data.rooms) ? data.rooms.slice(0, 5) : [];
-
-                if (summary) {
-                    summary.textContent = `${Number(data.occupiedBeds ?? 0)} occupied / ${Number(data.totalCapacity ?? 0)} capacity (${Number(data.utilizationRate ?? 0)}% utilized)`;
-                }
-
-                const roomSummaryValue = document.getElementById('rooms-summary-value');
-                const roomSummaryMeta = document.getElementById('rooms-summary-meta');
-                if (roomSummaryValue) roomSummaryValue.textContent = String(Number(data.totalCapacity ?? 0));
-                if (roomSummaryMeta) roomSummaryMeta.textContent = `${Number(data.occupiedBeds ?? 0)} occupied`;
-
-                if (chart) {
-                    chart.innerHTML = rooms.map(function (room) {
-                        const pct = room.capacity ? Math.min((Number(room.occupied || 0) / Number(room.capacity)) * 100, 100) : 0;
-                        return '<div class="mb-2"><div class="d-flex justify-content-between small mb-1"><span>' + (room.id || 'Room') + '</span><span>' + Number(room.occupied || 0) + '/' + Number(room.capacity || 0) + '</span></div><div class="progress" style="height: 10px;"><div class="progress-bar bg-success" role="progressbar" style="width: ' + pct + '%"></div></div></div>';
-                    }).join('') || '<div class="text-muted small">No room data available.</div>';
-                }
-            })
-            .catch(function () {
-                const summary = document.getElementById('room-occupancy-summary');
-                if (summary) summary.textContent = 'Room usage data unavailable.';
-            });
-
-        fetch(incidentsUrl, { headers: buildHeaders() })
-            .then(function (response) {
-                if (!response.ok) throw new Error('Incident breakdown request failed');
-                return response.json();
-            })
-            .then(function (data) {
-                const container = document.getElementById('incident-breakdown-chart');
-                if (!container) return;
-
-                const breakdown = Object.entries(data.byType || {}).slice(0, 5);
-                if (!breakdown.length) {
-                    container.innerHTML = '<div class="text-muted small">No incident data.</div>';
-                    return;
-                }
-
-                const maxCount = Math.max(...breakdown.map(function (entry) { return Number(entry[1] || 0); }), 1);
-                container.innerHTML = breakdown.map(function ([type, count]) {
-                    const width = (Number(count || 0) / maxCount) * 100;
-                    return '<div><div class="d-flex justify-content-between small text-capitalize mb-1"><span>' + type + '</span><span>' + count + '</span></div><div class="progress" style="height: 10px;"><div class="progress-bar bg-warning" role="progressbar" style="width: ' + width + '%"></div></div></div>';
-                }).join('');
-            })
-            .catch(function () {
-                const container = document.getElementById('incident-breakdown-chart');
-                if (container) container.innerHTML = '<div class="text-muted small">Incident data unavailable.</div>';
+                loadRoomOccupancy();
+                loadIncidentBreakdown();
             });
     });
 </script>

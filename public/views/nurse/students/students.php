@@ -17,9 +17,62 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\MedicalService;
 use App\Services\StudentService;
+use App\Services\FirebaseService;
 
-$students = StudentService::all();
-$medicalRecords = (new MedicalService())->all();
+$search = strtolower(trim(sanitize($_GET['search'] ?? '')));
+$statusFilter = strtolower(trim(sanitize($_GET['status'] ?? 'all')));
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$firebase = FirebaseService::getInstance();
+$allStudents = $search !== '' ? StudentService::all() : [];
+$studentFilters = $statusFilter !== 'all' ? [['status', '=', $statusFilter]] : [];
+if ($search !== '') {
+    $filteredStudents = array_values(array_filter($allStudents, static function (array $student) use ($search, $statusFilter): bool {
+        $status = strtolower((string) ($student['status'] ?? 'active'));
+        $haystack = strtolower(implode(' ', [
+            (string) ($student['firstName'] ?? ''),
+            (string) ($student['lastName'] ?? ''),
+            (string) ($student['studentId'] ?? $student['id'] ?? ''),
+            (string) ($student['admissionNo'] ?? ''),
+            (string) ($student['course'] ?? ''),
+            (string) ($student['guardianName'] ?? $student['parentName'] ?? ''),
+            (string) ($student['guardianPhone'] ?? $student['parentPhone'] ?? ''),
+        ]));
+        return ($statusFilter === 'all' || $status === $statusFilter)
+            && str_contains($haystack, $search);
+    }));
+    usort($filteredStudents, static fn(array $first, array $second): int => strcasecmp(
+        trim(($first['lastName'] ?? '') . ' ' . ($first['firstName'] ?? '')),
+        trim(($second['lastName'] ?? '') . ' ' . ($second['firstName'] ?? ''))
+    ));
+    $totalFilteredStudents = count($filteredStudents);
+} else {
+    $totalFilteredStudents = $firebase->count(COL_STUDENTS, $studentFilters);
+}
+$totalPages = max(1, (int) ceil($totalFilteredStudents / $limit));
+$page = min($page, $totalPages);
+if ($search !== '') {
+    $filteredStudents = array_slice($filteredStudents, ($page - 1) * $limit, $limit);
+} else {
+    $filteredStudents = $firebase->getCollection(
+        COL_STUDENTS,
+        $studentFilters,
+        $limit,
+        ($page - 1) * $limit,
+        false,
+        [['lastName', 'ASC']]
+    );
+    usort($filteredStudents, static fn(array $first, array $second): int => strcasecmp(
+        trim(($first['lastName'] ?? '') . ' ' . ($first['firstName'] ?? '')),
+        trim(($second['lastName'] ?? '') . ' ' . ($second['firstName'] ?? ''))
+    ));
+}
+
+$visibleStudentIds = array_map(
+    static fn(array $student): string => (string) ($student['id'] ?? $student['studentId'] ?? ''),
+    $filteredStudents
+);
+$medicalRecords = (new MedicalService())->forStudents($visibleStudentIds);
 $medicalRecordCounts = [];
 foreach ($medicalRecords as $medicalRecord) {
     $recordStudentId = (string) ($medicalRecord['studentId'] ?? '');
@@ -27,35 +80,13 @@ foreach ($medicalRecords as $medicalRecord) {
         $medicalRecordCounts[$recordStudentId] = ($medicalRecordCounts[$recordStudentId] ?? 0) + 1;
     }
 }
-$search = strtolower(trim(sanitize($_GET['search'] ?? '')));
-$statusFilter = strtolower(trim(sanitize($_GET['status'] ?? 'all')));
-$filteredStudents = array_values(array_filter($students, static function (array $student) use ($search, $statusFilter): bool {
-    $status = strtolower((string) ($student['status'] ?? 'active'));
-    $haystack = strtolower(implode(' ', [
-        (string) ($student['firstName'] ?? ''),
-        (string) ($student['lastName'] ?? ''),
-        (string) ($student['studentId'] ?? $student['id'] ?? ''),
-        (string) ($student['admissionNo'] ?? ''),
-        (string) ($student['course'] ?? ''),
-        (string) ($student['guardianName'] ?? $student['parentName'] ?? ''),
-        (string) ($student['guardianPhone'] ?? $student['parentPhone'] ?? ''),
-    ]));
-    return ($statusFilter === 'all' || $status === $statusFilter)
-        && ($search === '' || str_contains($haystack, $search));
-}));
-usort($filteredStudents, static fn(array $first, array $second): int => strcasecmp(
-    trim(($first['lastName'] ?? '') . ' ' . ($first['firstName'] ?? '')),
-    trim(($second['lastName'] ?? '') . ' ' . ($second['firstName'] ?? ''))
-));
-$page = max(1, (int) ($_GET['page'] ?? 1));
-$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
-$totalFilteredStudents = count($filteredStudents);
-$totalPages = max(1, (int) ceil($totalFilteredStudents / $limit));
-$page = min($page, $totalPages);
-$filteredStudents = array_slice($filteredStudents, ($page - 1) * $limit, $limit);
-$activeCount = count(array_filter($students, static fn(array $student): bool => strtolower((string) ($student['status'] ?? 'active')) === 'active'));
-$assignedCount = count(array_filter($students, static fn(array $student): bool => !empty($student['roomId'])));
-$courseCount = count(array_unique(array_filter(array_map(static fn(array $student): string => trim((string) ($student['course'] ?? '')), $students))));
+$totalStudentCount = $firebase->count(COL_STUDENTS);
+$activeCount = $firebase->count(COL_STUDENTS, [['status', '=', 'active']]);
+$assignedCount = $firebase->count(COL_STUDENTS, [['roomId', '!=', '']]);
+$courseCount = count(array_unique(array_filter(array_map(
+    static fn(array $student): string => trim((string) ($student['course'] ?? '')),
+    $filteredStudents
+))));
 
 $pageTitle = 'Nurse Students';
 $navItems = [
@@ -94,7 +125,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold">Total Students</span>
-                            <h3 class="fw-bold my-1 text-primary"><?= e((string) count($students)) ?></h3>
+                            <h3 class="fw-bold my-1 text-primary"><?= e((string) $totalStudentCount) ?></h3>
                             <span class="small text-muted">All enrolled students</span>
                         </div>
                         <div class="rounded-3 bg-primary bg-opacity-10 p-2 text-primary"><i class="bi bi-people fs-4"></i></div>
@@ -131,7 +162,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold">Academic Programs</span>
                             <h3 class="fw-bold my-1 text-warning"><?= e((string) $courseCount) ?></h3>
-                            <span class="small text-muted">Distinct class codes</span>
+                            <span class="small text-muted">Distinct class codes on this page</span>
                         </div>
                         <div class="rounded-3 bg-warning bg-opacity-10 p-2 text-warning"><i class="bi bi-mortarboard fs-4"></i></div>
                     </div>

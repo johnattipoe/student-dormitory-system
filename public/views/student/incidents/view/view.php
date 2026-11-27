@@ -20,14 +20,7 @@ use App\Services\StudentService;
 
 $studentId = current_user()['studentId'] ?? current_user()['uid'] ?? current_user()['id'] ?? null;
 $id = sanitize($_GET['id'] ?? '');
-$incident = null;
-
-foreach ((new IncidentService())->studentIncidents($studentId) as $record) {
-    if ((string) ($record['id'] ?? '') === $id) {
-        $incident = $record;
-        break;
-    }
-}
+$incident = (new IncidentService())->findForStudent($id, $studentId);
 
 if (!$incident) {
     flash('error', 'Incident not found.');

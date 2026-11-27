@@ -16,7 +16,6 @@ $allowedRoles = [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\VisitorService;
-use App\Services\StudentService;
 use App\Services\HouseService;
 
 $houseId = (string) (current_user()['houseId'] ?? current_user()['house_id'] ?? '');
@@ -24,11 +23,6 @@ $house = $houseId !== '' ? HouseService::find($houseId) : null;
 $houseName = $house['name'] ?? ($houseId ?: 'Assigned House');
 
 $visitors = (new VisitorService())->byHouse($houseId);
-$students = StudentService::all($houseId);
-$studentMap = [];
-foreach ($students as $student) {
-    $studentMap[(string) ($student['id'] ?? '')] = $student;
-}
 
 $counts = ['inside' => 0, 'checked_out' => 0, 'approved' => 0, 'pending' => 0];
 foreach ($visitors as $visitor) {
@@ -119,8 +113,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <?php else: ?>
                             <?php foreach ($visitors as $visitor): ?>
                                 <?php 
-                                    $student = $studentMap[(string) ($visitor['studentId'] ?? '')] ?? [];
-                                    $sName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: ($visitor['studentId'] ?? 'Student');
+                                    $studentName = (string) ($visitor['studentName'] ?? '') ?: ($visitor['studentId'] ?? 'Student');
                                     $status = strtolower((string) ($visitor['status'] ?? 'unknown'));
                                     $badgeColor = match($status) {
                                         'inside' => 'success',
@@ -136,9 +129,9 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                     <td><strong><?= e($visitor['visitorName'] ?? $visitor['name'] ?? 'Visitor') ?></strong></td>
                                     <td><?= e($visitor['phone'] ?? $visitor['contact'] ?? '—') ?></td>
                                     <td>
-                                        <div><strong><?= e($sName) ?></strong></div>
-                                        <?php if (!empty($student['admissionNo'])): ?>
-                                            <div class="small text-muted">[<?= e($student['admissionNo']) ?>]</div>
+                                        <div><strong><?= e($studentName) ?></strong></div>
+                                        <?php if (!empty($visitor['studentAdmissionNo'])): ?>
+                                            <div class="small text-muted">[<?= e($visitor['studentAdmissionNo']) ?>]</div>
                                         <?php endif; ?>
                                     </td>
                                     <td>
@@ -168,7 +161,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     </div>
 </div>
 <?php foreach ($visitors as $visitor): ?>
-    <?php $modalReportVisitorId = (string) ($visitor['id'] ?? ''); $modalReportVisitorStudent = $studentMap[(string) ($visitor['studentId'] ?? '')] ?? []; ?>
-    <div class="modal fade" id="houseReportVisitorModal-<?= e($modalReportVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Visitor Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Visitor</dt><dd class="col-sm-7"><?= e($visitor['visitorName'] ?? $visitor['name'] ?? 'Visitor') ?></dd><dt class="col-sm-5">Phone</dt><dd class="col-sm-7"><?= e($visitor['phone'] ?? $visitor['contact'] ?? '—') ?></dd><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e(trim(($modalReportVisitorStudent['firstName'] ?? '') . ' ' . ($modalReportVisitorStudent['lastName'] ?? '')) ?: ($visitor['studentId'] ?? '—')) ?></dd><dt class="col-sm-5">Purpose</dt><dd class="col-sm-7"><?= e($visitor['purpose'] ?? 'General Visit') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucwords(str_replace('_', ' ', (string) ($visitor['status'] ?? 'unknown')))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+    <?php $modalReportVisitorId = (string) ($visitor['id'] ?? ''); $modalVisitorStudentName = (string) ($visitor['studentName'] ?? '') ?: ($visitor['studentId'] ?? '—'); ?>
+    <div class="modal fade" id="houseReportVisitorModal-<?= e($modalReportVisitorId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Visitor Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-5">Visitor</dt><dd class="col-sm-7"><?= e($visitor['visitorName'] ?? $visitor['name'] ?? 'Visitor') ?></dd><dt class="col-sm-5">Phone</dt><dd class="col-sm-7"><?= e($visitor['phone'] ?? $visitor['contact'] ?? '—') ?></dd><dt class="col-sm-5">Student</dt><dd class="col-sm-7"><?= e($modalVisitorStudentName) ?></dd><dt class="col-sm-5">Purpose</dt><dd class="col-sm-7"><?= e($visitor['purpose'] ?? 'General Visit') ?></dd><dt class="col-sm-5">Status</dt><dd class="col-sm-7"><?= e(ucwords(str_replace('_', ' ', (string) ($visitor['status'] ?? 'unknown')))) ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
 <?php endforeach; ?>
 <?php require APP_ROOT . '/app/views/components/footer/footer.php'; ?>

@@ -19,18 +19,6 @@ use App\Services\MedicalService;
 use App\Services\StudentService;
 use App\Services\BmsSmsService;
 
-$students = StudentService::all();
-$studentDataMap = [];
-foreach ($students as $student) {
-    $studentId = (string) ($student['id'] ?? '');
-    if ($studentId === '') {
-        continue;
-    }
-    $studentDataMap[$studentId] = [
-        'guardianName' => trim((string) ($student['guardianName'] ?? '')),
-        'guardianPhone' => trim((string) ($student['guardianPhone'] ?? '')),
-    ];
-}
 $selectedStudentId = sanitize($_GET['studentId'] ?? '');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -163,7 +151,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <div class="col-md-6">
                             <label class="form-label" for="studentSearchInput">Student</label>
                             <div class="input-group">
-                                <input type="text" id="studentSearchInput" class="form-control" placeholder="Search student by name or admission no" aria-label="Search student">
+                                <input type="text" id="studentSearchInput" class="form-control" data-nurse-student-search placeholder="Search student by name or admission no" aria-label="Search student">
                                 <button type="button" class="btn btn-outline-secondary" onclick="filterStudentSelect()">
                                     <i class="bi bi-search"></i> Search
                                 </button>
@@ -171,16 +159,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
                             <br>
                             
-                            <select id="student-id" name="studentId" class="form-select mt-2" required onchange="updateStudentDetails()">
+                            <select id="student-id" name="studentId" class="form-select mt-2" data-nurse-student-options="<?= e(url('views/nurse/dashboard/student-options.php')) ?>" data-selected-student-id="<?= e($selectedStudentId) ?>" required onchange="updateStudentDetails()">
                                 <option value="">Select student</option>
-                                <?php foreach ($students as $student): ?>
-                                    <?php $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')); ?>
-                                    <?php $optionStudentId = (string) ($student['id'] ?? ''); ?>
-                                    <option value="<?= e($optionStudentId) ?>" <?= $selectedStudentId === $optionStudentId ? 'selected' : '' ?>>
-                                        <?= e($studentName !== '' ? $studentName : 'Unnamed student') ?>
-                                        (<?= e($student['admissionNo'] ?? $student['studentId'] ?? $student['id'] ?? 'No ID') ?>)
-                                    </option>
-                                <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -237,8 +217,6 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     </div>
 </div>
 <script>
-const studentData = <?php echo json_encode($studentDataMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
-
 function filterStudentSelect() {
     const searchInput = document.getElementById('studentSearchInput');
     const studentSelect = document.getElementById('student-id');
@@ -277,10 +255,9 @@ function updateStudentDetails() {
         return;
     }
 
-    const studentId = studentSelect.value;
-    const student = studentData[studentId] || null;
-    const guardianName = student && student.guardianName ? student.guardianName : '';
-    const guardianPhone = student && student.guardianPhone ? student.guardianPhone : '';
+    const selectedOption = studentSelect.options[studentSelect.selectedIndex];
+    const guardianName = selectedOption ? (selectedOption.dataset.guardianName || '') : '';
+    const guardianPhone = selectedOption ? (selectedOption.dataset.guardianPhone || '') : '';
 
     guardianNameInput.value = guardianName;
     guardianPhoneInput.value = guardianPhone;

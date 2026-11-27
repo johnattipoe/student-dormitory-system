@@ -54,7 +54,27 @@ foreach ($students as $student) {
 
 $statusFilter = sanitize($_GET['status'] ?? '');
 $requestSearch = strtolower(sanitize($_GET['search'] ?? ''));
-$visitorRequests = FirebaseService::getInstance()->getCollection(\COL_VISITOR_REQUESTS, [], 500);
+$firebaseService = FirebaseService::getInstance();
+$visitorRequests = [];
+$requestQueries = $houseId ? [[['houseId', '=', $houseId]]] : [[]];
+if ($houseId) {
+    foreach (array_chunk(array_keys($studentMap), 30) as $studentIds) {
+        $requestQueries[] = [['studentId', 'in', $studentIds]];
+    }
+}
+$seenRequestIds = [];
+foreach ($requestQueries as $wheres) {
+    foreach ($firebaseService->getCollection(\COL_VISITOR_REQUESTS, $wheres, 150) as $request) {
+        $requestId = (string) ($request['id'] ?? '');
+        if ($requestId !== '' && isset($seenRequestIds[$requestId])) {
+            continue;
+        }
+        if ($requestId !== '') {
+            $seenRequestIds[$requestId] = true;
+        }
+        $visitorRequests[] = $request;
+    }
+}
 $filteredRequests = [];
 foreach ($visitorRequests as $request) {
     $studentId = (string) ($request['studentId'] ?? '');

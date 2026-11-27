@@ -19,13 +19,7 @@ use App\Services\BedService;
 
 $pageTitle = 'Student Attendance History';
 $studentId = current_user()['studentId'] ?? current_user()['uid'] ?? null;
-$assignedBed = null;
-foreach (BedService::all() as $bed) {
-    if ((string) ($bed['studentId'] ?? '') === (string) ($studentId ?? '')) {
-        $assignedBed = $bed;
-        break;
-    }
-}
+$assignedBed = $studentId ? BedService::forStudent((string) $studentId) : null;
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/student/dashboard/index.php')],
     ['icon' => 'bi-calendar-check', 'label' => 'Attendance', 'href' => url('views/student/attendance/index/index.php'), 'active' => true],

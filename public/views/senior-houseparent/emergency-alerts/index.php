@@ -13,7 +13,6 @@ $allowedRoles = [ROLE_SENIOR_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\FirebaseService;
-use App\Services\StudentService;
 
 $firebase = FirebaseService::getInstance();
 $user = current_user() ?? [];
@@ -39,8 +38,6 @@ if (empty($allContacts)) {
 }
 
 $contacts = array_values(array_filter($allContacts, static fn($c) => ($c['status'] ?? 'active') === 'active'));
-$houseId = (string) ($user['houseId'] ?? $user['house_id'] ?? '');
-$students = StudentService::all($houseId);
 
 usort($contacts, static function ($a, $b) {
     $weights = ['critical' => 0, 'high' => 1, 'normal' => 2];
@@ -258,7 +255,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="modal-header"><h5 class="modal-title">Log Emergency Call &amp; Incident Response</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
         <div class="modal-body"><div class="row g-3">
             <div class="col-md-6"><label class="form-label">Quick Select Agency / Contact</label><select class="form-select" id="seniorEmergencyContactSelect"><option value="">Select from Directory or type below</option><?php foreach ($contacts as $contactOption): ?><option value="<?= e($contactOption['phone'] ?? '') ?>" data-name="<?= e($contactOption['name'] ?? '') ?>"><?= e($contactOption['name'] ?? 'Contact') ?> (<?= e($contactOption['phone'] ?? '') ?>)</option><?php endforeach; ?></select></div>
-            <div class="col-md-6"><label class="form-label">Involved Student (Optional)</label><select name="studentId" class="form-select"><option value="">None / Dormitory-Wide Incident</option><?php foreach ($students as $studentOption): ?><option value="<?= e((string) ($studentOption['id'] ?? '')) ?>"><?= e(trim(($studentOption['firstName'] ?? '') . ' ' . ($studentOption['lastName'] ?? ''))) ?><?= !empty($studentOption['admissionNo']) ? ' [' . e($studentOption['admissionNo']) . ']' : '' ?></option><?php endforeach; ?></select></div>
+            <div class="col-md-6"><label class="form-label">Involved Student (Optional)</label><select name="studentId" class="form-select" data-house-student-options="<?= e(url('views/house-student-options.php')) ?>" data-placeholder="None / Dormitory-Wide Incident"><option value="">None / Dormitory-Wide Incident</option></select></div>
             <div class="col-md-6"><label class="form-label">Agency / Responder Contacted</label><input id="seniorEmergencyContactName" name="contactName" class="form-control" required></div>
             <div class="col-md-6"><label class="form-label">Phone Number Called</label><input id="seniorEmergencyContactPhone" name="contactPhone" class="form-control"></div>
             <div class="col-12"><label class="form-label">Incident Reason / Emergency Type</label><input name="reason" class="form-control"></div>

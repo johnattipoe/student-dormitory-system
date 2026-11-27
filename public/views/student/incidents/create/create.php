@@ -25,15 +25,9 @@ if (!$studentId) {
     redirect(url('views/student/incidents/index/index.php'));
 }
 
-$student = StudentService::find((string) $studentId);
-if (!$student && !empty($currentUser['email'])) {
-    foreach (StudentService::all() as $candidate) {
-        if ((string) ($candidate['email'] ?? '') === (string) $currentUser['email']) {
-            $student = $candidate;
-            $studentId = $candidate['id'];
-            break;
-        }
-    }
+$student = StudentService::findForUser($currentUser);
+if ($student) {
+    $studentId = $student['id'] ?? $studentId;
 }
 
 $returnRoutes = [

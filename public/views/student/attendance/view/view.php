@@ -19,14 +19,7 @@ use App\Services\AttendanceService;
 
 $studentId = current_user()['studentId'] ?? current_user()['uid'] ?? null;
 $id = sanitize($_GET['id'] ?? '');
-$entry = null;
-
-foreach (AttendanceService::history($studentId, 200) as $record) {
-    if ((string) ($record['id'] ?? '') === $id) {
-        $entry = $record;
-        break;
-    }
-}
+$entry = AttendanceService::findForStudent($id, $studentId);
 
 if (!$entry) {
     flash('error', 'Attendance record not found.');

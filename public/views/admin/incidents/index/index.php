@@ -18,7 +18,6 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\IncidentService;
 use App\Services\UserService;
 use App\Services\StudentService;
-use App\Services\FirebaseService;
 
 $pageTitle = 'Incidents';
 $page = max(1, (int) ($_GET['page'] ?? 1));
@@ -33,52 +32,81 @@ $urgentIncidents = count(array_filter($incidents, fn($i) => in_array(strtolower(
 
 $reporterMap = [];
 $studentMap = [];
+$studentLookupCache = [];
+$resolvedReporterIds = [];
+$userService = new UserService();
 
-// 1. Map all users
-try {
-    $allUsers = (new UserService())->all();
-    foreach ($allUsers as $user) {
-        $name = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))));
-        if ($name === '') {
-            $name = $user['displayName'] ?? $user['username'] ?? $user['email'] ?? null;
-        }
-        if ($name) {
-            $roleLabel = !empty($user['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $user['role'])) . ')' : '';
-            $displayName = $name . $roleLabel;
-            foreach ([$user['id'] ?? null, $user['uid'] ?? null, $user['userId'] ?? null, $user['firebaseUid'] ?? null, $user['email'] ?? null] as $key) {
-                if ($key !== null && $key !== '') {
-                    $reporterMap[(string) $key] = $displayName;
+$getStudentName = function (string $lookupId) use (&$studentLookupCache, &$studentMap, &$reporterMap): ?string {
+    $lookupId = trim($lookupId);
+    if ($lookupId === '') {
+        return null;
+    }
+
+    if (!array_key_exists($lookupId, $studentLookupCache)) {
+        $student = StudentService::findByIdentifier($lookupId);
+        $studentLookupCache[$lookupId] = $student;
+        if ($student) {
+            $name = trim(($student['name'] ?? '') ?: (($student['fullName'] ?? '') ?: (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))));
+            if ($name !== '') {
+                $admissionNo = !empty($student['admissionNo']) ? ' [' . $student['admissionNo'] . ']' : '';
+                $displayName = $name . $admissionNo;
+                foreach ([$student['id'] ?? null, $student['studentId'] ?? null, $student['admissionNo'] ?? null, $student['userId'] ?? null, $student['uid'] ?? null, $student['email'] ?? null] as $key) {
+                    if ($key !== null && $key !== '') {
+                        $reporterMap[(string) $key] = $displayName . ' (Student)';
+                        $studentMap[(string) $key] = $displayName;
+                    }
                 }
             }
         }
     }
-} catch (\Throwable $e) {}
 
-// 2. Map all students
-try {
-    $allStudents = StudentService::all();
-    foreach ($allStudents as $student) {
-        $studentName = trim(($student['name'] ?? '') ?: (($student['fullName'] ?? '') ?: (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))));
-        if ($studentName !== '') {
-            $adm = !empty($student['admissionNo']) ? ' [' . $student['admissionNo'] . ']' : '';
-            $displayName = $studentName . $adm;
-            foreach ([$student['id'] ?? null, $student['studentId'] ?? null, $student['admissionNo'] ?? null, $student['userId'] ?? null, $student['uid'] ?? null, $student['email'] ?? null] as $key) {
-                if ($key !== null && $key !== '') {
-                    $reporterMap[(string) $key] = $displayName . ' (Student)';
-                    $studentMap[(string) $key] = $displayName;
-                }
-            }
-        }
+    $student = $studentLookupCache[$lookupId];
+    if (!$student) {
+        return null;
     }
-} catch (\Throwable $e) {}
 
-$getReporterName = function (array $incident) use (&$reporterMap, $studentMap): string {
+    $name = trim(($student['name'] ?? '') ?: (($student['fullName'] ?? '') ?: (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))));
+    if ($name === '') {
+        return null;
+    }
+
+    $admissionNo = !empty($student['admissionNo']) ? ' [' . $student['admissionNo'] . ']' : '';
+    return $name . $admissionNo;
+};
+
+foreach ($incidents as $incident) {
+    $getStudentName((string) ($incident['studentId'] ?? ''));
+}
+
+$getReporterName = function (array $incident) use (&$reporterMap, &$resolvedReporterIds, &$studentMap, $getStudentName, $userService): string {
     if (!empty($incident['reportedByName']) && trim((string) $incident['reportedByName']) !== '' && !str_starts_with((string) $incident['reportedByName'], 'Staff/User')) {
         return (string) $incident['reportedByName'];
     }
 
     $rawId = trim((string) ($incident['reportedBy'] ?? ''));
     $studentId = trim((string) ($incident['studentId'] ?? ''));
+
+    if ($rawId !== '' && isset($reporterMap[$rawId])) {
+        return $reporterMap[$rawId];
+    }
+
+    if ($rawId !== '' && !isset($resolvedReporterIds[$rawId])) {
+        $resolvedReporterIds[$rawId] = true;
+        $user = $userService->find($rawId);
+        if ($user) {
+            $name = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))));
+            if ($name === '') {
+                $name = $user['displayName'] ?? $user['username'] ?? $user['email'] ?? '';
+            }
+            if ($name !== '') {
+                $roleLabel = !empty($user['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $user['role'])) . ')' : '';
+                $reporterMap[$rawId] = $name . $roleLabel;
+            }
+        }
+        if (!isset($reporterMap[$rawId])) {
+            $getStudentName($rawId);
+        }
+    }
 
     if ($rawId !== '' && isset($reporterMap[$rawId])) {
         return $reporterMap[$rawId];

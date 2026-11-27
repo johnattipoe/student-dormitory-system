@@ -19,35 +19,36 @@ use App\Services\MedicalService;
 use App\Services\StudentService;
 
 $pageTitle = 'Medical Records';
-$records = (new MedicalService())->all();
+$medicalService = new MedicalService();
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$totalRecords = $medicalService->count();
+$today = new DateTimeImmutable('today');
+$todayRecords = $medicalService->countCreatedBetween($today, $today->modify('+1 day'));
+$criticalRecords = 0;
+foreach (['critical', 'emergency', 'severe'] as $severity) {
+    $criticalRecords += $medicalService->countBySeverity($severity);
+}
+$moderateRecords = $medicalService->countBySeverity('moderate');
+$totalPages = max(1, (int) ceil($totalRecords / $limit));
+$page = min($page, $totalPages);
+$records = $medicalService->page($limit, ($page - 1) * $limit);
 $students = [];
+foreach ($records as $record) {
+    $studentId = (string) ($record['studentId'] ?? '');
+    if ($studentId === '' || array_key_exists($studentId, $students)) {
+        continue;
+    }
 
-try {
-    foreach (StudentService::all() as $student) {
-        $studentId = (string) ($student['id'] ?? '');
-        if ($studentId === '') {
-            continue;
-        }
-
+    $student = StudentService::find($studentId);
+    if ($student !== null) {
         $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
         $students[$studentId] = [
             'name' => $studentName !== '' ? $studentName : 'Unnamed student',
             'admissionNo' => $student['admissionNo'] ?? $student['studentId'] ?? $studentId,
         ];
     }
-} catch (Throwable $e) {
-    $students = [];
 }
-
-$totalRecords = count($records);
-$todayRecords = count(array_filter($records, static fn(array $record): bool => str_starts_with((string) ($record['createdAt'] ?? ''), date('Y-m-d'))));
-$criticalRecords = count(array_filter($records, static fn(array $record): bool => in_array(strtolower((string) ($record['severity'] ?? '')), ['critical', 'emergency', 'severe'], true)));
-$moderateRecords = count(array_filter($records, static fn(array $record): bool => strtolower((string) ($record['severity'] ?? '')) === 'moderate'));
-$totalPages = max(1, (int) ceil($totalRecords / $limit));
-$page = min($page, $totalPages);
-$records = array_slice($records, ($page - 1) * $limit, $limit);
 
 $displayDate = static function (?string $value): string {
     if (!$value) {

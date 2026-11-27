@@ -16,9 +16,6 @@ $allowedRoles = [ROLE_SECURITY];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\VisitorService;
-use App\Services\StudentService;
-
-$students = StudentService::all();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = (new VisitorService())->register([
@@ -88,13 +85,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <label class="form-label fw-semibold">Host Student <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-white"><i class="bi bi-mortarboard"></i></span>
-                                <select name="studentId" class="form-select" required>
+                                <select name="studentId" class="form-select" data-security-student-options="<?= e(url('views/security/dashboard/student-options.php')) ?>" required>
                                     <option value="">Select student being visited</option>
-                                    <?php foreach ($students as $student): ?>
-                                        <option value="<?= e((string) ($student['id'] ?? '')) ?>">
-                                            <?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?> (<?= e($student['admissionNo'] ?? 'No ID') ?>)
-                                        </option>
-                                    <?php endforeach; ?>
                                 </select>
                             </div>
                         </div>

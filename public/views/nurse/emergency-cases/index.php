@@ -16,10 +16,10 @@ $allowedRoles = [ROLE_NURSE];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\MedicalService;
-use App\Services\StudentService;
 
 $medicalService = new MedicalService();
-$nurseMedicalStudents = StudentService::all();
+$nurseMedicalStudents = [];
+$nurseMedicalLazyStudentOptions = true;
 $nurseMedicalModalId = 'nurseMedicalRecordCreate';
 $nurseMedicalReturnTo = 'emergencyCases';
 $nurseMedicalSelectedStudentId = '';
@@ -41,23 +41,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect(url('views/nurse/emergency-cases/emergency-cases.php'));
 }
 
+$records = $medicalService->urgent();
 $students = [];
-foreach ($nurseMedicalStudents as $student) {
-    $studentId = (string) ($student['id'] ?? '');
-    if ($studentId === '') continue;
-
-    $name = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
-    $students[$studentId] = [
-        'name' => $name !== '' ? $name : 'Unnamed student',
-        'admissionNo' => $student['admissionNo'] ?? $student['studentId'] ?? $studentId,
-        'houseId' => $student['houseId'] ?? '',
-    ];
+foreach ($records as $record) {
+    $studentId = trim((string) ($record['studentId'] ?? ''));
+    if ($studentId !== '' && !isset($students[$studentId])) {
+        $students[$studentId] = [
+            'name' => trim((string) ($record['studentName'] ?? '')) ?: $studentId,
+            'admissionNo' => $record['admissionNo'] ?? $studentId,
+        ];
+    }
 }
-
-$emergencySeverities = ['severe', 'critical', 'emergency'];
-$records = array_values(array_filter($medicalService->all(), static function (array $record) use ($emergencySeverities): bool {
-    return in_array(strtolower((string) ($record['severity'] ?? '')), $emergencySeverities, true);
-}));
 
 $search = strtolower(trim(sanitize($_GET['search'] ?? '')));
 $severityFilter = strtolower(trim(sanitize($_GET['severity'] ?? 'all')));

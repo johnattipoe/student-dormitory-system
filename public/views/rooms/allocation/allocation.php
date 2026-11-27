@@ -16,11 +16,9 @@ $allowedRoles = [ROLE_ADMIN, ROLE_HOUSE_MASTER];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\RoomService;
-use App\Services\FirebaseService;
 
 $pageTitle = 'Room Allocation';
 $rooms = RoomService::all();
-$students = FirebaseService::getInstance()->getCollection(COL_STUDENTS, [], 500);
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-door-closed', 'label' => 'Room Allocation', 'href' => url('views/rooms/allocation/allocation.php'), 'active' => true],
@@ -38,11 +36,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">Student</label>
-                        <select name="studentId" class="form-select" required>
+                        <select name="studentId" class="form-select" data-room-allocation-student-options="<?= e(url('views/rooms/allocation/student-options.php')) ?>" required>
                             <option value="">Select student</option>
-                            <?php foreach ($students as $student): ?>
-                                <option value="<?= e($student['id'] ?? '') ?>"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?></option>
-                            <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="col-md-6">

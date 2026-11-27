@@ -41,7 +41,7 @@ function applyWorkspaceFilter(options) {
     }
     options.container.setAttribute('aria-busy', 'false');
 }
-document.addEventListener('DOMContentLoaded', () => {
+SDS.onPageLoad(() => {
     document.querySelectorAll('[data-ts-workspace-filter]').forEach((input) => {
         const options = getWorkspaceFilterOptions(input);
         if (!options)

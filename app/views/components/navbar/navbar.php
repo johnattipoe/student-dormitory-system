@@ -35,9 +35,10 @@ try {
         : $notificationService->unreadCount($currentUserId);
 
     $topbarNotifications = $role === ROLE_ADMIN
-        ? $notificationService->all(50)
-        : $notificationService->forUser($currentUserId, 50);
+        ? $notificationService->recentAll(5)
+        : $notificationService->recentForUser($currentUserId, 5);
 } catch (Throwable $e) {
+    error_log('Topbar notifications unavailable for role ' . $role . ': ' . $e->getMessage());
     $topbarNotifications = [];
     $topbarUnreadCount = 0;
 }

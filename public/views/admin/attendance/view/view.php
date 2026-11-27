@@ -22,13 +22,7 @@ use App\Services\UserService;
 use App\Services\FirebaseService;
 
 $id = sanitize($_GET['id'] ?? '');
-$entry = null;
-foreach (AttendanceService::all() as $record) {
-    if (($record['id'] ?? '') === $id) {
-        $entry = $record;
-        break;
-    }
-}
+$entry = AttendanceService::find($id);
 
 if (!$entry) {
     flash('error', 'Attendance record not found.');
@@ -41,13 +35,7 @@ if ($student && !empty($student['admissionNo'])) {
     $studentName .= ' [' . $student['admissionNo'] . ']';
 }
 
-$bed = null;
-foreach (BedService::all() as $candidate) {
-    if ((string) ($candidate['studentId'] ?? '') === (string) ($entry['studentId'] ?? '')) {
-        $bed = $candidate;
-        break;
-    }
-}
+$bed = BedService::forStudent((string) ($entry['studentId'] ?? ''));
 
 $rawMarkedBy = (string) ($entry['markedBy'] ?? '');
 $markedByName = trim((string) ($entry['markedByName'] ?? ''));

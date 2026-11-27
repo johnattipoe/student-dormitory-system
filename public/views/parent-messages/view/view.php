@@ -21,12 +21,12 @@ use App\Services\StudentService;
 $currentUser = current_user();
 $role = current_role();
 $houseId = in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS, ROLE_SENIOR_HOUSEPARENT], true) ? ($currentUser['houseId'] ?? $currentUser['house_id'] ?? null) : null;
-$students = StudentService::all($houseId);
-$studentIds = array_map(fn($student) => (string) ($student['id'] ?? ''), $students);
 $id = sanitize($_GET['id'] ?? '');
 $message = (new ParentMessageService())->find($id);
+$messageStudentId = (string) ($message['studentId'] ?? '');
+$student = $houseId && $messageStudentId !== '' ? StudentService::find($messageStudentId) : null;
 
-if (!$message || ($houseId && !in_array((string) ($message['studentId'] ?? ''), $studentIds, true))) {
+if (!$message || ($houseId && (!$student || (string) ($student['houseId'] ?? '') !== (string) $houseId))) {
     flash('error', 'Parent message not found.');
     redirect(url('views/parent-messages/create/create.php'));
 }

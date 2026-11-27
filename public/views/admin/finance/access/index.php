@@ -68,8 +68,18 @@ $allHouseStaff = [];
 $houses = [];
 
 try {
-    $houses = FirebaseService::getInstance()->getCollection(COL_HOUSES, [], 200);
-    $users = FirebaseService::getInstance()->getCollection(COL_USERS, [], 500);
+    $firebase = FirebaseService::getInstance();
+    $houses = $firebase->getCollection(COL_HOUSES, [], 200);
+    $users = $firebase->getCollection(COL_USERS, [], 500);
+    $accessByUserHouse = [];
+    foreach ($firebase->getAllCollection(COL_FINANCE_ACCESS) as $accessRecord) {
+        $accessUserId = (string) ($accessRecord['userId'] ?? '');
+        $accessHouseId = (string) ($accessRecord['houseId'] ?? '');
+        if ($accessUserId !== '' && !isset($accessByUserHouse[$accessUserId][$accessHouseId])) {
+            $accessByUserHouse[$accessUserId][$accessHouseId] = $accessRecord;
+        }
+    }
+
     foreach ($users as $user) {
         $role = strtolower((string) ($user['role'] ?? ''));
         if (!in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS], true)) {
@@ -82,15 +92,7 @@ try {
             continue;
         }
 
-        $accessRecord = null;
-        $accessMatches = FirebaseService::getInstance()->getCollection(COL_FINANCE_ACCESS, [['userId', '=', $userId]], 20);
-        foreach ($accessMatches as $match) {
-            if ((string) ($match['houseId'] ?? '') === $houseId) {
-                $accessRecord = $match;
-                break;
-            }
-        }
-
+        $accessRecord = $accessByUserHouse[$userId][$houseId] ?? null;
         $status = strtolower((string) ($accessRecord['status'] ?? 'pending'));
         $allHouseStaff[] = [
             'id' => $userId,

@@ -16,25 +16,21 @@ $allowedRoles = [ROLE_SENIOR_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 // Use statements for services
-use App\Services\BedService; use App\Services\RoomService; 
+use App\Services\BedService; use App\Services\RoomService;
 use App\Services\StudentService;
 
-// Get the current user's house ID
-$houseId = current_user()['houseId'] ?? null; $id = sanitize($_GET['id'] ?? '');
-$rooms = RoomService::all($houseId);
-$roomMap = [];
-foreach ($rooms as $availableRoom) $roomMap[(string) ($availableRoom['id'] ?? '')] = $availableRoom;
+$houseId = current_user()['houseId'] ?? null;
+$id = sanitize($_GET['id'] ?? '');
 $bed = $id !== '' ? BedService::find($id) : null;
-if (!$bed && $id !== '') {
-	foreach (BedService::all() as $availableBed) {
-		if ((string) ($availableBed['id'] ?? '') === $id) { $bed = $availableBed; break; }
-	}
+$room = $bed && !empty($bed['roomId']) ? RoomService::find((string) $bed['roomId']) : null;
+if (!$bed || !$room || !$houseId || (string) ($room['houseId'] ?? '') !== (string) $houseId) {
+    flash('error', 'Bed not found in your assigned house.');
+    redirect(url('views/senior-houseparent/beds/index/index.php'));
 }
-
-// Get the room associated with the bed
-$room = $bed ? ($roomMap[(string) ($bed['roomId'] ?? '')] ?? null) : null;
-if (!$bed || !$room) { flash('error', 'Bed not found in your assigned house.'); redirect(url('views/senior-houseparent/beds/index/index.php')); }
 $student = !empty($bed['studentId']) ? StudentService::find((string)$bed['studentId']) : null;
+if ($student && (string) ($student['houseId'] ?? '') !== (string) $houseId) {
+    $student = null;
+}
 $pageTitle='Bed Details'; 
 $navItems=[['icon'=>'bi-grid-3x3-gap','label'=>'Beds','href'=>url('views/senior-houseparent/beds/index/index.php'),'active'=>true]]; 
 

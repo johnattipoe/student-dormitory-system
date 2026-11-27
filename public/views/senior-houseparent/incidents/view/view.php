@@ -22,13 +22,7 @@ use App\Services\FirebaseService;
 
 $id = sanitize($_GET['id'] ?? '');
 $houseId = current_user()['houseId'] ?? null;
-$incident = null;
-foreach ((new IncidentService())->byHouse($houseId) as $record) {
-    if (($record['id'] ?? '') === $id) {
-        $incident = $record;
-        break;
-    }
-}
+$incident = (new IncidentService())->findForHouse($id, $houseId);
 
 if (!$incident) {
     flash('error', 'Incident not found.');

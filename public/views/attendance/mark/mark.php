@@ -15,10 +15,7 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN, ROLE_HOUSE_MASTER, ROLE_SENIOR_HOUSEPARENT, ROLE_SECURITY];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
-use App\Services\FirebaseService;
-
 $pageTitle = 'Mark Attendance';
-$students = FirebaseService::getInstance()->getCollection(COL_STUDENTS, [], 500);
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-calendar-check', 'label' => 'Attendance', 'href' => url('views/attendance/index/index.php'), 'active' => true],
@@ -36,11 +33,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">Student</label>
-                        <select name="studentId" class="form-select" required>
+                        <select name="studentId" class="form-select" data-attendance-student-options="<?= e(url('views/attendance/student-options.php')) ?>" required>
                             <option value="">Select student</option>
-                            <?php foreach ($students as $student): ?>
-                                <option value="<?= e($student['id'] ?? '') ?>"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?></option>
-                            <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="col-md-6">

@@ -21,13 +21,22 @@ use App\Services\StudentService;
 
 $houseId = current_user()['houseId'] ?? null;
 $house = $houseId ? HouseService::find((string) $houseId) : null;
-$rooms = RoomService::all($houseId);
+$rooms = $houseId ? RoomService::all($houseId) : [];
 $roomMap = [];
 foreach ($rooms as $room) $roomMap[(string) ($room['id'] ?? '')] = $room;
-$students = StudentService::all($houseId);
+$beds = BedService::forRooms(array_keys($roomMap));
 $studentMap = [];
-foreach ($students as $student) $studentMap[(string) ($student['id'] ?? '')] = $student;
-$beds = array_values(array_filter(BedService::all(), static fn ($bed) => isset($roomMap[(string) ($bed['roomId'] ?? '')])));
+foreach ($beds as $bed) {
+    $studentId = trim((string) ($bed['studentId'] ?? ''));
+    if ($studentId === '' || isset($studentMap[$studentId]) || !$houseId) {
+        continue;
+    }
+
+    $student = StudentService::find($studentId);
+    if ($student && (string) ($student['houseId'] ?? '') === (string) $houseId) {
+        $studentMap[$studentId] = $student;
+    }
+}
 
 if (!function_exists('house_master_bed_allowed')) {
     function house_master_bed_allowed(?array $room, ?string $houseId): bool

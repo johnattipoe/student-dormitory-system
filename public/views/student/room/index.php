@@ -32,23 +32,20 @@ $activeAllocation = null;
 $pageNotice = null;
 
 try {
-    if ($studentId) {
-        $student = StudentService::find((string) $studentId);
-    }
-
-    if (!$student && !empty($currentUser['email'])) {
-        foreach (StudentService::all() as $candidate) {
-            if ((string) ($candidate['email'] ?? '') === (string) $currentUser['email']) {
-                $student = $candidate;
-                $studentId = $candidate['id'] ?? $studentId;
-                break;
-            }
-        }
+    $student = StudentService::findForUser($currentUser);
+    if ($student) {
+        $studentId = $student['id'] ?? $studentId;
     }
 
     $roomId = (string) ($student['roomId'] ?? '');
     if ($roomId === '' && $studentId) {
-        $allocations = FirebaseService::getInstance()->where(COL_ROOM_ALLOCATIONS, 'studentId', '=', (string) $studentId, 20);
+        $allocations = FirebaseService::getInstance()->getCollection(
+            COL_ROOM_ALLOCATIONS,
+            [['studentId', '=', (string) $studentId]],
+            20,
+            0,
+            false
+        );
         foreach ($allocations as $allocation) {
             if (($allocation['status'] ?? 'active') === 'active' || empty($allocation['status'])) {
                 $roomId = (string) ($allocation['roomId'] ?? '');
@@ -60,17 +57,8 @@ try {
 
     if ($roomId !== '') {
         $room = RoomService::find($roomId) ?? [];
-        foreach (BedService::all() as $bed) {
-            if ((string) ($bed['roomId'] ?? '') === $roomId) {
-                $roomBeds[] = $bed;
-            }
-        }
-
-        foreach (StudentService::all() as $candidate) {
-            if ((string) ($candidate['roomId'] ?? '') === $roomId) {
-                $roommates[] = $candidate;
-            }
-        }
+        $roomBeds = BedService::forRoom($roomId);
+        $roommates = StudentService::forRoom($roomId);
     }
 
     $houseId = (string) ($student['houseId'] ?? $room['houseId'] ?? '');

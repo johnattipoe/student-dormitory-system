@@ -16,11 +16,14 @@ $allowedRoles = [ROLE_SENIOR_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\NotificationService;
-use App\Services\UserService;
+use App\Services\FirebaseService;
 
 $notificationService = new NotificationService();
 $allowedRecipientRoles = ['house_master', 'student', 'nurse', 'security'];
-$sendableUsers = array_values(array_filter((new UserService())->all(), static function ($user) use ($allowedRecipientRoles) {
+$recipientUsers = $allowedRecipientRoles !== []
+    ? FirebaseService::getInstance()->getCollection(COL_USERS, [['role', 'in', $allowedRecipientRoles]], 150, 0, false)
+    : [];
+$sendableUsers = array_values(array_filter($recipientUsers, static function ($user) use ($allowedRecipientRoles) {
     return in_array((string) ($user['role'] ?? ''), $allowedRecipientRoles, true);
 }));
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

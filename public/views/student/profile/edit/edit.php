@@ -18,18 +18,9 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\StudentService;
 
 $pageStyles = ['student-profile.css'];
-$studentId = current_user()['studentId'] ?? current_user()['uid'] ?? null;
-$student = $studentId ? StudentService::find((string) $studentId) : null;
-
-if (!$student && !empty(current_user()['email'])) {
-    foreach (StudentService::all() as $candidate) {
-        if ((string) ($candidate['email'] ?? '') === (string) current_user()['email']) {
-            $student = $candidate;
-            $studentId = $candidate['id'];
-            break;
-        }
-    }
-}
+$currentUser = current_user() ?? [];
+$student = StudentService::findForUser($currentUser);
+$studentId = $student['id'] ?? $currentUser['studentId'] ?? $currentUser['uid'] ?? null;
 
 if (!$student) {
     flash('error', 'Student profile not found.');

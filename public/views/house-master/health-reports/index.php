@@ -25,29 +25,12 @@ $studentMap = [];
 foreach ($students as $student) {
     $studentMap[(string) ($student['id'] ?? '')] = $student;
 }
-$studentIds = array_fill_keys(array_keys($studentMap), true);
-
 $medicalService = new MedicalService();
 
-// User resolution map for "Recorded By"
 $userMap = [];
-try {
-    foreach ((new UserService())->all() as $u) {
-        $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
-        if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? $u['email'] ?? null;
-        if ($name) {
-            $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
-            $displayName = $name . $roleLabel;
-            foreach ([$u['id'] ?? null, $u['uid'] ?? null, $u['userId'] ?? null, $u['email'] ?? null] as $key) {
-                if ($key !== null && $key !== '') {
-                    $userMap[(string) $key] = $displayName;
-                }
-            }
-        }
-    }
-} catch (\Throwable $e) {}
+$userService = new UserService();
 
-$getRecorderName = function (array $record) use (&$userMap): string {
+$getRecorderName = function (array $record) use (&$userMap, $userService): string {
     if (!empty($record['recordedByName']) && trim((string) $record['recordedByName']) !== '' && !str_starts_with((string) $record['recordedByName'], 'Staff/User')) {
         return (string) $record['recordedByName'];
     }
@@ -57,30 +40,63 @@ $getRecorderName = function (array $record) use (&$userMap): string {
     }
     if ($rawId !== '') {
         try {
-            $u = FirebaseService::getInstance()->getDocument('users', $rawId);
-            if ($u) {
-                $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
-                if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? $u['email'] ?? '';
+            $user = $userService->find($rawId);
+            if ($user !== null) {
+                $name = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))));
+                if ($name === '') $name = $user['displayName'] ?? $user['username'] ?? $user['email'] ?? '';
                 if ($name !== '') {
-                    $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
+                    $roleLabel = !empty($user['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $user['role'])) . ')' : '';
                     $userMap[$rawId] = $name . $roleLabel;
                     return $userMap[$rawId];
                 }
             }
-        } catch (\Throwable $e) {}
-        return $rawId;
+        } catch (\Throwable $e) {
+            error_log('Medical recorder lookup failed: ' . get_class($e));
+        }
+        $userMap[$rawId] = $rawId;
+        return $userMap[$rawId];
     }
     return 'Clinic Staff';
 };
 
-// Fetch all medical records and filter to current house
-$allRecords = $medicalService->all();
-$records = array_values(array_filter($allRecords, function (array $record) use ($studentIds, $houseId): bool {
-    if (!empty($record['houseId']) && $record['houseId'] === $houseId) {
-        return true;
+$recordsById = [];
+$medicalReadBudget = 150;
+if ($houseId !== '') {
+    $houseRecords = FirebaseService::getInstance()->getCollection(
+        'medical_records',
+        [['houseId', '=', $houseId]],
+        $medicalReadBudget,
+        0,
+        false,
+        [['createdAt', 'DESC']]
+    );
+    foreach ($houseRecords as $record) {
+        $recordId = (string) ($record['id'] ?? '');
+        $recordsById[$recordId !== '' ? $recordId : (string) count($recordsById)] = $record;
     }
-    return isset($studentIds[(string) ($record['studentId'] ?? '')]);
-}));
+    $medicalReadBudget -= count($houseRecords);
+}
+
+$studentIdBatches = array_chunk(array_keys($studentMap), 30);
+foreach ($studentIdBatches as $index => $studentIdBatch) {
+    if ($medicalReadBudget <= 0) {
+        break;
+    }
+
+    $remainingBatches = count($studentIdBatches) - $index;
+    $batchLimit = (int) ceil($medicalReadBudget / $remainingBatches);
+    $studentRecords = $medicalService->forStudents($studentIdBatch, $batchLimit);
+    foreach ($studentRecords as $record) {
+        $recordId = (string) ($record['id'] ?? '');
+        $recordsById[$recordId !== '' ? $recordId : (string) count($recordsById)] = $record;
+    }
+    $medicalReadBudget -= count($studentRecords);
+}
+$records = array_values($recordsById);
+usort($records, static fn(array $first, array $second): int => strcmp(
+    (string) ($second['createdAt'] ?? ''),
+    (string) ($first['createdAt'] ?? '')
+));
 
 $counts = ['normal' => 0, 'moderate' => 0, 'severe' => 0, 'emergency' => 0];
 foreach ($records as $record) {

@@ -21,13 +21,7 @@ $currentUser = current_user();
 $studentId = $currentUser['studentId'] ?? $currentUser['uid'] ?? $currentUser['id'] ?? null;
 $id = sanitize($_GET['id'] ?? $_POST['id'] ?? '');
 $service = new IncidentService();
-$incident = null;
-foreach ($service->studentIncidents($studentId) as $record) {
-    if ((string) ($record['id'] ?? '') === $id) {
-        $incident = $record;
-        break;
-    }
-}
+$incident = $service->findForStudent($id, $studentId);
 if (!$incident) {
     flash('error', 'Incident not found.');
     redirect(url('views/student/incidents/index/index.php'));

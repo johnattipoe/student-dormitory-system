@@ -43,7 +43,7 @@ function initialiseProfileDraft(form) {
         window.localStorage.removeItem(profileDraftKey);
     });
 }
-document.addEventListener('DOMContentLoaded', () => {
+SDS.onPageLoad(() => {
     const form = getProfileForm();
     if (form)
         initialiseProfileDraft(form);

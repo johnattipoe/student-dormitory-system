@@ -167,11 +167,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['action'])) {
     }
 }
 
-$houseId = current_user()['houseId'] ?? null;
+$houseId = trim((string) (current_user()['houseId'] ?? current_user()['house_id'] ?? ''));
 $house = $houseId ? HouseService::find((string) $houseId) : null;
-$students = StudentService::all($houseId);
-$rooms = RoomService::all($houseId);
-$classRecords = FirebaseService::getInstance()->getCollection('classes', [], 500);
+$rooms = $houseId !== '' ? RoomService::all($houseId) : [];
+$classRecords = $houseId !== '' ? FirebaseService::getInstance()->getCollection('classes', [], 500) : [];
 $studentClassOptions = array_values(array_unique(array_filter(array_map(
     static function (array $class): string {
         $code = trim((string) ($class['classCode'] ?? ''));
@@ -197,15 +196,18 @@ foreach ($rooms as $room) {
 }
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
-$activeStudentCount = count(array_filter($students, fn($student) => ($student['status'] ?? '') === 'active'));
-$inactiveStudentCount = count(array_filter($students, fn($student) => ($student['status'] ?? '') === 'inactive'));
-$suspendedStudentCount = count(array_filter($students, fn($student) => ($student['status'] ?? '') === 'suspended'));
-$assignedRoomCount = count(array_filter($students, fn($student) => !empty($student['roomId'])));
-$unassignedRoomCount = max(0, count($students) - $assignedRoomCount);
-$totalStudents = count($students);
+$studentStats = $houseId !== ''
+    ? StudentService::stats($houseId)
+    : ['total' => 0, 'active' => 0, 'inactive' => 0, 'suspended' => 0, 'assignedRooms' => 0];
+$activeStudentCount = (int) ($studentStats['active'] ?? 0);
+$inactiveStudentCount = (int) ($studentStats['inactive'] ?? 0);
+$suspendedStudentCount = (int) ($studentStats['suspended'] ?? 0);
+$assignedRoomCount = (int) ($studentStats['assignedRooms'] ?? 0);
+$totalStudents = (int) ($studentStats['total'] ?? 0);
+$unassignedRoomCount = max(0, $totalStudents - $assignedRoomCount);
 $totalPages = max(1, (int) ceil($totalStudents / $limit));
 $page = min($page, $totalPages);
-$students = array_slice($students, ($page - 1) * $limit, $limit);
+$students = $houseId !== '' ? StudentService::page($houseId, $limit, $page) : [];
 
 $pageTitle = 'Resident Students';
 $navItems = [

@@ -1,6 +1,6 @@
 // incidents.js — report/view screen helpers: live severity preview and a
 // simple character counter on the description field.
-document.addEventListener('DOMContentLoaded', function () {
+SDS.onPageLoad(function () {
   const severitySelect = document.querySelector('select[name="severity"]');
   const preview = document.getElementById('severityPreview');
   const severityColors = { low: 'secondary', medium: 'info', high: 'warning', critical: 'danger' };

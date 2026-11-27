@@ -28,9 +28,11 @@ if (is_array($profile)) {
     $user = array_merge($user, $profile);
 }
 
-$allUsers = $userService->all();
-$totalStaff = count(array_filter($allUsers, fn($u) => ($u['role'] ?? '') !== ROLE_STUDENT));
-$totalStudents = count(StudentService::all());
+$firebase = FirebaseService::getInstance();
+$totalUsers = $firebase->count(COL_USERS);
+$totalStudentUsers = $firebase->count(COL_USERS, [['role', '=', ROLE_STUDENT]]);
+$totalStaff = max(0, $totalUsers - $totalStudentUsers);
+$totalStudents = StudentService::count();
 $totalHouses = count(HouseService::all());
 
 $fullName = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')))) ?: 'Administrator';

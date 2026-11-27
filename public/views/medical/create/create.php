@@ -15,10 +15,8 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_ADMIN, ROLE_NURSE];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
-use App\Services\FirebaseService;
-
 $pageTitle = 'Create Medical Record';
-$students = FirebaseService::getInstance()->getCollection(COL_STUDENTS, [], 500);
+$pageScripts = array_values(array_unique(array_merge($pageScripts ?? [], ['attendance.js'])));
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-heart-pulse', 'label' => 'Medical Records', 'href' => url('views/medical/index/index.php'), 'active' => true],
@@ -36,11 +34,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">Student</label>
-                        <select name="studentId" class="form-select" required>
+                        <select name="studentId" class="form-select" data-attendance-student-options="<?= e(url('views/attendance/student-options.php')) ?>" required>
                             <option value="">Select student</option>
-                            <?php foreach ($students as $student): ?>
-                                <option value="<?= e($student['id'] ?? '') ?>"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?></option>
-                            <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="col-md-6">

@@ -42,10 +42,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
 $pageTitle = 'Incidents';
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
-$allIncidents = FirebaseService::getInstance()->getCollection(COL_INCIDENTS, [], 200);
-$totalIncidents = count($allIncidents);
+$firebase = FirebaseService::getInstance();
+$totalIncidents = $firebase->count(COL_INCIDENTS);
 $totalPages = max(1, (int) ceil($totalIncidents / $limit));
-$incidents = array_slice($allIncidents, ($page - 1) * $limit, $limit);
+$page = min($page, $totalPages);
+$incidents = $firebase->getCollection(
+    COL_INCIDENTS,
+    [],
+    $limit,
+    ($page - 1) * $limit,
+    false,
+    [['createdAt', 'DESC']]
+);
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-exclamation-triangle', 'label' => 'Incidents', 'href' => url('views/incidents/index/index.php'), 'active' => true],

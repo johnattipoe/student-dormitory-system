@@ -56,6 +56,23 @@ Use the PHP development server:
 php -S localhost:8000 -t public
 php -S 127.0.0.1:8000 -t public
 
+### Redis-backed Firestore cache
+
+Start the project-owned Redis service from the repository root:
+
+```powershell
+docker compose up -d redis
+```
+
+The Compose service uses container name `student-dormitory-redis` and host port
+`6380`, so it does not conflict with other local Redis containers. Set the
+`REDIS_*` values from `.env.example` in `.env`. The development defaults connect
+PHP on the host to Redis at `127.0.0.1:6380`. If PHP runs in a Docker container
+on the same Compose network, set `REDIS_HOST=redis` and `REDIS_PORT=6379`. The
+application caches Firestore documents, query results, and aggregates for up to
+60 seconds and invalidates affected collection entries after writes. If Redis is
+unavailable, the request logs the cache failure and continues with Firestore.
+
 Then open:
 
 https://student-dormitory-system-5hxq.onrender.com

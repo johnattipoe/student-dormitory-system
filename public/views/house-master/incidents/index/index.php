@@ -18,59 +18,58 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\IncidentService;
 use App\Services\StudentService;
 use App\Services\UserService;
-use App\Services\FirebaseService;
 
 $houseId = current_user()['houseId'] ?? null;
-$students = StudentService::all($houseId);
-$studentMap = [];
 $reporterMap = [];
 
-foreach ($students as $student) {
-    $sName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
-    $adm = !empty($student['admissionNo']) ? ' [' . $student['admissionNo'] . ']' : '';
-    $displayName = $sName . $adm;
-    $studentMap[(string) ($student['id'] ?? '')] = $student;
-    foreach ([$student['id'] ?? null, $student['studentId'] ?? null, $student['admissionNo'] ?? null, $student['userId'] ?? null, $student['uid'] ?? null] as $key) {
-        if ($key !== null && $key !== '') {
-            $reporterMap[(string) $key] = $displayName . ' (Student)';
-        }
-    }
-}
+$userService = new UserService();
 
-try {
-    foreach ((new UserService())->all() as $user) {
-        $name = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))));
-        if ($name === '') $name = $user['displayName'] ?? $user['username'] ?? $user['email'] ?? null;
-        if ($name) {
-            $roleLabel = !empty($user['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $user['role'])) . ')' : '';
-            $displayName = $name . $roleLabel;
-            foreach ([$user['id'] ?? null, $user['uid'] ?? null, $user['userId'] ?? null, $user['email'] ?? null] as $key) {
-                if ($key !== null && $key !== '') {
-                    $reporterMap[(string) $key] = $displayName;
-                }
-            }
-        }
-    }
-} catch (\Throwable $e) {}
-
-$getReporterName = function (array $incident) use (&$reporterMap, $studentMap): string {
+$getReporterName = function (array $incident) use (&$reporterMap, $userService): string {
     if (!empty($incident['reportedByName']) && trim((string) $incident['reportedByName']) !== '' && !str_starts_with((string) $incident['reportedByName'], 'Staff/User')) {
         return (string) $incident['reportedByName'];
     }
     $rawId = trim((string) ($incident['reportedBy'] ?? ''));
     $studentId = trim((string) ($incident['studentId'] ?? ''));
+    if ($rawId !== '' && $rawId === $studentId && !empty($incident['studentName'])) {
+        return (string) $incident['studentName'] . ' (Student)';
+    }
     if ($rawId !== '' && isset($reporterMap[$rawId])) {
         return $reporterMap[$rawId];
     }
-    if ($rawId !== '' && $studentId !== '' && ($rawId === $studentId || isset($studentMap[$rawId]))) {
-        $s = $studentMap[$rawId] ?? $studentMap[$studentId] ?? [];
-        $sName = trim(($s['firstName'] ?? '') . ' ' . ($s['lastName'] ?? ''));
-        return ($sName ?: 'Student') . ' (Student)';
+    if ($rawId !== '' && !isset($reporterMap[$rawId])) {
+        try {
+            $user = $userService->find($rawId);
+            if ($user !== null) {
+                $name = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))));
+                if ($name === '') $name = $user['displayName'] ?? $user['username'] ?? $user['email'] ?? '';
+                if ($name !== '') {
+                    $roleLabel = !empty($user['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $user['role'])) . ')' : '';
+                    $reporterMap[$rawId] = $name . $roleLabel;
+                }
+            }
+            if (!isset($reporterMap[$rawId])) {
+                $student = StudentService::findByIdentifier($rawId);
+                if ($student !== null) {
+                    $name = trim((string) ($student['firstName'] ?? '') . ' ' . (string) ($student['lastName'] ?? ''));
+                    if ($name !== '') {
+                        $displayName = $name . ' (Student)';
+                        foreach ([$student['id'] ?? null, $student['studentId'] ?? null, $student['admissionNo'] ?? null, $student['userId'] ?? null, $student['uid'] ?? null] as $key) {
+                            if ($key !== null && (string) $key !== '') {
+                                $reporterMap[(string) $key] = $displayName;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('Incident reporter lookup failed: ' . get_class($e));
+        }
+        if (!isset($reporterMap[$rawId])) {
+            $reporterMap[$rawId] = $rawId;
+        }
     }
-    if ($studentId !== '' && isset($studentMap[$studentId])) {
-        $s = $studentMap[$studentId];
-        $sName = trim(($s['firstName'] ?? '') . ' ' . ($s['lastName'] ?? ''));
-        return ($sName ?: 'Student') . ' (Student)';
+    if ($rawId !== '' && isset($reporterMap[$rawId])) {
+        return $reporterMap[$rawId];
     }
     return $rawId !== '' ? $rawId : '—';
 };
@@ -271,8 +270,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <?php if (!empty($incidents)): ?>
                             <?php foreach ($incidents as $incident): ?>
                                 <?php 
-                                    $incidentStudent = $studentMap[(string) ($incident['studentId'] ?? '')] ?? null; 
-                                    $studentName = $incidentStudent ? trim((($incidentStudent['firstName'] ?? '') . ' ' . ($incidentStudent['lastName'] ?? ''))) : ($incident['studentId'] ?? '—');
+                                    $studentName = (string) ($incident['studentName'] ?? '') ?: ($incident['studentId'] ?? '—');
                                     $priority = $incident['priority'] ?? $incident['severity'] ?? 'medium';
                                     $reporterName = $getReporterName($incident);
                                 ?>
@@ -315,8 +313,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     </div>
 </div>
 <?php foreach ($incidents as $incident): ?>
-    <?php $modalIncidentId = (string) ($incident['id'] ?? ''); $modalIncidentPriority = (string) ($incident['priority'] ?? $incident['severity'] ?? 'medium'); $modalIncidentStatus = (string) ($incident['status'] ?? 'open'); ?>
-    <div class="modal fade" id="houseIncidentViewModal-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Incident Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-4">Title</dt><dd class="col-sm-8"><?= e($incident['title'] ?? $incident['type'] ?? 'Incident') ?></dd><dt class="col-sm-4">Student</dt><dd class="col-sm-8"><?= e($studentName) ?></dd><dt class="col-sm-4">Priority</dt><dd class="col-sm-8"><?= e(ucfirst($modalIncidentPriority)) ?></dd><dt class="col-sm-4">Status</dt><dd class="col-sm-8"><?= e(ucwords(str_replace('_', ' ', $modalIncidentStatus))) ?></dd><dt class="col-sm-4">Details</dt><dd class="col-sm-8"><?= e($incident['description'] ?? $incident['notes'] ?? '—') ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
+    <?php $modalIncidentId = (string) ($incident['id'] ?? ''); $modalIncidentStudentName = (string) ($incident['studentName'] ?? '') ?: ($incident['studentId'] ?? '—'); $modalIncidentPriority = (string) ($incident['priority'] ?? $incident['severity'] ?? 'medium'); $modalIncidentStatus = (string) ($incident['status'] ?? 'open'); ?>
+    <div class="modal fade" id="houseIncidentViewModal-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Incident Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-sm-4">Title</dt><dd class="col-sm-8"><?= e($incident['title'] ?? $incident['type'] ?? 'Incident') ?></dd><dt class="col-sm-4">Student</dt><dd class="col-sm-8"><?= e($modalIncidentStudentName) ?></dd><dt class="col-sm-4">Priority</dt><dd class="col-sm-8"><?= e(ucfirst($modalIncidentPriority)) ?></dd><dt class="col-sm-4">Status</dt><dd class="col-sm-8"><?= e(ucwords(str_replace('_', ' ', $modalIncidentStatus))) ?></dd><dt class="col-sm-4">Details</dt><dd class="col-sm-8"><?= e($incident['description'] ?? $incident['notes'] ?? '—') ?></dd></dl></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>
     <div class="modal fade" id="houseIncidentEditModal-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><form method="POST" action="<?= url('views/house-master/incidents/edit/edit.php?id=' . urlencode($modalIncidentId)) ?>"><div class="modal-header"><h5 class="modal-title">Edit Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" name="id" value="<?= e($modalIncidentId) ?>"><label class="form-label">Title</label><input name="title" class="form-control mb-3" value="<?= e($incident['title'] ?? $incident['type'] ?? '') ?>" required><div class="row g-3"><div class="col-md-6"><label class="form-label">Priority</label><select name="priority" class="form-select"><option value="low" <?= $modalIncidentPriority === 'low' ? 'selected' : '' ?>>Low</option><option value="medium" <?= $modalIncidentPriority === 'medium' ? 'selected' : '' ?>>Medium</option><option value="high" <?= $modalIncidentPriority === 'high' ? 'selected' : '' ?>>High</option></select></div><div class="col-md-6"><label class="form-label">Status</label><select name="status" class="form-select"><option value="open" <?= $modalIncidentStatus === 'open' ? 'selected' : '' ?>>Open</option><option value="investigating" <?= $modalIncidentStatus === 'investigating' ? 'selected' : '' ?>>Investigating</option><option value="resolved" <?= $modalIncidentStatus === 'resolved' ? 'selected' : '' ?>>Resolved</option></select></div></div><label class="form-label mt-3">Description</label><textarea name="description" class="form-control" rows="5"><?= e($incident['description'] ?? $incident['notes'] ?? '') ?></textarea></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save changes</button></div></form></div></div></div>
     <div class="modal fade" id="houseIncidentDeleteModal-<?= e($modalIncidentId) ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-0"><h5 class="modal-title text-danger">Delete Incident</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p class="mb-0">Delete <strong><?= e($incident['title'] ?? $incident['type'] ?? 'this incident') ?></strong>?</p></div><div class="modal-footer border-0"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="<?= url('views/house-master/incidents/delete/delete.php?id=' . urlencode($modalIncidentId)) ?>"><input type="hidden" name="id" value="<?= e($modalIncidentId) ?>"><button type="submit" class="btn btn-danger">Delete</button></form></div></div></div></div>
 <?php endforeach; ?>
@@ -335,11 +333,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Student Involved</label>
-                            <select name="studentId" class="form-select" required>
-                                <option value="">Select student</option>
-                                <?php foreach ($students as $studentOption): ?>
-                                    <option value="<?= e((string) ($studentOption['id'] ?? '')) ?>"><?= e(trim(($studentOption['firstName'] ?? '') . ' ' . ($studentOption['lastName'] ?? ''))) ?> (<?= e($studentOption['admissionNo'] ?? 'No ID') ?>)</option>
-                                <?php endforeach; ?>
+                            <select name="studentId" class="form-select" required disabled
+                                data-house-student-options="<?= e(url('views/house-student-options.php')) ?>"
+                                data-placeholder="Select student">
+                                <option value="">Student options load when this form opens</option>
                             </select>
                         </div>
                         <div class="col-md-6"><label class="form-label">Incident Title</label><input name="title" class="form-control" required></div>
@@ -350,7 +347,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <div class="col-12"><label class="form-label">Detailed Description</label><textarea name="description" class="form-control" rows="5" required></textarea></div>
                     </div>
                 </div>
-                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger"><i class="bi bi-send me-1"></i>Submit Incident</button></div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger" data-house-student-options-submit disabled><i class="bi bi-send me-1"></i>Submit Incident</button></div>
             </form>
         </div>
     </div>

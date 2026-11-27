@@ -123,7 +123,7 @@ function filterTable(elements) {
     }
     renderPagination(elements, matchingRows.length, pageCount);
 }
-document.addEventListener('DOMContentLoaded', () => {
+SDS.onPageLoad(() => {
     const elements = getTableFilterElements();
     if (!elements)
         return;

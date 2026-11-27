@@ -21,13 +21,7 @@ $paymentId = trim((string) ($_GET['paymentId'] ?? ''));
 $payment = null;
 if ($paymentId !== '') {
     try {
-        $records = FirebaseService::getInstance()->getCollection(COL_FINANCE_PAYMENTS, [], 1000);
-        foreach ($records as $record) {
-            if ((string) ($record['id'] ?? '') === $paymentId) {
-                $payment = $record;
-                break;
-            }
-        }
+        $payment = FirebaseService::getInstance()->getDocument(COL_FINANCE_PAYMENTS, $paymentId);
     } catch (Throwable $e) {
         $payment = null;
     }

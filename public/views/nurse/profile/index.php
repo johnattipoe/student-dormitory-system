@@ -26,11 +26,13 @@ if (is_array($profile)) {
     $user = array_merge($user, $profile);
 }
 
-$medicalRecords = (new MedicalService())->all();
-$totalRecords = count($medicalRecords);
-$acuteCases = count(array_filter($medicalRecords, fn($m) => in_array(strtolower((string)($m['severity'] ?? '')), ['severe', 'emergency', 'critical'], true)));
-$todayDate = date('Y-m-d');
-$todayVisits = count(array_filter($medicalRecords, fn($m) => str_starts_with((string)($m['createdAt'] ?? $m['date'] ?? ''), $todayDate)));
+$medicalService = new MedicalService();
+$totalRecords = $medicalService->count();
+$acuteCases = 0;
+foreach (['severe', 'emergency', 'critical'] as $severity) {
+    $acuteCases += $medicalService->countBySeverity($severity);
+}
+$todayVisits = $medicalService->todayCases();
 
 $fullName = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')))) ?: 'Staff Nurse';
 $initials = strtoupper(substr($fullName, 0, 1) . (str_contains($fullName, ' ') ? substr(explode(' ', $fullName)[1], 0, 1) : 'N'));

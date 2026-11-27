@@ -77,18 +77,30 @@ $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_p
 $notifications = $notificationService->all($limit);
 $totalNotifications = $notificationService->count();
 $totalPages = max(1, (int) ceil($totalNotifications / $limit));
-$users = (new UserService())->all();
+$userService = new UserService();
 $userMap = [];
-foreach ($users as $user) {
-    $userName = $user['name'] ?? $user['email'] ?? null;
-    if ($userName) {
-        foreach ([$user['id'] ?? null, $user['uid'] ?? null] as $userId) {
-            if ($userId !== null && $userId !== '') {
-                $userMap[(string) $userId] = $userName;
+$getNotificationUserName = function (string $userId) use (&$userMap, $userService): string {
+    if ($userId === '') {
+        return '-';
+    }
+
+    if (!array_key_exists($userId, $userMap)) {
+        $user = $userService->find($userId);
+        $userName = $user['name'] ?? $user['email'] ?? null;
+        if ($userName) {
+            foreach ([$user['id'] ?? null, $user['uid'] ?? null] as $userKey) {
+                if ($userKey !== null && $userKey !== '') {
+                    $userMap[(string) $userKey] = (string) $userName;
+                }
             }
         }
+        if (!isset($userMap[$userId])) {
+            $userMap[$userId] = $userId;
+        }
     }
-}
+
+    return $userMap[$userId];
+};
 $unreadCount = count(array_filter($notifications, fn($notification) => empty($notification['read'])));
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
@@ -146,11 +158,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">User</label>
-                    <select name="userId" class="form-select" id="notificationUserId">
+                    <select name="userId" class="form-select" id="notificationUserId" data-admin-notification-user-options="<?= e(url('views/admin/notifications/user-options.php')) ?>">
                         <option value="">Select user</option>
-                        <?php foreach ($users as $user): ?>
-                            <option value="<?= e((string) ($user['uid'] ?? $user['id'] ?? '')) ?>"><?= e((string) ($user['name'] ?? ($user['email'] ?? 'Unknown'))) ?> (<?= e((string) ($user['role'] ?? '')) ?>)</option>
-                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-6">
@@ -196,7 +205,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <td><?= e($note['type'] ?? 'info') ?></td>
                         <td><?= e($note['message'] ?? '') ?></td>
                         <td><?= !empty($note['read']) ? 'Yes' : 'No' ?></td>
-                        <td><?= e($userMap[$notificationUserId] ?? ($note['userId'] ?? '-')) ?></td>
+                        <td><?= e($getNotificationUserName($notificationUserId)) ?></td>
                         <td class="notification-actions-cell">
                             <div class="notification-actions">
                                 <button type="button" class="notification-action notification-action-view" data-bs-toggle="modal" data-bs-target="#notificationViewModal-<?= e((string) ($note['id'] ?? '')) ?>" title="View notification"><i class="bi bi-eye"></i><span>View</span></button>

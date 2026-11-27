@@ -19,13 +19,7 @@ use App\Services\AttendanceService;
 use App\Services\FirebaseService;
 
 $id = sanitize($_GET['id'] ?? $_POST['id'] ?? '');
-$entry = null;
-foreach (AttendanceService::byHouse(current_user()['houseId'] ?? null) as $record) {
-    if (($record['id'] ?? '') === $id) {
-        $entry = $record;
-        break;
-    }
-}
+$entry = AttendanceService::findByHouse($id, current_user()['houseId'] ?? null);
 
 if (!$entry) {
     flash('error', 'Attendance record not found.');

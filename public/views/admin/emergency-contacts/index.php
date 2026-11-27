@@ -24,7 +24,6 @@ $firebase = FirebaseService::getInstance();
 $user = current_user() ?? [];
 $userId = (string) current_user_id();
 $userName = trim((string) ($user['name'] ?? '')) ?: 'Administrator';
-$students = StudentService::allRecords();
 $indexUrl = url('views/admin/emergency-contacts/index.php');
 $exportUrl = url('views/admin/emergency-contacts/export/export.php');
 $allContacts = $firebase->getCollection('emergency_contacts', [], 500);
@@ -101,14 +100,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $studentId = trim((string) sanitize($_POST['studentId'] ?? ''));
             $studentName = '';
+            $student = null;
             if ($studentId !== '') {
-                foreach ($students as $student) {
-                    if ((string) ($student['id'] ?? '') === $studentId) {
-                        $studentName = trim((string) ($student['firstName'] ?? '') . ' ' . (string) ($student['lastName'] ?? ''));
-                        break;
-                    }
-                }
-                if ($studentName === '') {
+                $student = StudentService::find($studentId);
+                $studentName = trim((string) ($student['firstName'] ?? '') . ' ' . (string) ($student['lastName'] ?? ''));
+                if (!$student || $studentName === '') {
                     throw new \InvalidArgumentException('Select a valid student.');
                 }
             }
@@ -216,14 +212,14 @@ usort($contacts, static function ($a, $b) {
     return $wA <=> $wB;
 });
 
-// Recent emergency incidents & calls
-$incidents = $firebase->getCollection('emergency_incidents', [], 50);
-usort($incidents, static fn($a, $b) => strcmp((string) ($b['triggeredAt'] ?? ''), (string) ($a['triggeredAt'] ?? '')));
-
 $totalContacts = count($contacts);
 $criticalContacts = count(array_filter($contacts, fn($c) => ($c['priority'] ?? '') === 'critical'));
 $todayDate = date('Y-m-d');
-$todayCalls = count(array_filter($incidents, fn($i) => str_starts_with((string)($i['triggeredAt'] ?? ''), $todayDate)));
+$tomorrowDate = date('Y-m-d', strtotime('+1 day'));
+$todayCalls = $firebase->count('emergency_incidents', [
+    ['triggeredAt', '>=', $todayDate],
+    ['triggeredAt', '<', $tomorrowDate],
+]);
 
 $pageTitle = 'Emergency Contacts & Dispatch';
 $navItems = [
@@ -466,7 +462,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="row g-3">
                         <div class="col-md-6"><label class="form-label">Contacted agency / responder</label><input class="form-control" name="contactName" id="emergencyLogContactName" required></div>
                         <div class="col-md-6"><label class="form-label">Phone number called</label><input class="form-control" name="contactPhone" id="emergencyLogContactPhone"></div>
-                        <div class="col-md-6"><label class="form-label">Involved student (optional)</label><select class="form-select" name="studentId"><option value="">None / dormitory-wide incident</option><?php foreach ($students as $student): ?><option value="<?= e($student['id'] ?? '') ?>"><?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: 'Student') ?><?= !empty($student['admissionNo']) ? ' [' . e($student['admissionNo']) . ']' : '' ?></option><?php endforeach; ?></select></div>
+                        <div class="col-md-6"><label class="form-label">Involved student (optional)</label><select class="form-select" name="studentId" data-admin-student-options="<?= e(url('views/admin/emergency-contacts/student-options.php')) ?>" data-placeholder="None / dormitory-wide incident"><option value="">None / dormitory-wide incident</option></select></div>
                         <div class="col-md-6"><label class="form-label">Incident reason / type</label><input class="form-control" name="reason"></div>
                         <div class="col-12"><label class="form-label">Call summary & discussion</label><textarea class="form-control" name="notes" rows="3" required></textarea></div>
                         <div class="col-12"><label class="form-label">Immediate action taken</label><textarea class="form-control" name="actionTaken" rows="2"></textarea></div>

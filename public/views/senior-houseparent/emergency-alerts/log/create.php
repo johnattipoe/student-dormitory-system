@@ -21,8 +21,9 @@ $userName = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user[
 $houseId = (string) ($user['houseId'] ?? $user['house_id'] ?? '');
 
 $firebase = FirebaseService::getInstance();
-$contacts = $firebase->getCollection('emergency_contacts', [], 500);
-$students = StudentService::all($houseId);
+$contacts = $_SERVER['REQUEST_METHOD'] === 'POST'
+    ? []
+    : $firebase->getCollection('emergency_contacts', [], 500);
 
 $selectedContactId = sanitize($_GET['contactId'] ?? '');
 $prefillContactName = '';
@@ -46,21 +47,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $reason = trim((string) sanitize($_POST['reason'] ?? ''));
     $notes = trim((string) sanitize($_POST['notes'] ?? ''));
     $actionTaken = trim((string) sanitize($_POST['actionTaken'] ?? ''));
+    $student = $studentId !== '' ? StudentService::find($studentId) : null;
 
     if ($contactName === '') $errors['contactName'] = 'Contact or agency name is required.';
     if ($notes === '') $errors['notes'] = 'Incident call summary and notes are required.';
+    if ($studentId !== '' && (!$student || (string) ($student['houseId'] ?? '') !== $houseId)) {
+        $errors['studentId'] = 'Select a student assigned to your house.';
+    }
 
     if (empty($errors)) {
         try {
-            $studentName = '';
-            if ($studentId !== '') {
-                foreach ($students as $st) {
-                    if ((string)($st['id'] ?? '') === $studentId) {
-                        $studentName = trim(($st['firstName'] ?? '') . ' ' . ($st['lastName'] ?? ''));
-                        break;
-                    }
-                }
-            }
+            $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
 
             $incidentData = [
                 'contactName' => $contactName,
@@ -100,6 +97,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors['general'] = 'Failed to log call record: ' . $e->getMessage();
         }
     }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
+    $contacts = $firebase->getCollection('emergency_contacts', [], 500);
 }
 
 $pageTitle = 'Log Emergency Call';
@@ -145,14 +146,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
                 <div class="col-md-6">
                     <label class="form-label fw-bold" for="studentId">Involved Student (Optional)</label>
-                    <select class="form-select" id="studentId" name="studentId">
+                    <select class="form-select" id="studentId" name="studentId" data-house-student-options="<?= e(url('views/house-student-options.php')) ?>" data-placeholder="— None / Dormitory-Wide Incident —">
                         <option value="">— None / Dormitory-Wide Incident —</option>
-                        <?php foreach ($students as $st): ?>
-                            <?php $fullName = trim(($st['firstName'] ?? '') . ' ' . ($st['lastName'] ?? '')); ?>
-                            <option value="<?= e($st['id'] ?? '') ?>">
-                                <?= e($fullName ?: 'Student') ?> <?= !empty($st['admissionNo']) ? '[' . e($st['admissionNo']) . ']' : '' ?>
-                            </option>
-                        <?php endforeach; ?>
                     </select>
                 </div>
 

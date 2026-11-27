@@ -14,49 +14,69 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\MedicalService;
 use App\Services\StudentService;
 use App\Services\FirebaseService;
+use App\Services\CacheService;
 
 $user = current_user() ?? [];
 $nurseName = trim(($user['name'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))) ?: 'Nurse';
 
-$medicalService = new MedicalService();
-$students = StudentService::all();
-$nurseMedicalStudents = $students;
+$medicalData = CacheService::remember('dashboard:nurse:v3', 30, static function (): array {
+    $medicalService = new MedicalService();
+    $records = $medicalService->recent(7);
+    $todayCases = $medicalService->todayCases();
+    $totalRecords = $medicalService->count();
+    $severityCounts = ['normal' => 0];
+    foreach (['moderate', 'severe', 'critical', 'emergency'] as $severity) {
+        $severityCounts[$severity] = $medicalService->countBySeverity($severity);
+    }
+    $severityCounts['normal'] = max(0, $totalRecords - array_sum($severityCounts));
+
+    $totalStudents = StudentService::count();
+    $dailyLabels = [];
+    $dailyValues = [];
+    for ($daysAgo = 6; $daysAgo >= 0; $daysAgo--) {
+        $start = (new DateTimeImmutable('today'))->modify('-' . $daysAgo . ' days');
+        $end = $start->modify('+1 day');
+        $dailyLabels[] = $start->format('M j');
+        $dailyValues[] = $medicalService->countCreatedBetween($start, $end);
+    }
+
+    return [
+        'records' => $records,
+        'todayCases' => $todayCases,
+        'totalRecords' => $totalRecords,
+        'severityCounts' => $severityCounts,
+        'totalStudents' => $totalStudents,
+        'dailyLabels' => $dailyLabels,
+        'dailyValues' => $dailyValues,
+    ];
+});
+
+$nurseMedicalStudents = [];
+$nurseMedicalLazyStudentOptions = true;
 $nurseMedicalModalId = 'nurseMedicalRecordCreate';
 $nurseMedicalReturnTo = 'dashboard';
 $nurseMedicalSelectedStudentId = '';
-$records  = $medicalService->all();
-$todayCases    = (int) $medicalService->todayCases();
-$emergencyCases = (int) $medicalService->emergencyCases();
-
-$criticalRecords = array_values(array_filter($records, static fn($r) => in_array(strtolower((string)($r['severity'] ?? 'normal')), ['severe', 'critical', 'emergency'], true)));
-$moderateRecords = array_values(array_filter($records, static fn($r) => strtolower((string)($r['severity'] ?? 'normal')) === 'moderate'));
+$records = $medicalData['records'];
+$todayCases = (int) $medicalData['todayCases'];
+$totalRecords = (int) $medicalData['totalRecords'];
+$severityCounts = $medicalData['severityCounts'];
+$emergencyCases = $severityCounts['severe'] + $severityCounts['critical'] + $severityCounts['emergency'];
 
 // Fetch announcements for nurses
 $firebase = FirebaseService::getInstance();
-$allAnn = $firebase->getCollection('announcements', [], 50);
+$allAnn = $firebase->getCollection('announcements', [], 20, 0, false, [['createdAt', 'DESC']]);
 $nurseAnn = array_values(array_filter($allAnn, fn($a) => ($a['status'] ?? 'published') === 'published' && in_array($a['audience'] ?? 'all', ['all', 'role'])));
-usort($nurseAnn, fn($a, $b) => strcmp((string)($b['createdAt'] ?? ''), (string)($a['createdAt'] ?? '')));
 $topAnn = array_slice($nurseAnn, 0, 3);
 
-usort($records, static fn($a, $b) => strcmp((string)($b['createdAt'] ?? ''), (string)($a['createdAt'] ?? '')));
-$recentRecords = array_slice($records, 0, 7);
+$recentRecords = $records;
 
-$totalStudents  = count($students);
-$totalRecords   = count($records);
-$criticalCount  = count($criticalRecords);
-$moderateCount  = count($moderateRecords);
-$dailyLabels = [];
-$dailyValues = [];
-for ($daysAgo = 6; $daysAgo >= 0; $daysAgo--) {
-    $date = date('Y-m-d', strtotime('-' . $daysAgo . ' days'));
-    $dailyLabels[] = date('M j', strtotime($date));
-    $dailyValues[] = count(array_filter($records, static fn(array $record): bool => str_starts_with((string) ($record['createdAt'] ?? ''), $date)));
-}
+$totalStudents = (int) $medicalData['totalStudents'];
+$criticalCount = $emergencyCases;
+$moderateCount = $severityCounts['moderate'];
+$dailyLabels = $medicalData['dailyLabels'];
+$dailyValues = $medicalData['dailyValues'];
 $severityLabels = ['Normal', 'Moderate', 'Severe', 'Critical', 'Emergency'];
-$severityValues = [];
-foreach (['normal', 'moderate', 'severe', 'critical', 'emergency'] as $severity) {
-    $severityValues[] = count(array_filter($records, static fn(array $record): bool => strtolower((string) ($record['severity'] ?? 'normal')) === $severity));
-}
+$severityValues = array_values($severityCounts);
 
 $pageTitle  = 'Nurse Dashboard';
 $pageScripts = ['reports.js'];

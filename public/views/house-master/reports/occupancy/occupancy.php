@@ -16,7 +16,6 @@ $allowedRoles = [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\RoomService;
-use App\Services\StudentService;
 use App\Services\HouseService;
 
 $houseId = (string) (current_user()['houseId'] ?? current_user()['house_id'] ?? '');
@@ -24,7 +23,6 @@ $house = $houseId !== '' ? HouseService::find($houseId) : null;
 $houseName = $house['name'] ?? ($houseId ?: 'Assigned House');
 
 $rooms = RoomService::all($houseId);
-$students = StudentService::all($houseId);
 $stats = RoomService::occupancyStats($houseId);
 
 $pageTitle = 'Room & Bed Occupancy Report';

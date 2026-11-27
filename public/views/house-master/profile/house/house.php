@@ -19,23 +19,30 @@ use App\Services\HouseService;
 use App\Services\StudentService;
 use App\Services\RoomService;
 use App\Services\UserService;
+use App\Services\FirebaseService;
 
 $user = current_user() ?? [];
 $houseId = (string) ($user['houseId'] ?? $user['house_id'] ?? '');
 $house = $houseId !== '' ? HouseService::find($houseId) : null;
 $houseName = $house['name'] ?? ($houseId ?: 'Assigned House');
 
-$students = StudentService::all($houseId);
+$occupancy = $houseId !== '' ? StudentService::count($houseId) : 0;
 $rooms = RoomService::all($houseId);
 
 $capacity = (int) ($house['capacity'] ?? ($totalRooms = count($rooms) * 24));
 if ($capacity <= 0) $capacity = 100;
-$occupancy = count($students);
 $occupancyPercent = min(100, round(($occupancy / $capacity) * 100));
 
-// Fellow house masters assigned to same house
-$allUsers = (new UserService())->all();
-$houseStaff = array_values(array_filter($allUsers, function ($u) use ($houseId) {
+$houseStaffById = [];
+if ($houseId !== '') {
+    $firebase = FirebaseService::getInstance();
+    foreach (['houseId', 'house_id'] as $field) {
+        foreach ($firebase->getCollection(COL_USERS, [[$field, '=', $houseId]], 150, 0, false) as $staff) {
+            $houseStaffById[(string) ($staff['id'] ?? '')] = $staff;
+        }
+    }
+}
+$houseStaff = array_values(array_filter($houseStaffById, function ($u) use ($houseId) {
     $role = (string) ($u['role'] ?? '');
     $uHouseId = (string) ($u['houseId'] ?? $u['house_id'] ?? '');
     return in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS, ROLE_SENIOR_HOUSEPARENT], true) && $uHouseId === $houseId;

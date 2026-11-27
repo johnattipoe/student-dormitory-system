@@ -19,12 +19,11 @@ use App\Services\IncidentService;
 use App\Services\StudentService;
 
 $houseId = current_user()['houseId'] ?? null;
-$students = StudentService::all($houseId);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $studentId = sanitize($_POST['studentId'] ?? '');
-    $valid = array_filter($students, fn($student) => (string) ($student['id'] ?? '') === $studentId);
-    if (!$valid) {
+    $studentId = trim((string) sanitize($_POST['studentId'] ?? ''));
+    $student = $studentId !== '' ? StudentService::find($studentId) : null;
+    if (!$student || (string) ($student['houseId'] ?? '') !== (string) $houseId) {
         flash('error', 'Select a valid student from your assigned house.');
     } else {
         $result = (new IncidentService())->create([
@@ -80,13 +79,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             <label class="form-label fw-semibold">Student Involved <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-white"><i class="bi bi-person"></i></span>
-                                <select name="studentId" class="form-select" required>
-                                    <option value="">Select student</option>
-                                    <?php foreach ($students as $student): ?>
-                                        <option value="<?= e((string) ($student['id'] ?? '')) ?>">
-                                            <?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?> (<?= e($student['admissionNo'] ?? 'No ID') ?>)
-                                        </option>
-                                    <?php endforeach; ?>
+                                <select name="studentId" class="form-select" required
+                                    data-house-student-options="<?= e(url('views/house-student-options.php')) ?>"
+                                    data-placeholder="Select student">
+                                    <option value="">Focus to load students</option>
                                 </select>
                             </div>
                         </div>
@@ -121,7 +117,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <a class="btn btn-outline-secondary" href="<?= url('views/house-master/incidents/index/index.php') ?>">
                             Cancel
                         </a>
-                        <button type="submit" class="btn btn-danger">
+                        <button type="submit" class="btn btn-danger" data-house-student-options-submit disabled>
                             <i class="bi bi-send me-1"></i>Submit Incident
                         </button>
                     </div>

@@ -19,7 +19,10 @@ use App\Services\UserService;
 
 $pageTitle = 'Add House';
 $userService = new UserService();
-$users = $userService->all();
+$users = array_merge(
+    $userService->byRole(ROLE_HOUSE_MASTER),
+    $userService->byRole(ROLE_HOUSE_MISTRESS)
+);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = [

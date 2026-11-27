@@ -42,8 +42,9 @@ try {
 
 $payments = [];
 try {
-    $payments = FirebaseService::getInstance()->getCollection(COL_FINANCE_PAYMENTS, [], 1000);
-    $payments = array_values(array_filter($payments, static fn(array $payment): bool => (string) ($payment['houseId'] ?? '') === (string) $houseId));
+    $payments = $houseId !== ''
+        ? FirebaseService::getInstance()->getCollection(COL_FINANCE_PAYMENTS, [['houseId', '=', (string) $houseId]], 1000, 0, false)
+        : [];
 } catch (Throwable $e) {
     $payments = [];
 }
