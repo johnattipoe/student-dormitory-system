@@ -17,32 +17,57 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\VisitorService;
 use App\Services\StudentService;
+use App\Services\FirebaseService;
 
-$allVisitors = (new VisitorService())->all();
-$totalVisitors = count($allVisitors);
-$insideVisitors = count(array_filter($allVisitors, fn($v) => ($v['status'] ?? '') === 'inside'));
-$checkedOutVisitors = count(array_filter($allVisitors, fn($v) => ($v['status'] ?? '') === 'checked_out'));
-
-$students = [];
-foreach (StudentService::all() as $student) {
-    $sId = (string)($student['id'] ?? '');
-    if ($sId !== '') {
-        $students[$sId] = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
-    }
-}
+$firebase = FirebaseService::getInstance();
+$totalVisitors = $firebase->count(COL_VISITORS);
+$insideVisitors = $firebase->count(COL_VISITORS, [['status', '=', 'inside']]);
+$checkedOutVisitors = $firebase->count(COL_VISITORS, [['status', '=', 'checked_out']]);
 
 $search = strtolower(sanitize($_GET['search'] ?? ''));
 $statusFilter = sanitize($_GET['status'] ?? '');
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
-$visitors = array_values(array_filter($allVisitors, function ($visitor) use ($search, $statusFilter) {
-    return ($search === '' || str_contains(strtolower((string) ($visitor['visitorName'] ?? '')), $search) || str_contains(strtolower((string) ($visitor['studentId'] ?? '')), $search))
-        && ($statusFilter === '' || ($visitor['status'] ?? '') === $statusFilter);
-}));
-$totalVisitorsFiltered = count($visitors);
+$visitorFilters = $statusFilter !== '' ? [['status', '=', $statusFilter]] : [];
+if ($search !== '') {
+    $allVisitors = (new VisitorService())->all();
+    $visitors = array_values(array_filter($allVisitors, function ($visitor) use ($search, $statusFilter) {
+        return str_contains(strtolower((string) ($visitor['visitorName'] ?? '')), $search)
+            || str_contains(strtolower((string) ($visitor['studentId'] ?? '')), $search);
+    }));
+    if ($statusFilter !== '') {
+        $visitors = array_values(array_filter($visitors, static fn(array $visitor): bool => ($visitor['status'] ?? '') === $statusFilter));
+    }
+    $totalVisitorsFiltered = count($visitors);
+} else {
+    $totalVisitorsFiltered = $firebase->count(COL_VISITORS, $visitorFilters);
+}
 $totalPages = max(1, (int) ceil($totalVisitorsFiltered / $limit));
 $page = min($page, $totalPages);
-$visitors = array_slice($visitors, ($page - 1) * $limit, $limit);
+if ($search !== '') {
+    $visitors = array_slice($visitors, ($page - 1) * $limit, $limit);
+} else {
+    $visitors = $firebase->getCollection(
+        COL_VISITORS,
+        $visitorFilters,
+        $limit,
+        ($page - 1) * $limit,
+        false,
+        [['createdAt', 'DESC']]
+    );
+}
+
+$students = [];
+$visibleStudentIds = array_values(array_unique(array_filter(array_map(
+    static fn(array $visitor): string => trim((string) ($visitor['studentId'] ?? '')),
+    $visitors
+))));
+foreach (StudentService::forIds($visibleStudentIds) as $student) {
+    $studentId = trim((string) ($student['id'] ?? ''));
+    if ($studentId !== '') {
+        $students[$studentId] = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
+    }
+}
 
 $pageTitle = 'Security Visitors';
 $navItems = [

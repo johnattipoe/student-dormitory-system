@@ -173,7 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $houses = HouseService::all();
-$staffUsers = (new UserService())->all();
+$staffUsers = (new UserService())->byRoles([ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS]);
 $houseMasters = array_values(array_filter($staffUsers, static fn (array $staff): bool => ($staff['role'] ?? '') === ROLE_HOUSE_MASTER));
 $houseMistresses = array_values(array_filter($staffUsers, static fn (array $staff): bool => ($staff['role'] ?? '') === ROLE_HOUSE_MISTRESS));
 $totalHouses = count($houses);

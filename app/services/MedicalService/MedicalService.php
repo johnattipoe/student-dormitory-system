@@ -33,6 +33,138 @@ class MedicalService
         }
     }
 
+    public function recent(int $limit = 7): array
+    {
+        return $this->firebase->getCollection(
+            $this->collection,
+            [],
+            max(1, min(50, $limit)),
+            0,
+            false,
+            [['createdAt', 'DESC']]
+        );
+    }
+
+    public function page(int $limit = 25, int $offset = 0): array
+    {
+        return $this->firebase->getCollection(
+            $this->collection,
+            [],
+            max(1, min(150, $limit)),
+            max(0, $offset),
+            false,
+            [['createdAt', 'DESC']]
+        );
+    }
+
+    public function urgent(int $limit = 150): array
+    {
+        return $this->firebase->getCollection(
+            $this->collection,
+            [['severity', 'in', ['severe', 'critical', 'emergency']]],
+            max(1, min(150, $limit)),
+            0,
+            false,
+            [['createdAt', 'DESC']]
+        );
+    }
+
+    public function filtered(array $wheres = [], int $limit = 150): array
+    {
+        $records = $this->firebase->getCollection(
+            $this->collection,
+            $wheres,
+            max(1, min(150, $limit)),
+            0,
+            false,
+            [['createdAt', 'DESC']]
+        );
+
+        usort($records, static fn(array $first, array $second): int => strcmp(
+            (string) ($second['createdAt'] ?? ''),
+            (string) ($first['createdAt'] ?? '')
+        ));
+
+        return $records;
+    }
+
+    public function forStudents(array $studentIds, int $limit = 150): array
+    {
+        $studentIds = array_values(array_unique(array_filter(array_map(
+            static fn($studentId): string => trim((string) $studentId),
+            $studentIds
+        ))));
+        if ($studentIds === []) {
+            return [];
+        }
+
+        $records = [];
+        foreach (array_chunk($studentIds, 30) as $studentIdBatch) {
+            foreach ($this->firebase->getCollection(
+                $this->collection,
+                [['studentId', 'in', $studentIdBatch]],
+                max(1, min(150, $limit)),
+                0,
+                false,
+                [['createdAt', 'DESC']]
+            ) as $record) {
+                $records[(string) ($record['id'] ?? '')] = $record;
+            }
+        }
+
+        return array_values($records);
+    }
+
+    public function countForStudents(array $studentIds, array $wheres = []): int
+    {
+        $studentIds = array_values(array_unique(array_filter(array_map(
+            static fn($studentId): string => trim((string) $studentId),
+            $studentIds
+        ))));
+        if ($studentIds === []) {
+            return 0;
+        }
+
+        $count = 0;
+        foreach (array_chunk($studentIds, 30) as $studentIdBatch) {
+            $count += $this->firebase->count(
+                $this->collection,
+                array_merge([['studentId', 'in', $studentIdBatch]], $wheres)
+            );
+        }
+
+        return $count;
+    }
+
+    public function countForStudentsBySeverity(array $studentIds, array $severities): int
+    {
+        $studentIds = array_values(array_unique(array_filter(array_map(
+            static fn($studentId): string => trim((string) $studentId),
+            $studentIds
+        ))));
+        $severities = array_values(array_unique(array_filter(array_map(
+            static fn($severity): string => trim((string) $severity),
+            $severities
+        ))));
+        if ($studentIds === [] || $severities === []) {
+            return 0;
+        }
+        if (count($severities) > 30) {
+            throw new \InvalidArgumentException('Severity filters exceed Firestore disjunction limits.');
+        }
+
+        $count = 0;
+        $studentBatchSize = max(1, intdiv(30, count($severities)));
+        foreach (array_chunk($studentIds, $studentBatchSize) as $studentIdBatch) {
+            $count += $this->firebase->count($this->collection, [
+                ['studentId', 'in', $studentIdBatch],
+                ['severity', 'in', $severities],
+            ]);
+        }
+
+        return $count;
+    }
+
     public function find(?string $id): ?array
     {
         if (!$id) {
@@ -56,6 +188,25 @@ class MedicalService
         } catch (\Throwable $e) {
             return 0;
         }
+    }
+
+    public function countBySeverity(string $severity): int
+    {
+        return $this->firebase->count(
+            $this->collection,
+            [['severity', '=', $severity]]
+        );
+    }
+
+    public function countCreatedBetween(\DateTimeImmutable $start, \DateTimeImmutable $end): int
+    {
+        return $this->firebase->count(
+            $this->collection,
+            [
+                ['createdAt', '>=', $start->format(DATE_ATOM)],
+                ['createdAt', '<', $end->format(DATE_ATOM)],
+            ]
+        );
     }
 
     public function todayCases(): int

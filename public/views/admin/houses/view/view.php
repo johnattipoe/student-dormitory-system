@@ -25,7 +25,9 @@ $house = $id ? HouseService::find($id) : null;
 $houseName = $house['name'] ?? 'Dormitory House';
 $houseStudents = $id ? StudentService::all($id) : [];
 $houseRooms = $id ? RoomService::byHouse($id) : [];
-$houseStaffUsers = $house ? (new UserService())->all() : [];
+$houseStaffUsers = $house
+    ? (new UserService())->byRoles([ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS])
+    : [];
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],

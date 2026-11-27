@@ -23,11 +23,10 @@ $role = current_role();
 $houseId = in_array($role, [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS, ROLE_SENIOR_HOUSEPARENT], true) ? ($currentUser['houseId'] ?? $currentUser['house_id'] ?? null) : null;
 $students = StudentService::all($houseId);
 $studentIds = array_map(fn($student) => (string) ($student['id'] ?? ''), $students);
-$messages = (new ParentMessageService())->all();
-
-if ($houseId) {
-	$messages = array_values(array_filter($messages, fn($message) => in_array((string) ($message['studentId'] ?? ''), $studentIds, true)));
-}
+$messageService = new ParentMessageService();
+$messages = $houseId
+    ? $messageService->forStudentIds($studentIds)
+    : $messageService->all();
 
 usort($messages, fn($first, $second) => strcmp((string) ($second['createdAt'] ?? ''), (string) ($first['createdAt'] ?? '')));
 

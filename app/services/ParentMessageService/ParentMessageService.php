@@ -13,6 +13,47 @@ class ParentMessageService
         }
     }
 
+    public function forStudentIds(array $studentIds, int $limit = 150): array
+    {
+        $studentIds = array_values(array_unique(array_filter(array_map(
+            static fn($studentId): string => trim((string) $studentId),
+            $studentIds
+        ))));
+        if ($studentIds === []) {
+            return [];
+        }
+
+        $limit = max(1, min(150, $limit));
+        $messagesById = [];
+        foreach (array_chunk($studentIds, 30) as $studentIdBatch) {
+            $remainingLimit = $limit - count($messagesById);
+            if ($remainingLimit <= 0) {
+                break;
+            }
+
+            foreach (FirebaseService::getInstance()->getCollection(
+                \COL_PARENT_MESSAGES,
+                [['studentId', 'in', $studentIdBatch]],
+                $remainingLimit,
+                0,
+                false,
+                [['createdAt', 'DESC']]
+            ) as $message) {
+                $id = (string) ($message['id'] ?? '');
+                if ($id !== '') {
+                    $messagesById[$id] = $message;
+                }
+            }
+        }
+
+        $messages = array_values($messagesById);
+        usort($messages, static fn(array $first, array $second): int => strcmp(
+            (string) ($second['createdAt'] ?? ''),
+            (string) ($first['createdAt'] ?? '')
+        ));
+        return $messages;
+    }
+
     public function find(string $id): ?array
     {
         if ($id === '') {

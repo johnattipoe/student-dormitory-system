@@ -76,29 +76,56 @@ usort($logs, function ($a, $b) {
 
 // Preload user map
 $userMap = ['default-admin' => 'Administrator (Admin)'];
-try {
-    foreach ((new UserService())->all() as $u) {
-        $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
-        if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? '';
-        if ($name !== '') {
-            $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
-            $displayName = $name . $roleLabel;
-            foreach ([$u['id'] ?? null, $u['uid'] ?? null, $u['userId'] ?? null, $u['firebaseUid'] ?? null] as $key) {
-                if ($key !== null && (string)$key !== '') {
-                    $userMap[(string)$key] = $displayName;
+$userMapLoaded = false;
+$loadUserMap = function () use (&$userMap, &$userMapLoaded): void {
+    if ($userMapLoaded) {
+        return;
+    }
+
+    $userMapLoaded = true;
+    try {
+        foreach ((new UserService())->all() as $u) {
+            $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
+            if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? '';
+            if ($name !== '') {
+                $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
+                $displayName = $name . $roleLabel;
+                foreach ([$u['id'] ?? null, $u['uid'] ?? null, $u['userId'] ?? null, $u['firebaseUid'] ?? null] as $key) {
+                    if ($key !== null && (string)$key !== '') {
+                        $userMap[(string)$key] = $displayName;
+                    }
                 }
             }
         }
+    } catch (\Throwable $e) {
+        error_log('Activity log export user map unavailable: ' . $e->getMessage());
     }
-} catch (\Throwable $e) {}
+};
 
-$getUserName = function (array $log) use (&$userMap): string {
+$getUserName = function (array $log) use (&$userMap, $loadUserMap): string {
     $name = (string) ($log['performedByName'] ?? $log['userName'] ?? '');
     if ($name !== '' && $name !== 'default-admin' && !str_starts_with($name, 'Staff/User')) {
         return $name;
     }
     $raw = (string) ($log['userId'] ?? $log['performedBy'] ?? '');
     if ($raw === 'default-admin') return 'Administrator (Admin)';
+    if ($raw !== '' && !isset($userMap[$raw])) {
+        try {
+            $user = FirebaseService::getInstance()->getDocument('users', $raw);
+            if ($user) {
+                $name = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))));
+                if ($name === '') $name = $user['displayName'] ?? $user['username'] ?? '';
+                if ($name !== '') {
+                    $roleLabel = !empty($user['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $user['role'])) . ')' : '';
+                    $userMap[$raw] = $name . $roleLabel;
+                    return $userMap[$raw];
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('Activity log export user lookup failed: ' . $e->getMessage());
+        }
+        $loadUserMap();
+    }
     return $userMap[$raw] ?? ($raw ?: 'System');
 };
 

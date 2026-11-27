@@ -23,21 +23,22 @@ $pageTitle = 'Emergency Broadcast';
 $medicalService = new MedicalService();
 $broadcastService = new EmergencyBroadcastService();
 
+$urgentRecords = $medicalService->urgent();
+$studentIds = array_values(array_unique(array_filter(array_map(
+    static fn(array $record): string => trim((string) ($record['studentId'] ?? '')),
+    $urgentRecords
+))));
 $students = [];
-foreach (StudentService::all() as $student) {
-    $studentId = (string) ($student['id'] ?? '');
-    if ($studentId === '') continue;
-
-    $name = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
-    $students[$studentId] = [
-        'name' => $name !== '' ? $name : 'Unnamed student',
-        'admissionNo' => $student['admissionNo'] ?? $student['studentId'] ?? $studentId,
-    ];
+foreach (StudentService::forIds($studentIds) as $student) {
+    $studentId = trim((string) ($student['id'] ?? ''));
+    if ($student !== null) {
+        $name = trim((string) ($student['firstName'] ?? '') . ' ' . (string) ($student['lastName'] ?? ''));
+        $students[$studentId] = [
+            'name' => $name !== '' ? $name : 'Unnamed student',
+            'admissionNo' => $student['admissionNo'] ?? $student['studentId'] ?? $studentId,
+        ];
+    }
 }
-
-$urgentRecords = array_values(array_filter($medicalService->all(), static function (array $record): bool {
-    return in_array(strtolower((string) ($record['severity'] ?? '')), ['severe', 'critical', 'emergency'], true);
-}));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $message = trim((string) ($_POST['message'] ?? ''));

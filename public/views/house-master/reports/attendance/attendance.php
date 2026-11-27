@@ -19,41 +19,29 @@ use App\Services\AttendanceService;
 use App\Services\StudentService;
 use App\Services\UserService;
 use App\Services\HouseService;
-use App\Services\FirebaseService;
 
 $date = sanitize($_GET['date'] ?? date('Y-m-d'));
 $houseId = (string) (current_user()['houseId'] ?? current_user()['house_id'] ?? '');
 $house = $houseId !== '' ? HouseService::find($houseId) : null;
 $houseName = $house['name'] ?? ($houseId ?: 'Assigned House');
 
-$students = StudentService::all($houseId);
+$records = AttendanceService::forDate($date, $houseId);
+$studentIds = array_values(array_unique(array_filter(array_map(
+    static fn(array $record): string => (string) ($record['studentId'] ?? ''),
+    $records
+))));
+$students = StudentService::forIds($studentIds);
 $studentMap = [];
 foreach ($students as $student) {
     $studentMap[(string) ($student['id'] ?? '')] = $student;
 }
 
-$records = AttendanceService::forDate($date, $houseId);
 $summary = AttendanceService::summary($date, $houseId);
 
-// Build markedBy resolver map
 $userMap = [];
-try {
-    foreach ((new UserService())->all() as $u) {
-        $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
-        if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? $u['email'] ?? '';
-        if ($name !== '') {
-            $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
-            $displayName = $name . $roleLabel;
-            foreach ([$u['id'] ?? null, $u['uid'] ?? null, $u['userId'] ?? null, $u['firebaseUid'] ?? null, $u['email'] ?? null] as $key) {
-                if ($key !== null && (string)$key !== '') {
-                    $userMap[(string)$key] = $displayName;
-                }
-            }
-        }
-    }
-} catch (\Throwable $e) {}
+$userService = new UserService();
 
-$getMarkedByName = function (array $record) use (&$userMap): string {
+$getMarkedByName = function (array $record) use (&$userMap, $userService): string {
     if (!empty($record['markedByName']) && !str_starts_with((string)$record['markedByName'], 'Staff/User')) {
         return (string) $record['markedByName'];
     }
@@ -62,19 +50,22 @@ $getMarkedByName = function (array $record) use (&$userMap): string {
     if (isset($userMap[$raw])) return $userMap[$raw];
 
     try {
-        $u = FirebaseService::getInstance()->getDocument('users', $raw);
-        if ($u) {
-            $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
-            if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? '';
+        $user = $userService->find($raw);
+        if ($user !== null) {
+            $name = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))));
+            if ($name === '') $name = $user['displayName'] ?? $user['username'] ?? $user['email'] ?? '';
             if ($name !== '') {
-                $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
+                $roleLabel = !empty($user['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $user['role'])) . ')' : '';
                 $userMap[$raw] = $name . $roleLabel;
                 return $userMap[$raw];
             }
         }
-    } catch (\Throwable $e) {}
+    } catch (\Throwable $e) {
+        error_log('Attendance marker lookup failed: ' . get_class($e));
+    }
 
-    return $raw;
+    $userMap[$raw] = $raw;
+    return $userMap[$raw];
 };
 
 $pageTitle = 'Attendance Report';

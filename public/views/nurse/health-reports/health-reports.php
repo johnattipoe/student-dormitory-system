@@ -18,7 +18,6 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\MedicalService;
 
 $medicalService = new MedicalService();
-$records = $medicalService->all();
 $fromDate = trim((string) ($_GET['from'] ?? ''));
 $toDate = trim((string) ($_GET['to'] ?? ''));
 $severityFilter = strtolower(trim((string) ($_GET['severity'] ?? 'all')));
@@ -26,6 +25,17 @@ $validSeverities = ['normal', 'moderate', 'severe', 'critical', 'emergency'];
 if (!in_array($severityFilter, array_merge(['all'], $validSeverities), true)) {
     $severityFilter = 'all';
 }
+$reportFilters = [];
+if ($severityFilter !== 'all') {
+    $reportFilters[] = ['severity', '=', $severityFilter];
+}
+if ($fromDate !== '') {
+    $reportFilters[] = ['createdAt', '>=', $fromDate];
+}
+if ($toDate !== '') {
+    $reportFilters[] = ['createdAt', '<', date('Y-m-d', strtotime($toDate . ' +1 day'))];
+}
+$records = $medicalService->filtered($reportFilters, 150);
 $filteredRecords = array_values(array_filter($records, static function (array $record) use ($fromDate, $toDate, $severityFilter): bool {
     $createdDate = substr((string) ($record['createdAt'] ?? ''), 0, 10);
     $severity = strtolower((string) ($record['severity'] ?? 'normal'));

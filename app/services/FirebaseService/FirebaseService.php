@@ -137,7 +137,27 @@ class FirebaseService
     private function applyWheres(object $query, array $wheres): object
     {
         foreach ($wheres as [$field, $op, $value]) {
-            $query = $query->where($field, $op, $value);
+            $fieldPath = $field === '__name__'
+                ? \Google\Cloud\Firestore\FieldPath::documentId()
+                : $field;
+            $query = $query->where($fieldPath, $op, $value);
+        }
+
+        return $query;
+    }
+
+    private function applyOrderBy(object $query, array $orderBy): object
+    {
+        foreach ($orderBy as $ordering) {
+            if (!is_array($ordering) || count($ordering) !== 2 || !is_string($ordering[0])) {
+                throw new \InvalidArgumentException('Each order clause must contain a field and direction.');
+            }
+
+            [$field, $direction] = $ordering;
+            $fieldPath = $field === '__name__'
+                ? \Google\Cloud\Firestore\FieldPath::documentId()
+                : $field;
+            $query = $query->orderBy($fieldPath, $direction);
         }
 
         return $query;
@@ -296,20 +316,102 @@ class FirebaseService
             throw new \RuntimeException($this->credentialsErrorMessage());
         }
 
-        $doc = $this->client()->collection($collection)->document($id)->snapshot();
-        if (!$doc->exists()) {
-            $this->recordCollectionRead($collection, 1, 0);
-            return null;
+        $cacheKey = $this->cacheKey($collection, 'document', [$id]);
+        return CacheService::remember($cacheKey, 60, function () use ($collection, $id): ?array {
+            $doc = $this->client()->collection($collection)->document($id)->snapshot();
+            if (!$doc->exists()) {
+                $this->recordCollectionRead($collection, 1, 0);
+                return null;
+            }
+            $this->recordCollectionRead($collection, 1, 1);
+            return array_merge(['id' => $doc->id()], $doc->data());
+        });
+    }
+
+    /**
+     * Fetch one cursor-paginated collection page without rereading earlier pages.
+     *
+     * Each order clause is [field, direction]. Use "__name__" for document ID;
+     * cursor values use the field name, with the document ID stored as "id".
+     *
+     * @return array{items:array<int,array<string,mixed>>,nextCursor:array<string,mixed>|null}
+     */
+    public function getCollectionPage(
+        string $collection,
+        array $wheres,
+        int $limit,
+        array $orderBy,
+        array $cursor = []
+    ): array {
+        if (!$this->credentialsAvailable()) {
+            throw new \RuntimeException($this->credentialsErrorMessage());
         }
-        $this->recordCollectionRead($collection, 1, 1);
-        return array_merge(['id' => $doc->id()], $doc->data());
+        if ($orderBy === []) {
+            throw new \InvalidArgumentException('Cursor pagination requires an explicit order.');
+        }
+
+        $limit = max(1, min(150, $limit));
+        $cacheKey = $this->cacheKey($collection, 'cursor-page', [$wheres, $limit, $orderBy, $cursor]);
+
+        return CacheService::remember($cacheKey, 60, function () use ($collection, $wheres, $limit, $orderBy, $cursor): array {
+            return $this->withAuthenticationRefresh(function ($client) use ($collection, $wheres, $limit, $orderBy, $cursor): array {
+                $query = $this->applyOrderBy(
+                    $this->applyWheres($client->collection($collection), $wheres),
+                    $orderBy
+                );
+
+                $cursorValues = [];
+                if ($cursor !== []) {
+                    foreach ($orderBy as [$field]) {
+                        if ($field === '__name__') {
+                            $documentId = (string) ($cursor['id'] ?? '');
+                            if ($documentId === '') {
+                                throw new \InvalidArgumentException('Cursor is missing its document ID.');
+                            }
+                            $cursorValues[] = $client->collection($collection)->document($documentId);
+                            continue;
+                        }
+
+                        if (!array_key_exists($field, $cursor)) {
+                            throw new \InvalidArgumentException(sprintf('Cursor is missing the ordered field "%s".', $field));
+                        }
+                        $cursorValues[] = $cursor[$field];
+                    }
+
+                    $query = $query->startAfter($cursorValues);
+                }
+
+                $out = [];
+                $documentsRead = 0;
+                foreach ($query->limit($limit)->documents() as $doc) {
+                    $documentsRead++;
+                    if ($doc->exists()) {
+                        $out[] = array_merge(['id' => $doc->id()], $doc->data());
+                    }
+                }
+
+                $this->recordCollectionRead($collection, $documentsRead, count($out));
+                $nextCursor = null;
+                if ($out !== []) {
+                    $last = $out[count($out) - 1];
+                    $nextCursor = [];
+                    foreach ($orderBy as [$field]) {
+                        $nextCursor[$field === '__name__' ? 'id' : $field] = $field === '__name__'
+                            ? (string) $last['id']
+                            : ($last[$field] ?? null);
+                    }
+                }
+
+                return ['items' => $out, 'nextCursor' => $nextCursor];
+            });
+        });
     }
 
     /**
      * Fetch documents from a collection, optionally filtered.
      * $wheres: array of [field, operator, value] triples, e.g. [['role', '=', 'student']]
      */
-    public function getCollection(string $collection, array $wheres = [], int $limit = 150, int $offset = 0, bool $respectRequestPagination = true): array
+    public function getCollection(string $collection, array $wheres = [], int $limit = 150, int $offset = 0, bool $respectRequestPagination = true, array $orderBy = []): array
     {
         if (!$this->credentialsAvailable()) {
             throw new \RuntimeException($this->credentialsErrorMessage());
@@ -323,32 +425,38 @@ class FirebaseService
             $offset = max(0, $offset);
         }
 
-        $fetchLimit = $offset > 0 ? $offset + $limit : $limit;
-        return $this->withAuthenticationRefresh(function ($client) use ($collection, $wheres, $fetchLimit, $offset, $limit): array {
-            $query = $this->applyWheres($client->collection($collection), $wheres)->limit($fetchLimit);
+        $cacheKey = $this->cacheKey($collection, 'collection', [$wheres, $limit, $offset, $orderBy]);
+        return CacheService::remember($cacheKey, 60, function () use ($collection, $wheres, $limit, $offset, $orderBy): array {
+            $fetchLimit = $offset > 0 ? $offset + $limit : $limit;
+            return $this->withAuthenticationRefresh(function ($client) use ($collection, $wheres, $fetchLimit, $offset, $limit, $orderBy): array {
+                $query = $this->applyOrderBy(
+                    $this->applyWheres($client->collection($collection), $wheres),
+                    $orderBy
+                )->limit($fetchLimit);
 
-            $out = [];
-            $seen = 0;
-            $documentsRead = 0;
-            foreach ($query->documents() as $doc) {
-                $documentsRead++;
-                if (!$doc->exists()) {
-                    continue;
+                $out = [];
+                $seen = 0;
+                $documentsRead = 0;
+                foreach ($query->documents() as $doc) {
+                    $documentsRead++;
+                    if (!$doc->exists()) {
+                        continue;
+                    }
+
+                    if ($offset > 0 && $seen < $offset) {
+                        $seen++;
+                        continue;
+                    }
+
+                    $out[] = array_merge(['id' => $doc->id()], $doc->data());
+                    if (count($out) >= $limit) {
+                        break;
+                    }
                 }
 
-                if ($offset > 0 && $seen < $offset) {
-                    $seen++;
-                    continue;
-                }
-
-                $out[] = array_merge(['id' => $doc->id()], $doc->data());
-                if (count($out) >= $limit) {
-                    break;
-                }
-            }
-
-            $this->recordCollectionRead($collection, $documentsRead, count($out));
-            return $out;
+                $this->recordCollectionRead($collection, $documentsRead, count($out));
+                return $out;
+            });
         });
     }
 
@@ -365,22 +473,25 @@ class FirebaseService
             throw new \RuntimeException($this->credentialsErrorMessage());
         }
 
-        return $this->withAuthenticationRefresh(function ($client) use ($collection, $wheres): array {
-            $query = $this->applyWheres($client->collection($collection), $wheres);
-            $out = [];
-            $documentsRead = 0;
+        $cacheKey = $this->cacheKey($collection, 'all', [$wheres]);
+        return CacheService::remember($cacheKey, 60, function () use ($collection, $wheres): array {
+            return $this->withAuthenticationRefresh(function ($client) use ($collection, $wheres): array {
+                $query = $this->applyWheres($client->collection($collection), $wheres);
+                $out = [];
+                $documentsRead = 0;
 
-            foreach ($query->documents() as $doc) {
-                $documentsRead++;
-                if (!$doc->exists()) {
-                    continue;
+                foreach ($query->documents() as $doc) {
+                    $documentsRead++;
+                    if (!$doc->exists()) {
+                        continue;
+                    }
+
+                    $out[] = array_merge(['id' => $doc->id()], $doc->data());
                 }
 
-                $out[] = array_merge(['id' => $doc->id()], $doc->data());
-            }
-
-            $this->recordCollectionRead($collection, $documentsRead, count($out));
-            return $out;
+                $this->recordCollectionRead($collection, $documentsRead, count($out));
+                return $out;
+            });
         });
     }
 
@@ -391,11 +502,13 @@ class FirebaseService
             throw new \RuntimeException($this->credentialsErrorMessage());
         }
 
-        $query = $this->applyWheres($this->client()->collection($collection), $wheres);
-
-        $count = (int) $query->count();
-        $this->recordAggregateQuery($collection);
-        return $count;
+        $cacheKey = $this->cacheKey($collection, 'count', [$wheres]);
+        return CacheService::remember($cacheKey, 60, function () use ($collection, $wheres): int {
+            $query = $this->applyWheres($this->client()->collection($collection), $wheres);
+            $count = (int) $query->count();
+            $this->recordAggregateQuery($collection);
+            return $count;
+        });
     }
 
     /** Efficiently sum a numeric field across matching documents without loading the full collection. */
@@ -405,11 +518,13 @@ class FirebaseService
             throw new \RuntimeException($this->credentialsErrorMessage());
         }
 
-        $query = $this->applyWheres($this->client()->collection($collection), $wheres);
-
-        $sum = $query->sum($field);
-        $this->recordAggregateQuery($collection);
-        return $sum;
+        $cacheKey = $this->cacheKey($collection, 'sum', [$field, $wheres]);
+        return CacheService::remember($cacheKey, 60, function () use ($collection, $field, $wheres): int|float {
+            $query = $this->applyWheres($this->client()->collection($collection), $wheres);
+            $sum = $query->sum($field);
+            $this->recordAggregateQuery($collection);
+            return $sum;
+        });
     }
 
     /** Create a document. Returns its generated (or given) id. */
@@ -424,10 +539,12 @@ class FirebaseService
 
         if ($id) {
             $this->client()->collection($collection)->document($id)->set($data);
+            $this->invalidateCollectionCache($collection);
             return $id;
         }
         $ref = $this->client()->collection($collection)->newDocument();
         $ref->set($data);
+        $this->invalidateCollectionCache($collection);
         return $ref->id();
     }
 
@@ -443,7 +560,7 @@ class FirebaseService
         $data['updatedAt'] = $data['updatedAt'] ?? $now;
         $document = $this->client()->collection($collection)->document($id);
 
-        return (bool) $this->client()->runTransaction(
+        $created = (bool) $this->client()->runTransaction(
             static function ($transaction) use ($document, $data): bool {
                 if ($transaction->snapshot($document)->exists()) {
                     return false;
@@ -453,6 +570,10 @@ class FirebaseService
                 return true;
             }
         );
+        if ($created) {
+            $this->invalidateCollectionCache($collection);
+        }
+        return $created;
     }
 
     /**
@@ -469,7 +590,7 @@ class FirebaseService
         $expiresAt = (new \DateTimeImmutable('@' . ($now + max(60, $leaseSeconds))))->format(DATE_ATOM);
         $nowIso = (new \DateTimeImmutable('@' . $now))->format(DATE_ATOM);
 
-        return (bool) $this->client()->runTransaction(
+        $claimed = (bool) $this->client()->runTransaction(
             static function ($transaction) use ($document, $token, $now, $expiresAt, $nowIso): bool {
                 $snapshot = $transaction->snapshot($document);
                 if (!$snapshot->exists()) {
@@ -492,6 +613,10 @@ class FirebaseService
                 return true;
             }
         );
+        if ($claimed) {
+            $this->invalidateCollectionCache($collection);
+        }
+        return $claimed;
     }
 
     /** Release a document lease and atomically update its final state if the token still matches. */
@@ -511,7 +636,7 @@ class FirebaseService
             $fields[] = ['path' => $key, 'value' => $value];
         }
 
-        return (bool) $this->client()->runTransaction(
+        $released = (bool) $this->client()->runTransaction(
             static function ($transaction) use ($document, $token, $fields): bool {
                 $snapshot = $transaction->snapshot($document);
                 if (!$snapshot->exists() || (string) ($snapshot->data()['lockToken'] ?? '') !== $token) {
@@ -522,6 +647,10 @@ class FirebaseService
                 return true;
             }
         );
+        if ($released) {
+            $this->invalidateCollectionCache($collection);
+        }
+        return $released;
     }
 
     public function updateDocument(string $collection, string $id, array $data): void
@@ -537,6 +666,7 @@ class FirebaseService
             $fields[] = ['path' => $key, 'value' => $value];
         }
         $this->client()->collection($collection)->document($id)->update($fields);
+        $this->invalidateCollectionCache($collection);
     }
 
     public function deleteDocument(string $collection, string $id): void
@@ -544,13 +674,24 @@ class FirebaseService
         if (!$this->credentialsAvailable()) {
             throw new \RuntimeException($this->credentialsErrorMessage());
         }
-
         $this->client()->collection($collection)->document($id)->delete();
+        $this->invalidateCollectionCache($collection);
     }
 
     private function now(): string
     {
         return (new \DateTime())->format(DATE_ATOM);
+    }
+
+    private function cacheKey(string $collection, string $operation, array $parameters): string
+    {
+        $namespace = 'firestore:' . $collection;
+        return $namespace . ':' . CacheService::generation($namespace) . ':' . $operation . ':' . hash('sha256', serialize($parameters));
+    }
+
+    private function invalidateCollectionCache(string $collection): void
+    {
+        CacheService::invalidate('firestore:' . $collection);
     }
 
     /**

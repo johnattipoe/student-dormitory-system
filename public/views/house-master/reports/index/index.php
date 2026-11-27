@@ -21,7 +21,7 @@ use App\Services\StudentService;
 use App\Services\RoomService;
 use App\Services\VisitorService;
 use App\Services\HouseService;
-use App\Services\FirebaseService;
+use App\Services\MedicalService;
 
 $date = sanitize($_GET['date'] ?? date('Y-m-d'));
 $houseId = (string) (current_user()['houseId'] ?? current_user()['house_id'] ?? '');
@@ -31,19 +31,21 @@ $houseName = $house['name'] ?? ($houseId ?: 'Assigned House');
 $students = StudentService::all($houseId);
 $studentIds = array_fill_keys(array_filter(array_map(fn($s) => (string)($s['id'] ?? ''), $students)), true);
 
-$attendance = AttendanceService::forDate($date, $houseId);
-$incidents = (new IncidentService())->byHouse($houseId, true);
+$incidents = (new IncidentService())->byHouse($houseId, true, $students);
 $summary = AttendanceService::summary($date, $houseId);
 $roomStats = RoomService::occupancyStats($houseId);
-$visitorRecords = (new VisitorService())->byHouse($houseId);
+$visitorRecords = (new VisitorService())->byHouse($houseId, $students);
 $visitorCount = count($visitorRecords);
 $visitorInside = count(array_filter($visitorRecords, fn($visitor) => ($visitor['status'] ?? '') === 'inside'));
 $visitorCheckedOut = count(array_filter($visitorRecords, fn($visitor) => ($visitor['status'] ?? '') === 'checked_out'));
 
-// Medical records for this house
-$allMedical = FirebaseService::getInstance()->getCollection('medical_records', [], 500);
-$medicalRecords = array_values(array_filter($allMedical, fn($r) => isset($studentIds[(string)($r['studentId'] ?? '')])));
-$emergencyCount = count(array_filter($medicalRecords, fn($r) => strtolower((string)($r['severity'] ?? '')) === 'emergency'));
+$medicalService = new MedicalService();
+$medicalStudentIds = array_keys($studentIds);
+$medicalRecordCount = $medicalService->countForStudents($medicalStudentIds);
+$emergencyCount = $medicalService->countForStudentsBySeverity(
+    $medicalStudentIds,
+    ['emergency', 'Emergency', 'EMERGENCY']
+);
 
 $studentStatusCounts = [];
 foreach ($students as $student) {
@@ -291,7 +293,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <ul class="list-group list-group-flush">
                             <li class="list-group-item d-flex justify-content-between py-3">
                                 <span>Total Health Reports</span>
-                                <strong><?= e((string) count($medicalRecords)) ?></strong>
+                                <strong><?= e((string) $medicalRecordCount) ?></strong>
                             </li>
                             <li class="list-group-item d-flex justify-content-between py-3">
                                 <span>Emergency Cases</span>
@@ -299,7 +301,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             </li>
                             <li class="list-group-item d-flex justify-content-between py-3">
                                 <span>Standard / Observation</span>
-                                <strong><?= e((string) (count($medicalRecords) - $emergencyCount)) ?></strong>
+                                <strong><?= e((string) ($medicalRecordCount - $emergencyCount)) ?></strong>
                             </li>
                         </ul>
                     </div>

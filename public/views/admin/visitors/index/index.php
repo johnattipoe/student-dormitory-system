@@ -65,7 +65,18 @@ $visitors = array_values(array_filter($allVisitors, function ($visitor) use ($se
     return ($search === '' || str_contains(strtolower((string) ($visitor['visitorName'] ?? '')), $search) || str_contains(strtolower((string) ($visitor['studentId'] ?? '')), $search))
         && ($statusFilter === '' || ($visitor['status'] ?? '') === $statusFilter);
 }));
-$students = StudentService::all();
+$students = [];
+foreach ($visitors as $visitor) {
+    $studentId = trim((string) ($visitor['studentId'] ?? ''));
+    if ($studentId === '' || array_key_exists($studentId, $students)) {
+        continue;
+    }
+
+    $student = StudentService::find($studentId);
+    if ($student !== null) {
+        $students[$studentId] = $student;
+    }
+}
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],
     ['icon' => 'bi-person-badge', 'label' => 'Visitors', 'href' => url('views/admin/visitors/index/index.php'), 'active' => true],
@@ -120,11 +131,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label fw-semibold">Student to Visit <span class="text-danger">*</span></label>
-                                    <select name="studentId" class="form-select select2" data-select2-search="true" required>
+                                    <select name="studentId" class="form-select select2" data-select2-search="true" data-admin-student-options="<?= e(url('views/admin/emergency-contacts/student-options.php')) ?>" data-placeholder="-- Choose student --" required>
                                         <option value="">-- Choose student --</option>
-                                        <?php foreach ($students as $student): ?>
-                                            <option value="<?= e((string) ($student['id'] ?? '')) ?>"><?= e(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' (' . ($student['admissionNo'] ?? '') . ')') ?></option>
-                                        <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-md-6">
@@ -226,13 +234,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <?php else: ?>
                             <?php foreach ($visitors as $visitor): ?>
                                 <?php
-                                $studentName = '-';
-                                foreach ($students as $student) {
-                                    if (($student['id'] ?? '') === ($visitor['studentId'] ?? '')) {
-                                        $studentName = (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: ($visitor['studentId'] ?? '-');
-                                        break;
-                                    }
-                                }
+                                $student = $students[(string) ($visitor['studentId'] ?? '')] ?? null;
+                                $studentName = $student
+                                    ? (trim((string) ($student['firstName'] ?? '') . ' ' . (string) ($student['lastName'] ?? '')) ?: (string) ($visitor['studentId'] ?? '-'))
+                                    : '-';
                                 $vStatus = strtolower((string) ($visitor['status'] ?? 'registered'));
                                 $vBadge = match($vStatus) {
                                     'inside' => 'bg-success',
@@ -286,13 +291,10 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
     $vStatus = strtolower((string) ($visitor['status'] ?? 'registered'));
     $visitorPurpose = (string) ($visitor['purpose'] ?? '—');
     $visitorPhone = (string) ($visitor['phone'] ?? '—');
-    $studentName = '-';
-    foreach ($students as $student) {
-        if (($student['id'] ?? '') === ($visitor['studentId'] ?? '')) {
-            $studentName = (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: ($visitor['studentId'] ?? '-');
-            break;
-        }
-    }
+    $student = $students[(string) ($visitor['studentId'] ?? '')] ?? null;
+    $studentName = $student
+        ? (trim((string) ($student['firstName'] ?? '') . ' ' . (string) ($student['lastName'] ?? '')) ?: (string) ($visitor['studentId'] ?? '-'))
+        : '-';
     ?>
     <div class="modal fade" id="visitorViewModal-<?= e($vId) ?>" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">

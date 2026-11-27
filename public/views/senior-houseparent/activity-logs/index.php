@@ -16,7 +16,6 @@ $allowedRoles = [ROLE_SENIOR_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\FirebaseService;
-use App\Services\UserService;
 use App\Services\StudentService;
 use App\Services\RoomService;
 use App\Services\HouseService;
@@ -49,7 +48,8 @@ $currUser = current_user();
 $currUserIds = array_filter([(string) ($currUser['uid'] ?? ''), (string) ($currUser['id'] ?? '')]);
 
 // Fetch raw logs
-$allLogs = FirebaseService::getInstance()->getCollection(COL_ACTIVITY_LOGS, [], 500);
+$firebase = FirebaseService::getInstance();
+$allLogs = $firebase->getCollection(COL_ACTIVITY_LOGS, [], 500);
 
 // Filter strictly to the assigned house or general dorm activities
 $logs = array_values(array_filter($allLogs, function ($log) use ($houseId, $houseStudentIds, $currUserIds, $houseRoomIds) {
@@ -101,36 +101,16 @@ $userMap = [
     'system' => 'System',
 ];
 
-try {
-    foreach ((new UserService())->all() as $user) {
-        $name = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))));
-        if ($name === '') {
-            $name = $user['displayName'] ?? $user['username'] ?? $user['email'] ?? null;
-        }
-        if ($name) {
-            $roleLabel = !empty($user['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $user['role'])) . ')' : '';
-            $displayName = $name . $roleLabel;
-            foreach ([$user['id'] ?? null, $user['uid'] ?? null, $user['userId'] ?? null, $user['firebaseUid'] ?? null, $user['email'] ?? null] as $key) {
-                if ($key !== null && (string)$key !== '') {
-                    $userMap[(string) $key] = $displayName;
-                }
-            }
+foreach ($houseStudents as $student) {
+    $sName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
+    $adm = !empty($student['admissionNo']) ? ' [' . $student['admissionNo'] . ']' : '';
+    $displayName = ($sName ?: 'Student') . $adm . ' (Student)';
+    foreach ([$student['id'] ?? null, $student['studentId'] ?? null, $student['admissionNo'] ?? null, $student['userId'] ?? null, $student['uid'] ?? null] as $key) {
+        if ($key !== null && (string)$key !== '') {
+            $userMap[(string) $key] = $displayName;
         }
     }
-} catch (\Throwable $e) {}
-
-try {
-    foreach (StudentService::all() as $student) {
-        $sName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
-        $adm = !empty($student['admissionNo']) ? ' [' . $student['admissionNo'] . ']' : '';
-        $displayName = ($sName ?: 'Student') . $adm . ' (Student)';
-        foreach ([$student['id'] ?? null, $student['studentId'] ?? null, $student['admissionNo'] ?? null, $student['userId'] ?? null, $student['uid'] ?? null] as $key) {
-            if ($key !== null && (string)$key !== '') {
-                $userMap[(string) $key] = $displayName;
-            }
-        }
-    }
-} catch (\Throwable $e) {}
+}
 
 $getUserDisplayName = function (array $log) use (&$userMap): string {
     $userName = trim((string) ($log['userName'] ?? $log['user_name'] ?? $log['performedByName'] ?? ''));
@@ -144,8 +124,7 @@ $getUserDisplayName = function (array $log) use (&$userMap): string {
                 return $userMap[$rawId];
             }
             try {
-                $db = FirebaseService::getInstance();
-                $u = $db->getDocument('users', $rawId);
+                $u = $firebase->getDocument('users', $rawId);
                 if ($u) {
                     $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
                     if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? $u['email'] ?? '';
@@ -155,7 +134,7 @@ $getUserDisplayName = function (array $log) use (&$userMap): string {
                         return $userMap[$rawId];
                     }
                 }
-                $s = $db->getDocument('students', $rawId);
+                $s = $firebase->getDocument('students', $rawId);
                 if ($s) {
                     $sName = trim(($s['firstName'] ?? '') . ' ' . ($s['lastName'] ?? ''));
                     $adm = !empty($s['admissionNo']) ? ' [' . $s['admissionNo'] . ']' : '';
@@ -163,6 +142,7 @@ $getUserDisplayName = function (array $log) use (&$userMap): string {
                     return $userMap[$rawId];
                 }
             } catch (\Throwable $e) {}
+            $userMap[$rawId] = $rawId;
             return $rawId;
         }
     }
@@ -178,7 +158,6 @@ $toDate = sanitize($_GET['to_date'] ?? '');
 $filteredLogs = array_values(array_filter($logs, function ($log) use ($search, $categoryFilter, $fromDate, $toDate, $getUserDisplayName) {
     $action = strtolower((string) ($log['event'] ?? $log['action'] ?? $log['type'] ?? ''));
     $details = strtolower((string) ($log['details'] ?? $log['description'] ?? $log['message'] ?? ''));
-    $userName = strtolower($getUserDisplayName($log));
 
     if ($categoryFilter !== '') {
         if (!str_contains($action, $categoryFilter) && !str_contains($details, $categoryFilter)) {
@@ -192,7 +171,9 @@ $filteredLogs = array_values(array_filter($logs, function ($log) use ($search, $
     if ($toDate !== '' && $logDate > $toDate) return false;
 
     if ($search !== '') {
-        return str_contains($userName, $search) || str_contains($action, $search) || str_contains($details, $search);
+        return str_contains($action, $search)
+            || str_contains($details, $search)
+            || str_contains(strtolower($getUserDisplayName($log)), $search);
     }
     return true;
 }));

@@ -16,7 +16,7 @@ $allowedRoles = [ROLE_SENIOR_HOUSEPARENT];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\AttendanceService;
-use App\Services\BedService;
+use App\Services\FirebaseService;
 use App\Services\HouseService;
 use App\Services\StudentService;
 use App\Services\UserService;
@@ -27,26 +27,48 @@ $statusFilter = sanitize($_GET['status'] ?? '');
 $houseFilter = sanitize($_GET['house'] ?? '');
 
 $attendance = AttendanceService::forDate($date);
-$students = StudentService::all();
-$beds = BedService::all();
+$attendanceStudentIds = array_values(array_unique(array_filter(array_map(
+    static fn(array $record): string => (string) ($record['studentId'] ?? ''),
+    $attendance
+))));
+$students = StudentService::forIds($attendanceStudentIds);
+$studentMap = [];
+foreach ($students as $student) {
+    $studentMap[(string) ($student['id'] ?? '')] = $student;
+}
+$bedsById = [];
+foreach (array_chunk($attendanceStudentIds, 30) as $studentIdBatch) {
+    foreach (FirebaseService::getInstance()->getCollection(COL_BEDS, [['studentId', 'in', $studentIdBatch]], 150, 0, false) as $bed) {
+        $bedsById[(string) ($bed['id'] ?? count($bedsById))] = $bed;
+    }
+}
 $bedMap = [];
-foreach ($beds as $bed) {
+foreach ($bedsById as $bed) {
     if (!empty($bed['studentId'])) $bedMap[(string) $bed['studentId']] = (string) ($bed['bedNumber'] ?? '—');
 }
 $houses = HouseService::all();
 $markedByMap = [];
-foreach ((new UserService())->all() as $user) {
+$userService = new UserService();
+foreach ($attendance as $record) {
+    $markedBy = trim((string) ($record['markedBy'] ?? ''));
+    if ($markedBy === '' || isset($markedByMap[$markedBy])) {
+        continue;
+    }
+
+    $user = $userService->find($markedBy);
+    if ($user === null) {
+        continue;
+    }
+
     $markedByName = trim((string) ($user['name'] ?? '')) ?: (string) ($user['email'] ?? '');
-    foreach ([(string) ($user['id'] ?? ''), (string) ($user['uid'] ?? '')] as $userKey) {
-        if ($userKey !== '' && $markedByName !== '') {
-            $markedByMap[$userKey] = $markedByName;
-        }
+    if ($markedByName !== '') {
+        $markedByMap[$markedBy] = $markedByName;
     }
 }
 
 if (!empty($searchQuery)) {
-    $attendance = array_filter($attendance, function($record) use ($searchQuery, $students) {
-        $student = current(array_filter($students, fn($s) => ((string) ($s['id'] ?? '')) === ((string) ($record['studentId'] ?? ''))));
+    $attendance = array_filter($attendance, function($record) use ($searchQuery, $studentMap) {
+        $student = $studentMap[(string) ($record['studentId'] ?? '')] ?? [];
         $name = ($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '');
         $admNo = $student['admissionNo'] ?? '';
         return stripos($name, $searchQuery) !== false || stripos($admNo, $searchQuery) !== false;
@@ -56,8 +78,8 @@ if (!empty($statusFilter)) {
     $attendance = array_filter($attendance, fn($record) => ($record['status'] ?? 'present') === $statusFilter);
 }
 if (!empty($houseFilter)) {
-    $attendance = array_filter($attendance, function($record) use ($houseFilter, $students) {
-        $student = current(array_filter($students, fn($s) => ((string) ($s['id'] ?? '')) === ((string) ($record['studentId'] ?? ''))));
+    $attendance = array_filter($attendance, function($record) use ($houseFilter, $studentMap) {
+        $student = $studentMap[(string) ($record['studentId'] ?? '')] ?? [];
         return ((string) ($student['houseId'] ?? '')) === $houseFilter;
     });
 }
@@ -224,13 +246,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                         <?php else: ?>
                             <?php foreach ($attendance as $record): ?>
                                 <?php
-                                $student = null;
-                                foreach ($students as $s) {
-                                    if (($s['id'] ?? '') === ($record['studentId'] ?? '')) {
-                                        $student = $s;
-                                        break;
-                                    }
-                                }
+                                $student = $studentMap[(string) ($record['studentId'] ?? '')] ?? [];
                                 ?>
                                 <tr>
                                     <td class="small text-muted"><?= e($record['date'] ?? '-') ?></td>

@@ -60,7 +60,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $medicalService = new MedicalService();
             $currentUserId = current_user_id();
-            $records = $medicalService->all();
+            $records = $medicalService->forStudents(array_map(
+                static fn($studentId): string => trim((string) $studentId),
+                $studentIds
+            ));
             $updatedCount = 0;
             
             foreach ($records as $record) {
@@ -88,15 +91,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $students = StudentService::all();
+$medicalService = new MedicalService();
+$allRecords = $medicalService->recent(150);
+$recordStudentIds = array_values(array_unique(array_filter(array_map(
+    static fn(array $record): string => trim((string) ($record['studentId'] ?? '')),
+    $allRecords
+))));
 $studentMap = [];
-foreach ($students as $student) {
+foreach (StudentService::forIds($recordStudentIds) as $student) {
     $studentId = (string) ($student['id'] ?? '');
     if ($studentId !== '') {
         $studentMap[$studentId] = $student;
     }
 }
-$medicalService = new MedicalService();
-$allRecords = $medicalService->all();
 
 $pageTitle = 'Bulk Medical Management';
 $navItems = [

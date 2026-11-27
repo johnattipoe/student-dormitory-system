@@ -16,7 +16,6 @@ $allowedRoles = [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\AttendanceService;
-use App\Services\BedService;
 use App\Services\FirebaseService;
 use App\Services\RoomService;
 use App\Services\StudentService;
@@ -39,34 +38,74 @@ $studentHouseId = static fn(array $student): string => (string) (
     ?? ''
 );
 
-$studentsForHouse = static function (string $houseId) use ($studentRecordId, $studentHouseId): array {
+$rooms = $houseId !== '' ? RoomService::all($houseId) : [];
+$roomIds = array_values(array_unique(array_filter(array_map(
+    static fn(array $room): string => (string) ($room['id'] ?? $room['roomId'] ?? ''),
+    $rooms
+))));
+$roomIdSet = array_fill_keys($roomIds, true);
+
+$studentsForHouse = static function (string $houseId, array $roomIds, array $roomIdSet) use ($studentRecordId, $studentHouseId): array {
     if ($houseId === '') {
         return [];
     }
 
-    $allStudents = StudentService::all();
-    $rooms = RoomService::all($houseId);
-    $roomIds = array_values(array_filter(array_map(
-        static fn(array $room): string => (string) ($room['id'] ?? $room['roomId'] ?? ''),
-        $rooms
-    )));
-    $roomIdSet = array_fill_keys($roomIds, true);
+    $firebase = FirebaseService::getInstance();
+    $studentsById = [];
+    $addStudent = static function (array $student) use (&$studentsById, $studentRecordId): void {
+        $studentId = $studentRecordId($student);
+        if ($studentId !== '') {
+            $studentsById[$studentId] = $student;
+        }
+    };
+
+    foreach (StudentService::all($houseId) as $student) {
+        $addStudent($student);
+    }
+    foreach (['house_id', 'assignedHouseId', 'assigned_house_id'] as $field) {
+        foreach ($firebase->getCollection(COL_STUDENTS, [[$field, '=', $houseId]], 150, 0, false) as $student) {
+            $addStudent($student);
+        }
+    }
+
+    foreach (array_chunk($roomIds, 30) as $roomIdBatch) {
+        foreach ($firebase->getCollection(COL_STUDENTS, [['roomId', 'in', $roomIdBatch]], 150, 0, false) as $student) {
+            $addStudent($student);
+        }
+    }
+
+    $bedsById = [];
+    foreach (array_chunk($roomIds, 30) as $roomIdBatch) {
+        foreach ($firebase->getCollection(COL_BEDS, [['roomId', 'in', $roomIdBatch]], 150, 0, false) as $bed) {
+            $bedsById[(string) ($bed['id'] ?? count($bedsById))] = $bed;
+        }
+    }
+
+    $allocationsById = [];
+    foreach ([ [['houseId', '=', $houseId]], [['house_id', '=', $houseId]] ] as $wheres) {
+        foreach ($firebase->getCollection(COL_ROOM_ALLOCATIONS, $wheres, 150, 0, false) as $allocation) {
+            $allocationsById[(string) ($allocation['id'] ?? count($allocationsById))] = $allocation;
+        }
+    }
+    foreach (array_chunk($roomIds, 30) as $roomIdBatch) {
+        foreach ($firebase->getCollection(COL_ROOM_ALLOCATIONS, [['roomId', 'in', $roomIdBatch]], 150, 0, false) as $allocation) {
+            $allocationsById[(string) ($allocation['id'] ?? count($allocationsById))] = $allocation;
+        }
+    }
 
     $assignedStudentIds = [];
-    foreach (BedService::all() as $bed) {
+    foreach ($bedsById as $bed) {
         $bedRoomId = (string) ($bed['roomId'] ?? '');
         $bedStudentId = (string) ($bed['studentId'] ?? '');
         if ($bedStudentId !== '' && isset($roomIdSet[$bedRoomId])) {
             $assignedStudentIds[$bedStudentId] = true;
         }
     }
-
-    foreach (FirebaseService::getInstance()->getCollection(COL_ROOM_ALLOCATIONS, [], 1000) as $allocation) {
+    foreach ($allocationsById as $allocation) {
         $allocationStudentId = (string) ($allocation['studentId'] ?? '');
         $allocationHouseId = (string) ($allocation['houseId'] ?? $allocation['house_id'] ?? '');
         $allocationRoomId = (string) ($allocation['roomId'] ?? '');
         $allocationStatus = strtolower((string) ($allocation['status'] ?? 'active'));
-
         if ($allocationStudentId !== ''
             && $allocationStatus === 'active'
             && ($allocationHouseId === $houseId || isset($roomIdSet[$allocationRoomId]))) {
@@ -74,10 +113,18 @@ $studentsForHouse = static function (string $houseId) use ($studentRecordId, $st
         }
     }
 
-    $studentsWithRoomAssignment = array_values(array_filter($allStudents, static function (array $student) use ($studentRecordId, $roomIdSet, $assignedStudentIds): bool {
+    foreach (array_keys($assignedStudentIds) as $assignedStudentId) {
+        if (!isset($studentsById[$assignedStudentId])) {
+            $student = StudentService::find($assignedStudentId);
+            if ($student !== null) {
+                $addStudent($student);
+            }
+        }
+    }
+
+    $studentsWithRoomAssignment = array_values(array_filter($studentsById, static function (array $student) use ($studentRecordId, $roomIdSet, $assignedStudentIds): bool {
         $studentId = $studentRecordId($student);
         $studentRoomId = (string) ($student['roomId'] ?? '');
-
         return ($studentId !== '' && isset($assignedStudentIds[$studentId]))
             || ($studentRoomId !== '' && isset($roomIdSet[$studentRoomId]));
     }));
@@ -85,7 +132,7 @@ $studentsForHouse = static function (string $houseId) use ($studentRecordId, $st
     $students = !empty($studentsWithRoomAssignment)
         ? $studentsWithRoomAssignment
         : array_values(array_filter(
-            $allStudents,
+            $studentsById,
             static fn(array $student): bool => $studentHouseId($student) === $houseId
         ));
 
@@ -97,10 +144,10 @@ $studentsForHouse = static function (string $houseId) use ($studentRecordId, $st
     return $students;
 };
 
-$students = $studentsForHouse($houseId);
+$students = $studentsForHouse($houseId, $roomIds, $roomIdSet);
 $allowedStudentIds = array_fill_keys(array_filter(array_map($studentRecordId, $students)), true);
 $roomNumberById = [];
-foreach (RoomService::all($houseId) as $room) {
+foreach ($rooms as $room) {
     $roomId = (string) ($room['id'] ?? $room['roomId'] ?? '');
     if ($roomId !== '') {
         $roomNumberById[$roomId] = (string) ($room['roomNumber'] ?? $room['number'] ?? $roomId);

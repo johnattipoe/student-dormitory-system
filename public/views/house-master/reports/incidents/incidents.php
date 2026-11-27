@@ -25,8 +25,8 @@ $houseId = (string) (current_user()['houseId'] ?? current_user()['house_id'] ?? 
 $house = $houseId !== '' ? HouseService::find($houseId) : null;
 $houseName = $house['name'] ?? ($houseId ?: 'Assigned House');
 
-$incidents = (new IncidentService())->byHouse($houseId);
 $students = StudentService::all($houseId);
+$incidents = (new IncidentService())->byHouse($houseId, false, $students);
 $studentMap = [];
 foreach ($students as $student) {
     $studentMap[(string) ($student['id'] ?? '')] = $student;
@@ -50,25 +50,11 @@ foreach ($incidents as $incident) {
     }
 }
 
-// User map for resolving reportedBy
 $userMap = [];
-try {
-    foreach ((new UserService())->all() as $u) {
-        $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
-        if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? $u['email'] ?? '';
-        if ($name !== '') {
-            $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
-            $displayName = $name . $roleLabel;
-            foreach ([$u['id'] ?? null, $u['uid'] ?? null, $u['userId'] ?? null, $u['firebaseUid'] ?? null, $u['email'] ?? null] as $key) {
-                if ($key !== null && (string)$key !== '') {
-                    $userMap[(string)$key] = $displayName;
-                }
-            }
-        }
-    }
-} catch (\Throwable $e) {}
+$userService = new UserService();
+$firebase = FirebaseService::getInstance();
 
-$getReporterName = function (array $incident) use (&$userMap): string {
+$getReporterName = function (array $incident) use (&$userMap, $userService, $firebase): string {
     if (!empty($incident['reportedByName']) && !str_starts_with((string)$incident['reportedByName'], 'Staff/User')) {
         return (string) $incident['reportedByName'];
     }
@@ -77,26 +63,29 @@ $getReporterName = function (array $incident) use (&$userMap): string {
     if (isset($userMap[$raw])) return $userMap[$raw];
 
     try {
-        $u = FirebaseService::getInstance()->getDocument('users', $raw);
-        if ($u) {
+        $u = $userService->find($raw);
+        if ($u !== null) {
             $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
-            if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? '';
+            if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? $u['email'] ?? '';
             if ($name !== '') {
                 $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
                 $userMap[$raw] = $name . $roleLabel;
                 return $userMap[$raw];
             }
         }
-        $s = FirebaseService::getInstance()->getDocument('students', $raw);
+        $s = $firebase->getDocument('students', $raw);
         if ($s) {
             $sName = trim(($s['firstName'] ?? '') . ' ' . ($s['lastName'] ?? ''));
             $adm = !empty($s['admissionNo']) ? ' [' . $s['admissionNo'] . ']' : '';
             $userMap[$raw] = ($sName ?: 'Student') . $adm . ' (Student)';
             return $userMap[$raw];
         }
-    } catch (\Throwable $e) {}
+    } catch (\Throwable $e) {
+        error_log('Incident reporter lookup failed: ' . get_class($e));
+    }
 
-    return $raw;
+    $userMap[$raw] = $raw;
+    return $userMap[$raw];
 };
 
 $pageTitle = 'Incidents & Discipline Report';

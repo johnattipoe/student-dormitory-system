@@ -17,21 +17,33 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\IncidentService;
 use App\Services\StudentService;
+use App\Services\FirebaseService;
 
-$incidents = (new IncidentService())->all();
 $students = [];
-foreach (StudentService::all() as $st) {
-    $stId = (string) ($st['id'] ?? '');
-    if ($stId !== '') {
-        $stName = trim(($st['firstName'] ?? '') . ' ' . ($st['lastName'] ?? ''));
-        $students[$stId] = $stName !== '' ? $stName : ($st['admissionNo'] ?? $stId);
-    }
-}
-
 $search = strtolower(sanitize($_GET['search'] ?? ''));
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$firebase = FirebaseService::getInstance();
+$loadIncidentStudents = static function (array $records) use (&$students): void {
+    $studentIds = array_values(array_unique(array_filter(array_map(
+        static fn(array $incident): string => trim((string) ($incident['studentId'] ?? '')),
+        $records
+    ), static fn(string $studentId): bool => $studentId !== '' && !array_key_exists($studentId, $students))));
+
+    foreach (StudentService::forIds($studentIds) as $student) {
+        $studentId = trim((string) ($student['id'] ?? ''));
+        if ($studentId === '') {
+            continue;
+        }
+
+        $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
+        $students[$studentId] = $studentName !== '' ? $studentName : ($student['admissionNo'] ?? $studentId);
+    }
+};
 if ($search !== '') {
+    $incidents = (new IncidentService())->all();
+    $loadIncidentStudents($incidents);
+
     $incidents = array_values(array_filter($incidents, function ($incident) use ($search, $students) {
         $stId = (string) ($incident['studentId'] ?? '');
         $stName = strtolower($students[$stId] ?? '');
@@ -39,11 +51,26 @@ if ($search !== '') {
             || str_contains(strtolower((string) ($incident['studentId'] ?? '')), $search)
             || str_contains($stName, $search);
     }));
+    $totalFilteredIncidents = count($incidents);
+} else {
+    $totalFilteredIncidents = $firebase->count(COL_INCIDENTS);
 }
-$totalFilteredIncidents = count($incidents);
 $totalPages = max(1, (int) ceil($totalFilteredIncidents / $limit));
 $page = min($page, $totalPages);
-$incidents = array_slice($incidents, ($page - 1) * $limit, $limit);
+if ($search !== '') {
+    $incidents = array_slice($incidents, ($page - 1) * $limit, $limit);
+} else {
+    $incidents = $firebase->getCollection(
+        COL_INCIDENTS,
+        [],
+        $limit,
+        ($page - 1) * $limit,
+        false,
+        [['createdAt', 'DESC']]
+    );
+}
+
+$loadIncidentStudents($incidents);
 
 $openCount = count(array_filter($incidents, fn($i) => ($i['status'] ?? 'open') === 'open'));
 $resolvedCount = count(array_filter($incidents, fn($i) => ($i['status'] ?? '') === 'resolved'));

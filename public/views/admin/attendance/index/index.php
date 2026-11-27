@@ -36,9 +36,13 @@ $date = sanitize($_GET['date'] ?? date('Y-m-d'));
 $allRecords = AttendanceService::all();
 $todayRecords = AttendanceService::forDate($date);
 $summary = AttendanceService::summary($date);
-$students = StudentService::all();
+$todayStudentIds = array_values(array_unique(array_filter(array_map(
+    static fn(array $record): string => (string) ($record['studentId'] ?? ''),
+    $todayRecords
+))));
+$students = StudentService::forIds($todayStudentIds);
 $bedMap = [];
-foreach (BedService::all() as $bed) {
+foreach (BedService::forStudents($todayStudentIds) as $bed) {
     if (!empty($bed['studentId'])) $bedMap[(string) $bed['studentId']] = (string) ($bed['bedNumber'] ?? '—');
 }
 $houses = HouseService::all();
@@ -54,18 +58,6 @@ foreach ($houses as $house) {
 }
 $absentStudents = array_values(array_filter($todayRecords, fn($record) => ($record['status'] ?? '') === 'absent'));
 $lateStudents = array_values(array_filter($todayRecords, fn($record) => ($record['status'] ?? '') === 'late'));
-
-$studentStats = [];
-foreach ($students as $student) {
-    $studentId = (string) ($student['id'] ?? '');
-    $studentStats[] = [
-        'name' => trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')) ?: ($student['admissionNo'] ?? 'Student'),
-        'admissionNo' => $student['admissionNo'] ?? '-',
-        'present' => count(array_filter($allRecords, fn($record) => ($record['studentId'] ?? '') === $studentId && ($record['status'] ?? '') === 'present')),
-        'absent' => count(array_filter($allRecords, fn($record) => ($record['studentId'] ?? '') === $studentId && ($record['status'] ?? '') === 'absent')),
-        'late' => count(array_filter($allRecords, fn($record) => ($record['studentId'] ?? '') === $studentId && ($record['status'] ?? '') === 'late')),
-    ];
-}
 
 $monthly = [];
 for ($i = 5; $i >= 0; $i--) {
@@ -319,11 +311,8 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Student</label>
-                            <select name="studentId" class="form-select" required>
-                                <option value="">-- Choose student --</option>
-                                <?php foreach ($students as $student): ?>
-                                    <option value="<?= e((string) ($student['id'] ?? '')) ?>"><?= e(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '') . ' (' . ($student['admissionNo'] ?? '') . ')') ?></option>
-                                <?php endforeach; ?>
+                            <select name="studentId" class="form-select" data-attendance-student-options="<?= e(url('views/attendance/student-options.php')) ?>" required>
+                                <option value="">Select student</option>
                             </select>
                         </div>
                         <div class="col-md-6">

@@ -42,6 +42,65 @@ class IncidentService
         }
     }
 
+    public function findForHouse(?string $id, ?string $houseId): ?array
+    {
+        $id = trim((string) $id);
+        $houseId = trim((string) $houseId);
+        if ($id === '' || $houseId === '') {
+            return null;
+        }
+
+        $incident = $this->find($id);
+        if ($incident === null || empty($incident['studentId'])) {
+            return null;
+        }
+
+        try {
+            $studentId = (string) $incident['studentId'];
+            $student = $this->firebase->getDocument('students', $studentId);
+            if ($student !== null) {
+                $studentHouseId = (string) (
+                    $student['houseId']
+                    ?? $student['house_id']
+                    ?? $student['assignedHouseId']
+                    ?? $student['assigned_house_id']
+                    ?? ''
+                );
+                if ($studentHouseId === $houseId) {
+                    return $incident;
+                }
+            }
+
+            $students = $this->firebase->getCollection(
+                'students',
+                [['houseId', '=', $houseId]]
+            );
+            foreach ($students as $student) {
+                $studentId = (string) ($student['studentId'] ?? $student['id'] ?? '');
+                if ($studentId !== '' && $studentId === (string) $incident['studentId']) {
+                    return $incident;
+                }
+            }
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        return null;
+    }
+
+    public function findForStudent(?string $id, ?string $studentId): ?array
+    {
+        $studentId = trim((string) $studentId);
+        if ($studentId === '') {
+            return null;
+        }
+
+        $incident = $this->find($id);
+        return $incident !== null && (string) ($incident['studentId'] ?? '') === $studentId
+            ? $incident
+            : null;
+    }
+
     public function create(array $data): array
     {
         try {
@@ -108,7 +167,7 @@ class IncidentService
 
     public function deleteForStudent(string $id, ?string $studentId): array
     {
-        if (!$studentId || !$this->findOwnedIncident($id, $studentId)) {
+        if (!$studentId || !$this->findForStudent($id, $studentId)) {
             return [
                 'success' => false,
                 'message' => 'Incident not found.'
@@ -129,16 +188,6 @@ class IncidentService
         }
     }
 
-    private function findOwnedIncident(string $id, string $studentId): ?array
-    {
-        foreach ($this->studentIncidents($studentId) as $incident) {
-            if ((string) ($incident['id'] ?? '') === $id) {
-                return $incident;
-            }
-        }
-        return null;
-    }
-
     public function resolve(string $id): array
     {
         return $this->update(
@@ -155,6 +204,7 @@ class IncidentService
         try {
             return $this->firebase->count($this->collection);
         } catch (\Throwable $e) {
+            error_log('Incident count unavailable: ' . $e->getMessage());
             return 0;
         }
     }
@@ -169,6 +219,7 @@ class IncidentService
                 ]
             );
         } catch (\Throwable $e) {
+            error_log('Open incident count unavailable: ' . $e->getMessage());
             return 0;
         }
     }
@@ -223,28 +274,36 @@ class IncidentService
 
     public function byHouse(
         ?string $houseId,
-        bool $openOnly = false
+        bool $openOnly = false,
+        ?array $houseStudents = null
     ): array {
         if (!$houseId) {
             return [];
         }
 
         try {
-            $students = $this->firebase->getCollection(
+            $students = $houseStudents ?? $this->firebase->getCollection(
                 'students',
-                [
-                    ['houseId', '=', $houseId]
-                ]
+                [['houseId', '=', $houseId]]
             );
 
             $studentIds = [];
+            $studentNamesById = [];
             foreach ($students as $student) {
                 $studentId = $student['studentId']
                     ?? $student['id']
                     ?? null;
 
                 if ($studentId) {
-                    $studentIds[] = (string) $studentId;
+                    $studentId = (string) $studentId;
+                    $studentIds[] = $studentId;
+                    $studentName = trim((string) ($student['firstName'] ?? '') . ' ' . (string) ($student['lastName'] ?? ''));
+                    if ($studentName !== '') {
+                        $studentNamesById[$studentId] = $studentName;
+                        if (!empty($student['id'])) {
+                            $studentNamesById[(string) $student['id']] = $studentName;
+                        }
+                    }
                 }
             }
 
@@ -254,7 +313,7 @@ class IncidentService
             }
 
             $result = [];
-            foreach (array_chunk($studentIds, 10) as $studentIdBatch) {
+            foreach (array_chunk($studentIds, 30) as $studentIdBatch) {
                 $wheres = [['studentId', 'in', $studentIdBatch]];
 
                 $incidents = $this->firebase->getCollection(
@@ -269,6 +328,11 @@ class IncidentService
                         ($incident['status'] ?? '') !== 'open'
                     ) {
                         continue;
+                    }
+
+                    $incidentStudentId = (string) ($incident['studentId'] ?? '');
+                    if (empty($incident['studentName']) && isset($studentNamesById[$incidentStudentId])) {
+                        $incident['studentName'] = $studentNamesById[$incidentStudentId];
                     }
 
                     $result[] = $incident;
@@ -298,6 +362,36 @@ class IncidentService
         } catch (\Throwable $e) {
             return [];
         }
+    }
+
+    public function recentStudentIncidents(?string $studentId, int $limit = 5): array
+    {
+        if (!$studentId) {
+            return [];
+        }
+
+        return $this->firebase->getCollection(
+            $this->collection,
+            [['studentId', '=', $studentId]],
+            max(1, min(50, $limit)),
+            0,
+            false,
+            [['reportedAt', 'DESC']]
+        );
+    }
+
+    public function countForStudent(?string $studentId, bool $openOnly = false): int
+    {
+        if (!$studentId) {
+            return 0;
+        }
+
+        $wheres = [['studentId', '=', $studentId]];
+        if ($openOnly) {
+            $wheres[] = ['status', '=', 'open'];
+        }
+
+        return $this->firebase->count($this->collection, $wheres);
     }
 
     public function history(): array

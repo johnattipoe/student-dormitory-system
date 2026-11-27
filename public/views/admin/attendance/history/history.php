@@ -18,46 +18,46 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 use App\Services\AttendanceService;
 use App\Services\StudentService;
 use App\Services\UserService;
-use App\Services\FirebaseService;
 
 $pageTitle = 'Attendance History';
 $date = sanitize($_GET['date'] ?? date('Y-m-d'));
 $records = AttendanceService::forDate($date);
 
-$students = StudentService::all();
 $studentMap = [];
 $markedByMap = [];
+$userService = new UserService();
+$studentLookupCache = [];
 
-foreach ($students as $student) {
-    $sName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
-    $adm = !empty($student['admissionNo']) ? ' [' . $student['admissionNo'] . ']' : '';
-    $studentMap[(string) ($student['id'] ?? '')] = $student;
-    if ($sName !== '') {
-        foreach ([$student['id'] ?? null, $student['studentId'] ?? null, $student['admissionNo'] ?? null, $student['userId'] ?? null, $student['uid'] ?? null] as $key) {
-            if ($key !== null && $key !== '') {
-                $markedByMap[(string) $key] = $sName . $adm . ' (Student)';
-            }
-        }
+$getStudent = function (string $studentId) use (&$studentLookupCache, &$studentMap, &$markedByMap): ?array {
+    $studentId = trim($studentId);
+    if ($studentId === '') {
+        return null;
     }
-}
 
-try {
-    foreach ((new UserService())->all() as $user) {
-        $name = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))));
-        if ($name === '') $name = $user['displayName'] ?? $user['username'] ?? $user['email'] ?? null;
-        if ($name) {
-            $roleLabel = !empty($user['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $user['role'])) . ')' : '';
-            $displayName = $name . $roleLabel;
-            foreach ([$user['id'] ?? null, $user['uid'] ?? null, $user['userId'] ?? null, $user['email'] ?? null] as $key) {
+    if (!array_key_exists($studentId, $studentLookupCache)) {
+        $student = StudentService::findByIdentifier($studentId);
+        $studentLookupCache[$studentId] = $student;
+        if ($student !== null) {
+            $name = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
+            $admissionNumber = !empty($student['admissionNo']) ? ' [' . $student['admissionNo'] . ']' : '';
+            $displayName = $name . $admissionNumber . ' (Student)';
+            foreach ([$student['id'] ?? null, $student['studentId'] ?? null, $student['admissionNo'] ?? null, $student['userId'] ?? null, $student['uid'] ?? null] as $key) {
                 if ($key !== null && $key !== '') {
                     $markedByMap[(string) $key] = $displayName;
                 }
             }
+            $studentMap[$studentId] = $student;
         }
     }
-} catch (\Throwable $e) {}
 
-$getMarkedByName = function (array $entry) use (&$markedByMap): string {
+    return $studentLookupCache[$studentId];
+};
+
+foreach ($records as $record) {
+    $getStudent((string) ($record['studentId'] ?? ''));
+}
+
+$getMarkedByName = function (array $entry) use (&$markedByMap, $getStudent, $userService): string {
     if (!empty($entry['markedByName']) && trim((string) $entry['markedByName']) !== '' && !str_starts_with((string) $entry['markedByName'], 'Staff/User')) {
         return (string) $entry['markedByName'];
     }
@@ -65,20 +65,28 @@ $getMarkedByName = function (array $entry) use (&$markedByMap): string {
     if ($rawId === '') return '—';
     if (isset($markedByMap[$rawId])) return $markedByMap[$rawId];
 
-    try {
-        $db = FirebaseService::getInstance();
-        $u = $db->getDocument('users', $rawId);
-        if ($u) {
-            $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
-            if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? $u['email'] ?? '';
-            if ($name !== '') {
-                $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
-                $markedByMap[$rawId] = $name . $roleLabel;
-                return $markedByMap[$rawId];
-            }
+    $user = $userService->find($rawId);
+    if ($user) {
+        $name = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))));
+        if ($name === '') $name = $user['displayName'] ?? $user['username'] ?? $user['email'] ?? '';
+        if ($name !== '') {
+            $roleLabel = !empty($user['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $user['role'])) . ')' : '';
+            $markedByMap[$rawId] = $name . $roleLabel;
+            return $markedByMap[$rawId];
         }
-    } catch (\Throwable $e) {}
+    }
 
+    $student = $getStudent($rawId);
+    if ($student !== null) {
+        $name = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
+        if ($name !== '') {
+            $admissionNumber = !empty($student['admissionNo']) ? ' [' . $student['admissionNo'] . ']' : '';
+            $markedByMap[$rawId] = $name . $admissionNumber . ' (Student)';
+            return $markedByMap[$rawId];
+        }
+    }
+
+    $markedByMap[$rawId] = $rawId;
     return $rawId;
 };
 

@@ -45,14 +45,13 @@ class UserService
         }
 
         try {
-            foreach ([
-                ['uid', '=', $target],
-                ['id', '=', $target],
-            ] as [$field, $op, $value]) {
+            foreach (['uid', 'id', 'userId', 'firebaseUid', 'email'] as $field) {
                 $matches = $this->firebase->getCollection(
                     $this->collection,
-                    [[$field, $op, $value]],
-                    1
+                    [[$field, '=', $target]],
+                    1,
+                    0,
+                    false
                 );
 
                 if (!empty($matches[0])) {
@@ -261,6 +260,33 @@ class UserService
                 ]
             );
         } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    public function byRoles(array $roles, int $limit = 150): array
+    {
+        $roles = array_values(array_unique(array_filter(array_map(
+            static fn($role): string => trim((string) $role),
+            $roles
+        ))));
+        if ($roles === []) {
+            return [];
+        }
+        if (count($roles) > 30) {
+            throw new \InvalidArgumentException('Role filters exceed Firestore disjunction limits.');
+        }
+
+        try {
+            return $this->firebase->getCollection(
+                $this->collection,
+                [['role', 'in', $roles]],
+                max(1, min(150, $limit)),
+                0,
+                false
+            );
+        } catch (\Throwable $e) {
+            error_log('User role query unavailable: ' . $e->getMessage());
             return [];
         }
     }

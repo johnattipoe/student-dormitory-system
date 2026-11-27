@@ -17,6 +17,25 @@ class StudentService
         return FirebaseService::getInstance()->getCollection(\COL_STUDENTS, [], $limit);
     }
 
+    public static function page(string $houseId, int $limit, int $page): array
+    {
+        $houseId = trim($houseId);
+        if ($houseId === '') {
+            return [];
+        }
+
+        $limit = max(1, min(150, $limit));
+        $page = max(1, $page);
+
+        return FirebaseService::getInstance()->getCollection(
+            \COL_STUDENTS,
+            [['houseId', '=', $houseId]],
+            $limit,
+            ($page - 1) * $limit,
+            false
+        );
+    }
+
     public static function allRecords(?string $houseId = null): array
     {
         $wheres = $houseId ? [['houseId', '=', $houseId]] : [];
@@ -26,6 +45,108 @@ class StudentService
     public static function find(string $id): ?array
     {
         return FirebaseService::getInstance()->getDocument(\COL_STUDENTS, $id);
+    }
+
+    public static function findByIdentifier(string $id): ?array
+    {
+        $id = trim($id);
+        if ($id === '') {
+            return null;
+        }
+
+        $student = self::find($id);
+        if ($student !== null) {
+            return $student;
+        }
+
+        foreach (['studentId', 'admissionNo', 'userId', 'uid', 'email'] as $field) {
+            $matches = FirebaseService::getInstance()->getCollection(
+                \COL_STUDENTS,
+                [[$field, '=', $id]],
+                1,
+                0,
+                false
+            );
+            if (!empty($matches[0])) {
+                return $matches[0];
+            }
+        }
+
+        return null;
+    }
+
+    public static function findForUser(array $user): ?array
+    {
+        $checkedIds = [];
+        foreach ([$user['studentId'] ?? null, $user['uid'] ?? null, $user['id'] ?? null] as $candidateId) {
+            $candidateId = trim((string) $candidateId);
+            if ($candidateId === '' || isset($checkedIds[$candidateId])) {
+                continue;
+            }
+
+            $checkedIds[$candidateId] = true;
+            $student = self::find($candidateId);
+            if ($student !== null) {
+                return $student;
+            }
+        }
+
+        $email = trim((string) ($user['email'] ?? ''));
+        return $email !== '' ? self::findByEmail($email) : null;
+    }
+
+    public static function forRoom(string $roomId, int $limit = 150, ?string $houseId = null): array
+    {
+        $roomId = trim($roomId);
+        if ($roomId === '') {
+            return [];
+        }
+
+        $wheres = [['roomId', '=', $roomId]];
+        $houseId = trim((string) $houseId);
+        if ($houseId !== '') {
+            $wheres[] = ['houseId', '=', $houseId];
+        }
+
+        return FirebaseService::getInstance()->getCollection(
+            \COL_STUDENTS,
+            $wheres,
+            max(1, min(150, $limit)),
+            0,
+            false
+        );
+    }
+
+    public static function forIds(array $studentIds, int $limit = 150): array
+    {
+        $limit = max(1, min(150, $limit));
+        $studentIds = array_values(array_unique(array_filter(array_map(
+            static fn($studentId): string => trim((string) $studentId),
+            $studentIds
+        ))));
+        $studentsById = [];
+
+        foreach (array_chunk($studentIds, 30) as $studentIdBatch) {
+            $remainingLimit = $limit - count($studentsById);
+            if ($remainingLimit <= 0) {
+                break;
+            }
+
+            foreach (FirebaseService::getInstance()->getCollection(
+                \COL_STUDENTS,
+                [['__name__', 'in', $studentIdBatch]],
+                $remainingLimit,
+                0,
+                false
+            ) as $student) {
+                $id = (string) ($student['id'] ?? '');
+                if ($id !== '') {
+                    $studentsById[$id] = $student;
+                }
+            }
+        }
+
+        return array_values($studentsById);
     }
 
     public static function create(array $data): string
@@ -64,14 +185,14 @@ class StudentService
         FirebaseService::getInstance()->deleteDocument(\COL_STUDENTS, $id);
     }
 
-    public static function count(?string $houseId = null): int
+    public static function count(?string $houseId = null, array $additionalWheres = []): int
     {
         $wheres = [];
         if ($houseId) {
             $wheres[] = ['houseId', '=', $houseId];
         }
 
-        return FirebaseService::getInstance()->count(\COL_STUDENTS, $wheres);
+        return FirebaseService::getInstance()->count(\COL_STUDENTS, array_merge($wheres, $additionalWheres));
     }
 
     public static function stats(?string $houseId = null): array
@@ -84,12 +205,10 @@ class StudentService
         $result = [
             'total' => self::count($houseId),
             'active' => FirebaseService::getInstance()->count(\COL_STUDENTS, array_merge($wheres, [['status', '=', 'active']])),
-            'inactive' => 0,
-            'male' => FirebaseService::getInstance()->count(\COL_STUDENTS, array_merge($wheres, [['gender', '=', 'male']])),
-            'female' => FirebaseService::getInstance()->count(\COL_STUDENTS, array_merge($wheres, [['gender', '=', 'female']])),
+            'inactive' => FirebaseService::getInstance()->count(\COL_STUDENTS, array_merge($wheres, [['status', '=', 'inactive']])),
+            'suspended' => FirebaseService::getInstance()->count(\COL_STUDENTS, array_merge($wheres, [['status', '=', 'suspended']])),
+            'assignedRooms' => self::count($houseId, [['roomId', '!=', '']]),
         ];
-
-        $result['inactive'] = max(0, $result['total'] - $result['active']);
 
         return $result;
     }
@@ -110,20 +229,18 @@ class StudentService
             return null;
         }
 
-        try {
-            $records = FirebaseService::getInstance()->getCollection(
-                \COL_STUDENTS,
-                [['email', '=', $email]],
-                50
-            );
+        $records = FirebaseService::getInstance()->getCollection(
+            \COL_STUDENTS,
+            [['email', '=', $email]],
+            1,
+            0,
+            false
+        );
 
-            foreach ($records as $student) {
-                if (strtolower(trim((string) ($student['email'] ?? ''))) === strtolower($email)) {
-                    return $student;
-                }
+        foreach ($records as $student) {
+            if (strtolower(trim((string) ($student['email'] ?? ''))) === strtolower($email)) {
+                return $student;
             }
-        } catch (\Throwable $e) {
-            return null;
         }
 
         return null;

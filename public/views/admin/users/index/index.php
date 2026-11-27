@@ -458,7 +458,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                                 <label class="form-label">House</label>
                                 <select name="houseId" class="form-select">
                                     <option value="">Select house</option>
-                                    <?php foreach (HouseService::all() as $house): ?>
+                                    <?php foreach ($houses as $house): ?>
                                         <option value="<?= e((string) ($house['id'] ?? '')) ?>" <?= (($userHouseId ?? '') === ($house['id'] ?? '')) ? 'selected' : '' ?>><?= e($house['name'] ?? 'House') ?></option>
                                     <?php endforeach; ?>
                                 </select>

@@ -26,6 +26,62 @@ class VisitorService
         }
     }
 
+    public function byStatus(string $status, int $limit = 150): array
+    {
+        $status = trim($status);
+        if ($status === '') {
+            return [];
+        }
+
+        try {
+            return $this->firebase->getCollection(
+                $this->collection,
+                [['status', '=', $status]],
+                max(1, min(150, $limit)),
+                0,
+                false,
+                [['createdAt', 'DESC']]
+            );
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    public function forIds(array $visitorIds, int $limit = 150): array
+    {
+        $visitorIds = array_values(array_unique(array_filter(array_map(
+            static fn($visitorId): string => trim((string) $visitorId),
+            $visitorIds
+        ))));
+        if ($visitorIds === []) {
+            return [];
+        }
+
+        $limit = max(1, min(150, $limit));
+        $visitorsById = [];
+        foreach (array_chunk($visitorIds, 30) as $visitorIdBatch) {
+            $remainingLimit = $limit - count($visitorsById);
+            if ($remainingLimit <= 0) {
+                break;
+            }
+
+            foreach ($this->firebase->getCollection(
+                $this->collection,
+                [['__name__', 'in', $visitorIdBatch]],
+                $remainingLimit,
+                0,
+                false
+            ) as $visitor) {
+                $id = (string) ($visitor['id'] ?? '');
+                if ($id !== '') {
+                    $visitorsById[$id] = $visitor;
+                }
+            }
+        }
+
+        return array_values($visitorsById);
+    }
+
     public function find(?string $id): ?array
     {
         if (!$id) {
@@ -37,6 +93,52 @@ class VisitorService
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    public function findForHouse(?string $id, ?string $houseId): ?array
+    {
+        $id = trim((string) $id);
+        $houseId = trim((string) $houseId);
+        if ($id === '' || $houseId === '') {
+            return null;
+        }
+
+        $visitor = $this->find($id);
+        if ($visitor === null || empty($visitor['studentId'])) {
+            return null;
+        }
+
+        try {
+            $studentId = (string) $visitor['studentId'];
+            $student = $this->firebase->getDocument('students', $studentId);
+            if ($student !== null) {
+                $studentHouseId = (string) (
+                    $student['houseId']
+                    ?? $student['house_id']
+                    ?? $student['assignedHouseId']
+                    ?? $student['assigned_house_id']
+                    ?? ''
+                );
+                if ($studentHouseId === $houseId) {
+                    return $visitor;
+                }
+            }
+
+            $students = $this->firebase->getCollection(
+                'students',
+                [['houseId', '=', $houseId]]
+            );
+            foreach ($students as $student) {
+                $studentId = (string) ($student['studentId'] ?? $student['id'] ?? '');
+                if ($studentId !== '' && $studentId === (string) $visitor['studentId']) {
+                    return $visitor;
+                }
+            }
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        return null;
     }
 
     public function update(string $id, array $data): bool
@@ -214,22 +316,44 @@ class VisitorService
         }
     }
 
-    public function byHouse(?string $houseId): array
+    public function recentStudentVisitors(?string $studentId, int $limit = 5): array
+    {
+        if (!$studentId) {
+            return [];
+        }
+
+        return $this->firebase->getCollection(
+            $this->collection,
+            [['studentId', '=', $studentId]],
+            max(1, min(50, $limit)),
+            0,
+            false,
+            [['createdAt', 'DESC']]
+        );
+    }
+
+    public function countForStudent(?string $studentId): int
+    {
+        return $studentId
+            ? $this->firebase->count($this->collection, [['studentId', '=', $studentId]])
+            : 0;
+    }
+
+    public function byHouse(?string $houseId, ?array $houseStudents = null): array
     {
         if (!$houseId) {
             return [];
         }
 
         try {
-            $students = $this->firebase->getCollection(
+            $students = $houseStudents ?? $this->firebase->getCollection(
                 'students',
-                [
-                    ['houseId', '=', $houseId]
-                ]
+                [['houseId', '=', $houseId]]
             );
 
             $studentIds = [];
             $studentNames = [];
+            $studentAdmissionNumbers = [];
 
             foreach ($students as $student) {
                 $studentId = $student['studentId']
@@ -244,6 +368,7 @@ class VisitorService
                 $studentNames[(string) $studentId] = trim(
                     ($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')
                 );
+                $studentAdmissionNumbers[(string) $studentId] = (string) ($student['admissionNo'] ?? '');
             }
 
             $studentIds = array_values(array_unique($studentIds));
@@ -252,7 +377,7 @@ class VisitorService
             }
 
             $result = [];
-            foreach (array_chunk($studentIds, 10) as $studentIdBatch) {
+            foreach (array_chunk($studentIds, 30) as $studentIdBatch) {
                 $visitors = $this->firebase->getCollection(
                     $this->collection,
                     [['studentId', 'in', $studentIdBatch]],
@@ -262,6 +387,7 @@ class VisitorService
                 foreach ($visitors as $visitor) {
                     $studentId = (string) ($visitor['studentId'] ?? '');
                     $visitor['studentName'] = $studentNames[$studentId] ?? '';
+                    $visitor['studentAdmissionNo'] = $studentAdmissionNumbers[$studentId] ?? '';
                     $result[] = $visitor;
                 }
             }
@@ -283,6 +409,7 @@ class VisitorService
         try {
             return $this->firebase->count($this->collection);
         } catch (\Throwable $e) {
+            error_log('Visitor count unavailable: ' . $e->getMessage());
             return 0;
         }
     }
@@ -301,6 +428,7 @@ class VisitorService
                 ]
             );
         } catch (\Throwable $e) {
+            error_log('Today visitor count unavailable: ' . $e->getMessage());
             return 0;
         }
     }
@@ -313,6 +441,7 @@ class VisitorService
                 [['status', '=', 'inside']]
             );
         } catch (\Throwable $e) {
+            error_log('Currently inside visitor count unavailable: ' . $e->getMessage());
             return 0;
         }
     }
@@ -325,24 +454,61 @@ class VisitorService
                 [['status', '=', 'pending']]
             );
         } catch (\Throwable $e) {
+            error_log('Pending visitor count unavailable: ' . $e->getMessage());
             return 0;
         }
     }
 
     public function todayByHouse(?string $houseId): array
     {
-        $visitors = $this->byHouse($houseId);
+        if (!$houseId) {
+            return [];
+        }
 
         $today = date('Y-m-d');
-
-        return array_values(
-            array_filter(
-                $visitors,
-                function ($visitor) use ($today) {
-                    $time = $visitor['checkInTime'] ?? '';
-                    return $time && str_starts_with($time, $today);
-                }
-            )
+        $students = $this->firebase->getCollection(
+            'students',
+            [['houseId', '=', $houseId]]
         );
+        $studentNames = [];
+        foreach ($students as $student) {
+            $studentId = (string) ($student['studentId'] ?? $student['id'] ?? '');
+            if ($studentId !== '') {
+                $studentNames[$studentId] = trim(
+                    (string) ($student['firstName'] ?? '') . ' ' . (string) ($student['lastName'] ?? '')
+                );
+            }
+        }
+
+        if ($studentNames === []) {
+            return [];
+        }
+
+        $todayVisitors = [];
+        foreach (array_chunk(array_keys($studentNames), 30) as $studentIdBatch) {
+            $visitors = $this->firebase->getCollection(
+                $this->collection,
+                [
+                    ['studentId', 'in', $studentIdBatch],
+                    ['checkInTime', '>=', $today],
+                ],
+                150,
+                0,
+                false
+            );
+
+            foreach ($visitors as $visitor) {
+                $checkInTime = (string) ($visitor['checkInTime'] ?? '');
+                $studentId = (string) ($visitor['studentId'] ?? '');
+                if (!str_starts_with($checkInTime, $today) || !isset($studentNames[$studentId])) {
+                    continue;
+                }
+
+                $visitor['studentName'] = $studentNames[$studentId];
+                $todayVisitors[] = $visitor;
+            }
+        }
+
+        return $todayVisitors;
     }
 }

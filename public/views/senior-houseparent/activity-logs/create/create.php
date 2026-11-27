@@ -27,7 +27,6 @@ $houseId = (string) ($user['houseId'] ?? $user['house_id'] ?? '');
 $house = $houseId !== '' ? HouseService::find($houseId) : null;
 $houseName = $house['name'] ?? ($houseId ?: 'Assigned House');
 
-$students = StudentService::all($houseId);
 $rooms = RoomService::all($houseId);
 
 $errors = [];
@@ -46,17 +45,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors['details'] = 'Log details and observations are required.';
     }
 
+    $student = null;
+    if ($studentId !== '') {
+        $student = StudentService::find($studentId);
+        if ($houseId === '' || !$student || (string) ($student['houseId'] ?? '') !== $houseId) {
+            $errors['studentId'] = 'Select a student assigned to your house.';
+        }
+    }
+
     if (empty($errors)) {
         try {
-            $studentName = '';
-            if ($studentId !== '') {
-                foreach ($students as $st) {
-                    if ((string)($st['id'] ?? '') === $studentId) {
-                        $studentName = trim(($st['firstName'] ?? '') . ' ' . ($st['lastName'] ?? ''));
-                        break;
-                    }
-                }
-            }
+            $studentName = trim((string) ($student['firstName'] ?? '') . ' ' . (string) ($student['lastName'] ?? ''));
 
             $roomNumber = '';
             if ($roomId !== '') {
@@ -158,15 +157,22 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
 
                 <div class="col-md-6">
                     <label class="form-label fw-bold" for="studentId">Involved Student (Optional)</label>
-                    <select class="form-select" id="studentId" name="studentId">
+                    <select
+                        class="form-select <?= !empty($errors['studentId']) ? 'is-invalid' : '' ?>"
+                        id="studentId"
+                        name="studentId"
+                        data-house-student-options="<?= e(url('views/house-student-options.php')) ?>"
+                        data-selected-id="<?= e($_POST['studentId'] ?? '') ?>"
+                        data-placeholder="— None / General House Event —"
+                    >
                         <option value="">— None / General House Event —</option>
-                        <?php foreach ($students as $st): ?>
-                            <?php $fullName = trim(($st['firstName'] ?? '') . ' ' . ($st['lastName'] ?? '')); ?>
-                            <option value="<?= e($st['id'] ?? '') ?>" <?= ($_POST['studentId'] ?? '') === ($st['id'] ?? '') ? 'selected' : '' ?>>
-                                <?= e($fullName ?: 'Student') ?> <?= !empty($st['admissionNo']) ? '[' . e($st['admissionNo']) . ']' : '' ?>
-                            </option>
-                        <?php endforeach; ?>
+                        <?php if (!empty($_POST['studentId'])): ?>
+                            <option value="<?= e($_POST['studentId']) ?>" selected>Selected student</option>
+                        <?php endif; ?>
                     </select>
+                    <?php if (!empty($errors['studentId'])): ?>
+                        <div class="invalid-feedback"><?= e($errors['studentId']) ?></div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="col-md-6">

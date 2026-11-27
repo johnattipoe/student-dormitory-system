@@ -20,16 +20,20 @@ use App\Services\StudentService;
 
 $pageTitle = 'Referral History';
 $referralService = new EmergencyReferralService();
+$referrals = $referralService->all();
+$studentIds = array_values(array_unique(array_filter(array_map(
+    static fn(array $referral): string => trim((string) ($referral['studentId'] ?? '')),
+    $referrals
+))));
 $students = [];
-foreach (StudentService::all() as $student) {
-    $studentId = (string) ($student['id'] ?? '');
-    if ($studentId === '') continue;
-
-    $name = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
-    $students[$studentId] = $name !== '' ? $name : 'Unnamed student';
+foreach (StudentService::forIds($studentIds) as $student) {
+    $studentId = trim((string) ($student['id'] ?? ''));
+    if ($student !== null) {
+        $name = trim((string) ($student['firstName'] ?? '') . ' ' . (string) ($student['lastName'] ?? ''));
+        $students[$studentId] = $name !== '' ? $name : 'Unnamed student';
+    }
 }
 
-$referrals = $referralService->all();
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/nurse/dashboard/dashboard.php')],
     ['icon' => 'bi-people', 'label' => 'Students', 'href' => url('views/nurse/students/students.php')],
@@ -111,7 +115,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
             <input type="hidden" name="returnToReferralHistory" value="1">
             <div class="modal-header"><h5 class="modal-title">Create Referral</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
             <div class="modal-body"><div class="row g-3">
-                <div class="col-md-6"><label class="form-label">Student</label><select name="studentId" class="form-select" required><option value="">Select student</option><?php foreach ($students as $studentId => $name): ?><option value="<?= e((string) $studentId) ?>"><?= e($name) ?></option><?php endforeach; ?></select></div>
+                <div class="col-md-6"><label class="form-label">Student</label><select name="studentId" class="form-select" data-nurse-student-options="<?= e(url('views/nurse/dashboard/student-options.php')) ?>" required><option value="">Select student</option></select></div>
                 <div class="col-md-6"><label class="form-label">Referral facility</label><input name="facility" class="form-control" required></div>
                 <div class="col-md-6"><label class="form-label">Attending doctor</label><input name="doctor" class="form-control"></div>
                 <div class="col-md-6"><label class="form-label">Urgency</label><select name="urgency" class="form-select"><option value="urgent">Urgent</option><option value="routine">Routine</option><option value="follow-up">Follow-up</option></select></div>

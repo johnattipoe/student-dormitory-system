@@ -20,9 +20,6 @@ use App\Services\StudentService;
 
 $allVisitors = (new VisitorService())->history();
 $students = [];
-foreach (StudentService::all() as $student) {
-    $students[(string) ($student['id'] ?? '')] = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
-}
 $search = strtolower(sanitize($_GET['search'] ?? ''));
 $statusFilter = strtolower(sanitize($_GET['status'] ?? 'all'));
 $dateFrom = sanitize($_GET['dateFrom'] ?? '');
@@ -43,6 +40,16 @@ $totalFilteredVisitors = count($visitors);
 $totalPages = max(1, (int) ceil($totalFilteredVisitors / $limit));
 $page = min($page, $totalPages);
 $visitors = array_slice($visitors, ($page - 1) * $limit, $limit);
+$visibleStudentIds = array_values(array_unique(array_filter(array_map(
+    static fn(array $visitor): string => trim((string) ($visitor['studentId'] ?? '')),
+    $visitors
+))));
+foreach (StudentService::forIds($visibleStudentIds) as $student) {
+    $studentId = trim((string) ($student['id'] ?? ''));
+    if ($studentId !== '') {
+        $students[$studentId] = trim((string) ($student['firstName'] ?? '') . ' ' . (string) ($student['lastName'] ?? ''));
+    }
+}
 $checkedOutCount = count(array_filter($allVisitors, static fn(array $visitor): bool => strtolower((string) ($visitor['status'] ?? '')) === 'checked_out'));
 $insideCount = count(array_filter($allVisitors, static fn(array $visitor): bool => strtolower((string) ($visitor['status'] ?? '')) === 'inside'));
 $todayCount = count(array_filter($allVisitors, static fn(array $visitor): bool => str_starts_with((string) ($visitor['checkInTime'] ?? $visitor['visitDate'] ?? ''), date('Y-m-d'))));

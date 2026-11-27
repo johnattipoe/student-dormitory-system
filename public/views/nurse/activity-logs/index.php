@@ -17,7 +17,6 @@ require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\FirebaseService;
 use App\Services\StudentService;
-use App\Services\UserService;
 
 $pageTitle = 'Medical Activity Logs & Audit Trail';
 $createLogOld = $_SESSION['_nurse_log_create_old'] ?? [];
@@ -26,8 +25,14 @@ unset($_SESSION['_nurse_log_create_old'], $_SESSION['_nurse_log_create_errors'])
 
 // Fetch raw medical logs and general clinic activity logs
 $firebase = FirebaseService::getInstance();
-$allLogs = $firebase->getCollection(COL_ACTIVITY_LOGS, [], 500);
-$medicalRecords = $firebase->getCollection('medical_records', [], 500);
+$search = strtolower(sanitize($_GET['search'] ?? ''));
+$categoryFilter = sanitize($_GET['category'] ?? '');
+$fromDate = sanitize($_GET['from_date'] ?? '');
+$toDate = sanitize($_GET['to_date'] ?? '');
+$hasFilters = $search !== '' || $categoryFilter !== '' || $fromDate !== '' || $toDate !== '';
+$sourceLimit = $hasFilters ? 150 : 50;
+$allLogs = $firebase->getCollection(COL_ACTIVITY_LOGS, [], $sourceLimit, 0, false, [['createdAt', 'DESC']]);
+$medicalRecords = $firebase->getCollection('medical_records', [], $sourceLimit, 0, false, [['createdAt', 'DESC']]);
 
 // Combine medical logs and activity logs related to nurse / clinic
 $combinedLogs = [];
@@ -62,21 +67,19 @@ usort($combinedLogs, function ($a, $b) {
     return $tB <=> $tA;
 });
 
-// Map students
-$students = StudentService::all();
 $studentMap = [];
-foreach ($students as $st) {
-    $stId = (string) ($st['id'] ?? '');
-    if ($stId !== '') {
-        $studentMap[$stId] = trim(($st['firstName'] ?? '') . ' ' . ($st['lastName'] ?? ''));
+if ($search !== '') {
+    $searchStudentIds = array_values(array_unique(array_filter(array_map(
+        static fn(array $log): string => trim((string) ($log['studentId'] ?? '')),
+        $combinedLogs
+    ))));
+    foreach (StudentService::forIds($searchStudentIds) as $student) {
+        $studentId = trim((string) ($student['id'] ?? ''));
+        if ($studentId !== '') {
+            $studentMap[$studentId] = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
+        }
     }
 }
-
-// Filter params
-$search = strtolower(sanitize($_GET['search'] ?? ''));
-$categoryFilter = sanitize($_GET['category'] ?? '');
-$fromDate = sanitize($_GET['from_date'] ?? '');
-$toDate = sanitize($_GET['to_date'] ?? '');
 
 $logs = array_values(array_filter($combinedLogs, function ($log) use ($search, $categoryFilter, $fromDate, $toDate, $studentMap) {
     $event = strtolower((string) ($log['event'] ?? $log['action'] ?? $log['type'] ?? ''));
@@ -101,6 +104,20 @@ $logs = array_values(array_filter($combinedLogs, function ($log) use ($search, $
     return true;
 }));
 
+if (!$hasFilters) {
+    $logs = array_slice($logs, 0, 50);
+    $visibleStudentIds = array_values(array_unique(array_filter(array_map(
+        static fn(array $log): string => trim((string) ($log['studentId'] ?? '')),
+        $logs
+    ))));
+    foreach (StudentService::forIds($visibleStudentIds) as $student) {
+        $studentId = trim((string) ($student['id'] ?? ''));
+        if ($studentId !== '') {
+            $studentMap[$studentId] = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''));
+        }
+    }
+}
+
 // Metrics
 $totalCount = count($combinedLogs);
 $todayDate = date('Y-m-d');
@@ -124,7 +141,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
             <div>
                 <h5 class="mb-1">Clinic Activity Logs & Medical Audit Trail</h5>
-                <p class="text-muted mb-0">Complete audit trail of clinic consultations, prescriptions, and medical observations.</p>
+                <p class="text-muted mb-0">Recent clinic consultations, prescriptions, and medical observations. Apply filters to review a larger recent window or export records.</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
                 <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#nurseCreateLogModal">
@@ -140,21 +157,21 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
         <div class="row g-3 mb-4">
             <div class="col-sm-6 col-lg-4">
                 <div class="card stat-card p-3 h-100 border-start border-4 border-primary">
-                    <small class="text-muted">Total Clinical Audit Records</small>
+                    <small class="text-muted">Clinical Records Loaded</small>
                     <strong class="fs-2 text-primary my-1"><?= e((string) $totalCount) ?></strong>
-                    <span class="small text-muted">Infirmary consultation history</span>
+                    <span class="small text-muted">Latest <?= e((string) ($sourceLimit * 2)) ?> per source at most</span>
                 </div>
             </div>
             <div class="col-sm-6 col-lg-4">
                 <div class="card stat-card p-3 h-100 border-start border-4 border-success">
-                    <small class="text-muted">Clinic Visits Today</small>
+                    <small class="text-muted">Loaded Records Dated Today</small>
                     <strong class="fs-2 text-success my-1"><?= e((string) $todayCount) ?></strong>
                     <span class="small text-muted"><?= e(date('F d, Y')) ?></span>
                 </div>
             </div>
             <div class="col-sm-6 col-lg-4">
                 <div class="card stat-card p-3 h-100 border-start border-4 border-danger">
-                    <small class="text-muted">Emergency & Critical Cases</small>
+                    <small class="text-muted">High Priority In Loaded Records</small>
                     <strong class="fs-2 text-danger my-1"><?= e((string) $emergencyCount) ?></strong>
                     <span class="small text-muted">High priority consultations</span>
                 </div>
@@ -268,7 +285,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <div class="row g-3">
                     <div class="col-md-8"><label class="form-label">Event / Procedure</label><input name="event" class="form-control" value="<?= e($createLogOld['event'] ?? '') ?>" required><?php if (!empty($createLogErrors['event'])): ?><div class="text-danger small mt-1"><?= e($createLogErrors['event']) ?></div><?php endif; ?></div>
                     <div class="col-md-4"><label class="form-label">Severity / Priority</label><select name="severity" class="form-select"><?php foreach (['normal' => 'Normal', 'high' => 'High', 'emergency' => 'Emergency / Critical'] as $value => $label): ?><option value="<?= e($value) ?>" <?= ($createLogOld['severity'] ?? 'normal') === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?></select></div>
-                    <div class="col-12"><label class="form-label">Student patient (optional)</label><select name="studentId" class="form-select"><option value="">General clinic event / multiple students</option><?php foreach ($students as $student): ?><?php $studentId = (string) ($student['id'] ?? ''); $studentName = trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? '')); ?><option value="<?= e($studentId) ?>" <?= ($createLogOld['studentId'] ?? '') === $studentId ? 'selected' : '' ?>><?= e($studentName !== '' ? $studentName : 'Student') ?><?= !empty($student['admissionNo']) ? ' [' . e($student['admissionNo']) . ']' : '' ?></option><?php endforeach; ?></select></div>
+                    <div class="col-12"><label class="form-label">Student patient (optional)</label><select name="studentId" class="form-select" data-nurse-student-options="<?= e(url('views/nurse/dashboard/student-options.php')) ?>"><option value="">General clinic event / multiple students</option></select></div>
                     <div class="col-12"><label class="form-label">Clinical details and treatment notes</label><textarea name="details" class="form-control" rows="5" required><?= e($createLogOld['details'] ?? '') ?></textarea><?php if (!empty($createLogErrors['details'])): ?><div class="text-danger small mt-1"><?= e($createLogErrors['details']) ?></div><?php endif; ?></div>
                 </div>
             </div>

@@ -20,7 +20,21 @@ use App\Services\UserService;
 use App\Services\StudentService;
 
 $pageTitle = 'System Activity Logs & Audit Trail';
-$allLogs = FirebaseService::getInstance()->getCollection(COL_ACTIVITY_LOGS, [], 500);
+$firebase = FirebaseService::getInstance();
+$search = strtolower(sanitize($_GET['search'] ?? ''));
+$categoryFilter = sanitize($_GET['category'] ?? '');
+$fromDate = sanitize($_GET['from_date'] ?? '');
+$toDate = sanitize($_GET['to_date'] ?? '');
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
+$hasFilters = $search !== '' || $categoryFilter !== '' || $fromDate !== '' || $toDate !== '';
+$totalCount = $hasFilters ? null : $firebase->count(COL_ACTIVITY_LOGS);
+if (!$hasFilters) {
+    $page = min($page, max(1, (int) ceil($totalCount / $limit)));
+}
+$allLogs = $hasFilters
+    ? $firebase->getCollection(COL_ACTIVITY_LOGS, [], 500)
+    : $firebase->getCollection(COL_ACTIVITY_LOGS, [], $limit, ($page - 1) * $limit, false, [['createdAt', 'DESC']]);
 
 // Sort newest logs first
 usort($allLogs, function ($a, $b) {
@@ -35,40 +49,52 @@ $userMap = [
     'system' => 'System',
 ];
 
-try {
-    foreach ((new UserService())->all() as $user) {
-        $name = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))));
-        if ($name === '') {
-            $name = $user['displayName'] ?? $user['username'] ?? $user['email'] ?? null;
-        }
-        if ($name) {
-            $roleLabel = !empty($user['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $user['role'])) . ')' : '';
-            $displayName = $name . $roleLabel;
-            foreach ([$user['id'] ?? null, $user['uid'] ?? null, $user['userId'] ?? null, $user['firebaseUid'] ?? null, $user['email'] ?? null] as $key) {
-                if ($key !== null && $key !== '') {
-                    $userMap[(string) $key] = $displayName;
+$actorMapsLoaded = false;
+$loadActorMaps = function () use (&$userMap, &$actorMapsLoaded): void {
+    if ($actorMapsLoaded) {
+        return;
+    }
+
+    $actorMapsLoaded = true;
+    try {
+        foreach ((new UserService())->all() as $user) {
+            $name = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))));
+            if ($name === '') {
+                $name = $user['displayName'] ?? $user['username'] ?? $user['email'] ?? null;
+            }
+            if ($name) {
+                $roleLabel = !empty($user['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $user['role'])) . ')' : '';
+                $displayName = $name . $roleLabel;
+                foreach ([$user['id'] ?? null, $user['uid'] ?? null, $user['userId'] ?? null, $user['firebaseUid'] ?? null, $user['email'] ?? null] as $key) {
+                    if ($key !== null && $key !== '') {
+                        $userMap[(string) $key] = $displayName;
+                    }
                 }
             }
         }
+    } catch (\Throwable $e) {
+        error_log('Activity log user map unavailable: ' . $e->getMessage());
     }
-} catch (\Throwable $e) {}
 
-try {
-    foreach (StudentService::all() as $student) {
-        $studentName = trim(($student['name'] ?? '') ?: (($student['fullName'] ?? '') ?: (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))));
-        if ($studentName) {
-            $adm = !empty($student['admissionNo']) ? ' [' . $student['admissionNo'] . ']' : '';
-            $displayName = $studentName . $adm . ' (Student)';
-            foreach ([$student['id'] ?? null, $student['uid'] ?? null, $student['userId'] ?? null, $student['studentId'] ?? null, $student['admissionNo'] ?? null] as $key) {
-                if ($key !== null && $key !== '') {
-                    $userMap[(string) $key] = $displayName;
+    try {
+        foreach (StudentService::all() as $student) {
+            $studentName = trim(($student['name'] ?? '') ?: (($student['fullName'] ?? '') ?: (($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))));
+            if ($studentName) {
+                $adm = !empty($student['admissionNo']) ? ' [' . $student['admissionNo'] . ']' : '';
+                $displayName = $studentName . $adm . ' (Student)';
+                foreach ([$student['id'] ?? null, $student['uid'] ?? null, $student['userId'] ?? null, $student['studentId'] ?? null, $student['admissionNo'] ?? null] as $key) {
+                    if ($key !== null && $key !== '') {
+                        $userMap[(string) $key] = $displayName;
+                    }
                 }
             }
         }
+    } catch (\Throwable $e) {
+        error_log('Activity log student map unavailable: ' . $e->getMessage());
     }
-} catch (\Throwable $e) {}
+};
 
-$resolveLogUser = function (array $log) use (&$userMap): string {
+$resolveLogUser = function (array $log) use (&$userMap, $loadActorMaps): string {
     $actorName = (string) ($log['userName'] ?? $log['performedByName'] ?? $log['user_name'] ?? '');
     if ($actorName !== '' && $actorName !== 'default-admin' && !str_starts_with($actorName, 'Staff/User') && !str_starts_with($actorName, 'User #')) {
         return $actorName;
@@ -84,6 +110,9 @@ $resolveLogUser = function (array $log) use (&$userMap): string {
 
     if ($rawId === '' || $rawId === 'system') return 'System';
     if ($rawId === 'default-admin') return 'Administrator (Admin)';
+    if (isset($userMap[$rawId])) return $userMap[$rawId];
+
+    $loadActorMaps();
     if (isset($userMap[$rawId])) return $userMap[$rawId];
 
     try {
@@ -112,18 +141,9 @@ $resolveLogUser = function (array $log) use (&$userMap): string {
     return $rawId;
 };
 
-// Filter parameters
-$search = strtolower(sanitize($_GET['search'] ?? ''));
-$categoryFilter = sanitize($_GET['category'] ?? '');
-$fromDate = sanitize($_GET['from_date'] ?? '');
-$toDate = sanitize($_GET['to_date'] ?? '');
-$page = max(1, (int) ($_GET['page'] ?? 1));
-$limit = max(1, min(150, (int) ($_GET['limit'] ?? app_config()['pagination_per_page'] ?? 25)));
-
 $logs = array_values(array_filter($allLogs, function ($log) use ($search, $categoryFilter, $fromDate, $toDate, $resolveLogUser) {
     $event = strtolower((string) ($log['event'] ?? $log['action'] ?? $log['type'] ?? ''));
     $desc = strtolower((string) ($log['details'] ?? $log['description'] ?? $log['message'] ?? ''));
-    $user = strtolower($resolveLogUser($log));
     $ip = strtolower((string) ($log['ip'] ?? $log['ipAddress'] ?? ''));
 
     if ($categoryFilter !== '') {
@@ -138,20 +158,30 @@ $logs = array_values(array_filter($allLogs, function ($log) use ($search, $categ
     if ($toDate !== '' && $logDate > $toDate) return false;
 
     if ($search !== '') {
-        return str_contains($event, $search) || str_contains($desc, $search) || str_contains($user, $search) || str_contains($ip, $search);
+        if (str_contains($event, $search) || str_contains($desc, $search) || str_contains($ip, $search)) {
+            return true;
+        }
+        $user = strtolower($resolveLogUser($log));
+        return str_contains($user, $search);
     }
     return true;
 }));
-$totalLogs = count($logs);
+$totalLogs = $hasFilters ? count($logs) : $totalCount;
 $totalPages = max(1, (int) ceil($totalLogs / $limit));
 $page = min($page, $totalPages);
-$logs = array_slice($logs, ($page - 1) * $limit, $limit);
+if ($hasFilters) {
+    $logs = array_slice($logs, ($page - 1) * $limit, $limit);
+}
 
 // Statistics
-$totalCount = count($allLogs);
+$totalCount = $totalCount ?? $firebase->count(COL_ACTIVITY_LOGS);
 $todayDate = date('Y-m-d');
-$todayCount = count(array_filter($allLogs, fn($l) => str_starts_with((string)($l['timestamp'] ?? $l['createdAt'] ?? ''), $todayDate)));
-$manualCount = count(array_filter($allLogs, fn($l) => !empty($l['isManual'])));
+$tomorrowDate = date('Y-m-d', strtotime('+1 day'));
+$todayCount = $firebase->count(COL_ACTIVITY_LOGS, [
+    ['timestamp', '>=', $todayDate],
+    ['timestamp', '<', $tomorrowDate],
+]);
+$manualCount = $firebase->count(COL_ACTIVITY_LOGS, [['isManual', '=', true]]);
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/admin/dashboard.php')],

@@ -16,12 +16,19 @@ $allowedRoles = [ROLE_HOUSE_MASTER, ROLE_HOUSE_MISTRESS];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
 use App\Services\AttendanceService;
-use App\Services\StudentService;
-use App\Services\UserService;
 use App\Services\FirebaseService;
+use App\Services\StudentService;
 
 $houseId = current_user()['houseId'] ?? null;
-$students = StudentService::all();
+$attendanceHistory = AttendanceService::byHouse($houseId);
+$attendanceStudentIds = array_values(array_unique(array_filter(array_map(
+    static fn(array $entry): string => (string) ($entry['studentId'] ?? ''),
+    $attendanceHistory
+))));
+$students = array_values(array_filter(
+    StudentService::forIds($attendanceStudentIds),
+    static fn(array $student): bool => (string) ($student['houseId'] ?? '') === (string) $houseId
+));
 $studentMap = [];
 $markedByMap = [];
 
@@ -39,24 +46,7 @@ foreach ($students as $student) {
     }
 }
 
-// 2. Map all users (Admins, House Masters, Staff)
-try {
-    foreach ((new UserService())->all() as $user) {
-        $name = trim(($user['name'] ?? '') ?: (($user['fullName'] ?? '') ?: (($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? ''))));
-        if ($name === '') $name = $user['displayName'] ?? $user['username'] ?? $user['email'] ?? null;
-        if ($name) {
-            $roleLabel = !empty($user['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $user['role'])) . ')' : '';
-            $displayName = $name . $roleLabel;
-            foreach ([$user['id'] ?? null, $user['uid'] ?? null, $user['userId'] ?? null, $user['email'] ?? null] as $key) {
-                if ($key !== null && $key !== '') {
-                    $markedByMap[(string) $key] = $displayName;
-                }
-            }
-        }
-    }
-} catch (\Throwable $e) {}
-
-// 3. Fallback resolver for markedBy
+// Resolve markedBy only when the attendance record does not include a name.
 $getMarkedByName = function (array $entry) use (&$markedByMap, $studentMap): string {
     if (!empty($entry['markedByName']) && trim((string) $entry['markedByName']) !== '' && !str_starts_with((string) $entry['markedByName'], 'Staff/User')) {
         return (string) $entry['markedByName'];
@@ -104,7 +94,6 @@ $getMarkedByName = function (array $entry) use (&$markedByMap, $studentMap): str
     return $rawId;
 };
 
-$attendanceHistory = AttendanceService::byHouse($houseId);
 $attendanceStudent = sanitize($_GET['studentId'] ?? '');
 $attendanceStatus = sanitize($_GET['status'] ?? '');
 $attendanceDate = sanitize($_GET['date'] ?? '');
@@ -114,8 +103,6 @@ $attendanceHistory = array_values(array_filter($attendanceHistory, function ($en
         && ($attendanceStatus === '' || ($entry['status'] ?? '') === $attendanceStatus)
         && ($attendanceDate === '' || ($entry['date'] ?? '') === $attendanceDate);
 }));
-
-$houseStudents = array_values(array_filter($students, fn($s) => ($s['houseId'] ?? null) === $houseId));
 
 $presentCount = count(array_filter($attendanceHistory, fn($e) => ($e['status'] ?? '') === 'present'));
 $absentCount = count(array_filter($attendanceHistory, fn($e) => ($e['status'] ?? '') === 'absent'));
@@ -218,13 +205,17 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                 <form method="GET" class="row g-2 align-items-end">
                     <div class="col-md-4">
                         <label class="form-label small fw-semibold">Student</label>
-                        <select name="studentId" class="form-select form-select-sm">
-                            <option value="">All students in house</option>
-                            <?php foreach ($houseStudents as $student): ?>
-                                <option value="<?= e((string) ($student['id'] ?? '')) ?>" <?= $attendanceStudent === ($student['id'] ?? '') ? 'selected' : '' ?>>
-                                    <?= e(trim(($student['firstName'] ?? '') . ' ' . ($student['lastName'] ?? ''))) ?> (<?= e($student['admissionNo'] ?? '') ?>)
-                                </option>
-                            <?php endforeach; ?>
+                        <select
+                            name="studentId"
+                            class="form-select form-select-sm"
+                            data-house-student-options="<?= e(url('views/house-student-options.php')) ?>"
+                            data-selected-id="<?= e($attendanceStudent) ?>"
+                            data-placeholder="All students in house"
+                        >
+                            <option value="" <?= $attendanceStudent === '' ? 'selected' : '' ?>>All students in house</option>
+                            <?php if ($attendanceStudent !== ''): ?>
+                                <option value="<?= e($attendanceStudent) ?>" selected>Selected student</option>
+                            <?php endif; ?>
                         </select>
                     </div>
                     <div class="col-md-3">

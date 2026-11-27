@@ -16,14 +16,14 @@ if (!defined('APP_ROOT')) {
 $allowedRoles = [ROLE_SECURITY];
 require APP_ROOT . '/app/middleware/RoleMiddleware/RoleMiddleware.php';
 
-use App\Services\IncidentService;
-use App\Services\VisitorService;
+use App\Services\FirebaseService;
 
-$visitors = (new VisitorService())->all();
-$incidents = (new IncidentService())->all();
-$inside = count(array_filter($visitors, fn($visitor) => ($visitor['status'] ?? '') === 'inside'));
-$open = count(array_filter($incidents, fn($incident) => ($incident['status'] ?? 'open') === 'open'));
-$resolved = count(array_filter($incidents, fn($incident) => ($incident['status'] ?? '') === 'resolved'));
+$firebase = FirebaseService::getInstance();
+$visitorCount = $firebase->count(COL_VISITORS);
+$incidentCount = $firebase->count(COL_INCIDENTS);
+$inside = $firebase->count(COL_VISITORS, [['status', '=', 'inside']]);
+$open = $firebase->count(COL_INCIDENTS, [['status', '=', 'open']]);
+$resolved = $firebase->count(COL_INCIDENTS, [['status', '=', 'resolved']]);
 
 $pageTitle = 'Security Reports';
 $navItems = [
@@ -64,7 +64,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold">Total Visitors</span>
-                            <h3 class="fw-bold my-1 text-primary"><?= e((string) count($visitors)) ?></h3>
+                            <h3 class="fw-bold my-1 text-primary"><?= e((string) $visitorCount) ?></h3>
                             <span class="small text-muted">All registered entries</span>
                         </div>
                         <div class="rounded-3 bg-primary bg-opacity-10 p-2 text-primary"><i class="bi bi-people fs-4"></i></div>
@@ -88,7 +88,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <span class="text-muted small text-uppercase fw-semibold">Total Incidents</span>
-                            <h3 class="fw-bold my-1 text-info"><?= e((string) count($incidents)) ?></h3>
+                            <h3 class="fw-bold my-1 text-info"><?= e((string) $incidentCount) ?></h3>
                             <span class="small text-muted">Recorded events</span>
                         </div>
                         <div class="rounded-3 bg-info bg-opacity-10 p-2 text-info"><i class="bi bi-journal-text fs-4"></i></div>
@@ -178,7 +178,7 @@ require APP_ROOT . '/app/views/components/sidebar/sidebar.php';
                             </li>
                             <li class="list-group-item d-flex justify-content-between align-items-center py-3">
                                 <span><i class="bi bi-shield-check text-primary me-2"></i>Total Incidents</span>
-                                <span class="badge bg-primary"><?= e((string) count($incidents)) ?></span>
+                                <span class="badge bg-primary"><?= e((string) $incidentCount) ?></span>
                             </li>
                             <li class="list-group-item d-flex justify-content-between align-items-center py-3">
                                 <span><i class="bi bi-person-walking text-info me-2"></i>Active Visitors on Campus</span>

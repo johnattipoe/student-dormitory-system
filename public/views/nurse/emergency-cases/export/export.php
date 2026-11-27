@@ -20,8 +20,13 @@ use App\Services\StudentService;
 
 $pageTitle = 'Emergency Case Export';
 $medicalService = new MedicalService();
+$records = $medicalService->urgent(150);
+$studentIds = array_values(array_unique(array_filter(array_map(
+    static fn(array $record): string => trim((string) ($record['studentId'] ?? '')),
+    $records
+))));
 $students = [];
-foreach (StudentService::all() as $student) {
+foreach (StudentService::forIds($studentIds) as $student) {
     $studentId = (string) ($student['id'] ?? '');
     if ($studentId === '') continue;
 
@@ -38,7 +43,7 @@ if (isset($_GET['download']) && $_GET['download'] === 'csv') {
     $output = fopen('php://output', 'w');
     fputcsv($output, ['Student', 'Admission No', 'Severity', 'Status', 'Diagnosis', 'Treatment', 'Created At']);
 
-    foreach ($medicalService->all() as $record) {
+    foreach ($records as $record) {
         $studentId = (string) ($record['studentId'] ?? '');
         $severity = strtolower((string) ($record['severity'] ?? ''));
         if (!in_array($severity, ['severe', 'critical', 'emergency'], true)) {
@@ -59,10 +64,6 @@ if (isset($_GET['download']) && $_GET['download'] === 'csv') {
     fclose($output);
     exit;
 }
-
-$records = array_values(array_filter($medicalService->all(), static function (array $record): bool {
-    return in_array(strtolower((string) ($record['severity'] ?? '')), ['severe', 'critical', 'emergency'], true);
-}));
 
 $navItems = [
     ['icon' => 'bi-speedometer2', 'label' => 'Dashboard', 'href' => url('views/nurse/dashboard/dashboard.php')],

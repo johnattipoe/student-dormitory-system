@@ -57,8 +57,8 @@ if ($format === 'csv') {
         // Visitor CSV
         fputcsv($output, ['Visitor Name', 'Student', 'Admission No.', 'Visit Date', 'Status', 'Purpose']);
         
-        $visitors = (new VisitorService())->byHouse($houseId);
         $students = StudentService::all($houseId);
+        $visitors = (new VisitorService())->byHouse($houseId, $students);
         $studentMap = [];
         foreach ($students as $s) {
             $studentMap[(string) ($s['id'] ?? '')] = $s;
@@ -79,8 +79,8 @@ if ($format === 'csv') {
         // Incidents CSV
         fputcsv($output, ['Date', 'Student', 'Admission No.', 'Type', 'Description', 'Status', 'Reported By']);
         
-        $incidents = (new IncidentService())->byHouse($houseId);
         $students = StudentService::all($houseId);
+        $incidents = (new IncidentService())->byHouse($houseId, false, $students);
         $studentMap = [];
         foreach ($students as $s) {
             $studentMap[(string) ($s['id'] ?? '')] = $s;

@@ -24,9 +24,12 @@ use App\Services\IncidentService;
 $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = sanitize($_POST['action'] ?? '');
-    $visitorIds = (array) ($_POST['visitorIds'] ?? []);
-    $knownVisitorIds = array_map(fn($visitor) => (string) ($visitor['id'] ?? ''), (new VisitorService())->all());
-    $visitorIds = array_values(array_intersect(array_map('strval', $visitorIds), $knownVisitorIds));
+    $submittedVisitorIds = array_values(array_unique(array_filter(array_map('strval', (array) ($_POST['visitorIds'] ?? [])))));
+    $knownVisitorIds = array_map(
+        static fn(array $visitor): string => (string) ($visitor['id'] ?? ''),
+        (new VisitorService())->forIds($submittedVisitorIds)
+    );
+    $visitorIds = array_values(array_filter($knownVisitorIds));
     
     if ($action === 'bulk_check_in' && !empty($visitorIds)) {
         try {
@@ -84,9 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $visitorService = new VisitorService();
-$allVisitors = $visitorService->all();
-$pendingVisitors = array_filter($allVisitors, fn($v) => ($v['status'] ?? '') === 'pending');
-$insideVisitors = array_filter($allVisitors, fn($v) => ($v['status'] ?? '') === 'inside');
+$pendingVisitors = $visitorService->byStatus('pending');
+$insideVisitors = $visitorService->byStatus('inside');
 
 $pageTitle = 'Bulk Visitor Management';
 $navItems = [

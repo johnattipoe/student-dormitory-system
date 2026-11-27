@@ -28,25 +28,34 @@ $type = sanitize($_GET['type'] ?? $_GET['dataset'] ?? 'house_master');
 $date = sanitize($_GET['date'] ?? date('Y-m-d'));
 $filename = 'house-master-' . preg_replace('/[^a-z0-9_-]+/i', '-', $type) . '-' . date('Y-m-d') . '.csv';
 
-// Preload user map for name resolution
 $userMap = [];
-try {
-    foreach ((new UserService())->all() as $u) {
-        $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
-        if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? $u['email'] ?? '';
-        if ($name !== '') {
-            $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
-            $displayName = $name . $roleLabel;
-            foreach ([$u['id'] ?? null, $u['uid'] ?? null, $u['userId'] ?? null, $u['firebaseUid'] ?? null] as $key) {
-                if ($key !== null && (string)$key !== '') {
-                    $userMap[(string)$key] = $displayName;
+$userMapLoaded = false;
+$loadUserMap = function () use (&$userMap, &$userMapLoaded): void {
+    if ($userMapLoaded) {
+        return;
+    }
+
+    $userMapLoaded = true;
+    try {
+        foreach ((new UserService())->all() as $u) {
+            $name = trim(($u['name'] ?? '') ?: (($u['fullName'] ?? '') ?: (($u['firstName'] ?? '') . ' ' . ($u['lastName'] ?? ''))));
+            if ($name === '') $name = $u['displayName'] ?? $u['username'] ?? $u['email'] ?? '';
+            if ($name !== '') {
+                $roleLabel = !empty($u['role']) ? ' (' . ucfirst(str_replace(['_', '-'], ' ', (string) $u['role'])) . ')' : '';
+                $displayName = $name . $roleLabel;
+                foreach ([$u['id'] ?? null, $u['uid'] ?? null, $u['userId'] ?? null, $u['firebaseUid'] ?? null] as $key) {
+                    if ($key !== null && (string)$key !== '') {
+                        $userMap[(string)$key] = $displayName;
+                    }
                 }
             }
         }
+    } catch (\Throwable $e) {
+        error_log('Report export user map unavailable: ' . $e->getMessage());
     }
-} catch (\Throwable $e) {}
+};
 
-$resolveUser = function (?string $raw) use (&$userMap): string {
+$resolveUser = function (?string $raw) use (&$userMap, $loadUserMap): string {
     $raw = (string) $raw;
     if ($raw === '') return '—';
     if (isset($userMap[$raw])) return $userMap[$raw];
@@ -61,8 +70,11 @@ $resolveUser = function (?string $raw) use (&$userMap): string {
                 return $userMap[$raw];
             }
         }
-    } catch (\Throwable $e) {}
-    return $raw;
+    } catch (\Throwable $e) {
+        error_log('Report export user lookup failed: ' . $e->getMessage());
+    }
+    $loadUserMap();
+    return $userMap[$raw] ?? $raw;
 };
 
 header('Content-Type: text/csv; charset=utf-8');
@@ -140,7 +152,7 @@ if ($type === 'attendance') {
         $students[(string) ($student['id'] ?? '')] = $student;
     }
     fputcsv($output, ['Date Reported', 'Student Name', 'Admission No.', 'Incident Title', 'Priority', 'Status', 'Reported By', 'Details']);
-    foreach ((new IncidentService())->byHouse($houseId) as $incident) {
+    foreach ((new IncidentService())->byHouse($houseId, false, array_values($students)) as $incident) {
         $student = $students[(string) ($incident['studentId'] ?? '')] ?? [];
         $reporter = !empty($incident['reportedByName']) ? $incident['reportedByName'] : $resolveUser($incident['reportedBy'] ?? '');
         fputcsv($output, [
@@ -160,7 +172,7 @@ if ($type === 'attendance') {
         $students[(string) ($student['id'] ?? '')] = $student;
     }
     fputcsv($output, ['Visit Date', 'Visitor Name', 'Phone', 'Student Name', 'Admission No.', 'Relationship', 'Purpose', 'Status', 'Check-in Time', 'Check-out Time']);
-    foreach ((new VisitorService())->byHouse($houseId) as $visitor) {
+    foreach ((new VisitorService())->byHouse($houseId, array_values($students)) as $visitor) {
         $student = $students[(string) ($visitor['studentId'] ?? '')] ?? [];
         fputcsv($output, [
             $visitor['visitDate'] ?? substr((string) ($visitor['createdAt'] ?? '—'), 0, 10),
@@ -203,8 +215,8 @@ if ($type === 'attendance') {
     $students = StudentService::all($houseId);
     $summary = AttendanceService::summary($date, $houseId);
     $roomStats = RoomService::occupancyStats($houseId);
-    $incidents = (new IncidentService())->byHouse($houseId);
-    $visitors = (new VisitorService())->byHouse($houseId);
+    $incidents = (new IncidentService())->byHouse($houseId, false, $students);
+    $visitors = (new VisitorService())->byHouse($houseId, $students);
 
     fputcsv($output, ['Metric', 'Value']);
     fputcsv($output, ['Report Date', $date]);
